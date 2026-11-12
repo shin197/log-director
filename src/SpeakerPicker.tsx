@@ -26,7 +26,7 @@ export function SpeakerPicker({
   return (
     <div className="speaker-picker" onDoubleClick={(e) => e.stopPropagation()}>
       <label>
-        화자
+        <small>{draft.characterId ? '연결된 캐릭터' : '사용자 지정 화자'}</small>
         <input
           role="combobox"
           aria-expanded={open}
@@ -79,7 +79,6 @@ export function SpeakerPicker({
           ))}
         </div>
       )}
-      <small>{draft.characterId ? '캐릭터 연결됨' : '사용자 지정 화자'}</small>
     </div>
   );
 }

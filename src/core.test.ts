@@ -268,3 +268,56 @@ test('캐릭터 상속과 부분 순서 검색', () => {
   assert.equal(fuzzyName('사령관 그레샴', '사그샴'), true);
   assert.equal(fuzzyName('메튜', 'GM'), false);
 });
+
+import { parseClipboardCharacter } from './clipboardCharacter.ts';
+test('코코포리아 붙여넣기는 필요한 필드와 표정만 추출', () => {
+  const url = 'https://example.com/normal.png';
+  const c = parseClipboardCharacter(
+    JSON.stringify({
+      kind: 'character',
+      data: {
+        name: '라르코',
+        color: '#A69BAC',
+        iconUrl: `[${url}](${url})`,
+        faces: [
+          { label: '@평소', iconUrl: url },
+          { label: '@대화', iconUrl: 'https://example.com/talk.png' },
+        ],
+        memo: '제외',
+        status: [{ label: 'HP', value: 28 }],
+        commands: '제외',
+      },
+    }),
+  );
+  assert.equal(c.name, '라르코');
+  assert.equal(c.iconUrl, url);
+  assert.equal(c.faces.length, 2);
+  assert.equal(c.faces[0].name, '@평소');
+  assert.deepEqual(Object.keys(c).sort(), ['color', 'faces', 'iconUrl', 'id', 'name']);
+  assert.notEqual(
+    parseClipboardCharacter(
+      JSON.stringify({ kind: 'character', data: { name: '라르코' } }),
+    ).id,
+    c.id,
+  );
+  assert.throws(() => parseClipboardCharacter('{bad'));
+  assert.throws(() =>
+    parseClipboardCharacter(JSON.stringify({ kind: 'item', data: { name: '라르코' } })),
+  );
+  assert.throws(() =>
+    parseClipboardCharacter(
+      JSON.stringify({
+        kind: 'character',
+        data: { name: '라르코', iconUrl: 'javascript:alert(1)' },
+      }),
+    ),
+  );
+  const fallback = parseClipboardCharacter(
+    JSON.stringify({
+      kind: 'character',
+      data: { name: '라르코', faces: [{ iconUrl: url }] },
+    }),
+  );
+  assert.equal(fallback.iconUrl, url);
+  assert.equal(fallback.faces[0].name, '');
+});

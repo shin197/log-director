@@ -103,7 +103,7 @@ export function MessageBlock({
           <div className="block-editor">
             <SpeakerPicker draft={draft} characters={characters} onChange={setDraft} />
             <label>
-              본문
+              대사
               <textarea
                 autoFocus
                 rows={Math.max(3, Math.min(15, draft.text.split('\n').length + 1))}
@@ -123,6 +123,15 @@ export function MessageBlock({
             {options && (
               <div className="extra-options">
                 <label>
+                  표정
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={draft.iconUrl ?? ''}
+                    onChange={(e) => setDraft({ ...draft, iconUrl: e.target.value })}
+                  />
+                </label>
+                <label>
                   타임스탬프
                   <input
                     value={draft.timestamp ?? ''}
@@ -134,15 +143,6 @@ export function MessageBlock({
                   <input
                     value={draft.channel ?? ''}
                     onChange={(e) => setDraft({ ...draft, channel: e.target.value })}
-                  />
-                </label>
-                <label>
-                  이미지 URL
-                  <input
-                    type="url"
-                    placeholder="https://…"
-                    value={draft.iconUrl ?? ''}
-                    onChange={(e) => setDraft({ ...draft, iconUrl: e.target.value })}
                   />
                 </label>
                 <button onClick={() => setDice(!dice)}>

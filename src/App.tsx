@@ -1,12 +1,14 @@
+import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, reorder } from './query';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { blank, parse, replaceBlocks, type Project, type Block } from './core';
 import './style.css';
+import './workspace-layout.css';
 function App() {
   const [tab, setTab] = useState('로그');
   const [exportOpen, setExportOpen] = useState(false);
@@ -40,6 +42,9 @@ function App() {
   } catch (error) {
     queryError = String(error);
   }
+  useEffect(() => {
+    if (queryError) notifyError(queryError);
+  }, [queryError]);
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / 100)),
     current = Math.min(page, pages - 1);
@@ -93,7 +98,7 @@ function App() {
                 setPage(0);
                 setNotice(`${next.blocks.length}개 블록을 불러왔습니다.`);
               } catch (err) {
-                setNotice(String(err));
+                notifyError(err);
               } finally {
                 e.target.value = '';
               }
@@ -229,7 +234,7 @@ function App() {
             편집본에만 적용됩니다.
           </small>
         </aside>
-        <main>
+        <main className="log-editor">
           <div className="toolbar">
             <input
               aria-label="로그 검색"
@@ -246,70 +251,82 @@ function App() {
             </button>
             <button onClick={() => setSelected(new Set())}>선택 해제</button>
           </div>
-          <p className="query-help">
-            speaker:제타 text:"급한 일" · 화자:GM · -내용:잡담 · channel:메인
-            <br />
-            공백으로 조건을 연결하면 모두 만족하는 메시지를 찾습니다. 클릭: 단일 선택 ·
-            Ctrl+클릭: 추가/해제 · Shift+클릭: 직전 동작으로 구간 선택/해제 · 더블클릭:
-            편집 · 메시지를 끌어 순서 변경
-          </p>
-          {queryError && <p role="alert">{queryError}</p>}
-          <p role="status" className="notice">
-            {notice}
-          </p>
-          {original && <pre className="original">{p.original?.raw}</pre>}
-          <div className="row">
-            <span>검색 결과 {visible.length}개</span>
-            <button disabled={!current} onClick={() => setPage(current - 1)}>
-              이전
-            </button>
-            <span>
-              {current + 1} / {pages}
-            </span>
-            <button disabled={current + 1 >= pages} onClick={() => setPage(current + 1)}>
-              다음
-            </button>
-          </div>
-          {!visible.length && (
-            <div className="empty">
-              <h1>로그가 비어있습니다.</h1>
-              <p>JSON을 열거나 ‘블록 추가’로 시작하세요.</p>
+          <div className="log-scroll">
+            <p className="query-help">
+              speaker:제타 text:"급한 일" · 화자:GM · -내용:잡담 · channel:메인
+              <br />
+              공백으로 조건을 연결하면 모두 만족하는 메시지를 찾습니다. 클릭: 단일 선택 ·
+              Ctrl+클릭: 추가/해제 · Shift+클릭: 직전 동작으로 구간 선택/해제 · 더블클릭:
+              편집 · 메시지를 끌어 순서 변경
+            </p>
+
+            <p role="status" className="notice">
+              {notice}
+            </p>
+            {original && <pre className="original">{p.original?.raw}</pre>}
+            <div className="row">
+              <span>검색 결과 {visible.length}개</span>
+              <button disabled={!current} onClick={() => setPage(current - 1)}>
+                이전
+              </button>
+              <span>
+                {current + 1} / {pages}
+              </span>
+              <button
+                disabled={current + 1 >= pages}
+                onClick={() => setPage(current + 1)}
+              >
+                다음
+              </button>
             </div>
-          )}
-          {visible.slice(current * 100, (current + 1) * 100).map((b) => (
-            <MessageBlock
-              key={b.id}
-              block={b}
-              characters={p.characters}
-              display={p.display}
-              editing={editingId === b.id}
-              setEditing={(value) => setEditingId(value ? b.id : null)}
-              selected={selected.has(b.id)}
-              toggle={(keys: SelectionKeys) => {
-                const next = selectMessage(
-                  selected,
-                  selectionAnchor.current,
-                  visible.map((item) => item.id),
-                  b.id,
-                  keys,
-                );
-                selectionAnchor.current = next.anchor;
-                setSelectedRaw(next.selected);
-              }}
-              save={(next) => edit(b.id, next)}
-              remove={() => {
-                commit({ ...p, blocks: p.blocks.filter((x) => x.id !== b.id) });
-                setSelected(new Set([...selected].filter((id) => id !== b.id)));
-              }}
-              drop={(id, after) => {
-                const blocks = reorder(p.blocks, id, b.id, after);
-                if (blocks !== p.blocks) commit({ ...p, blocks });
-              }}
-            />
-          ))}
+            {!visible.length && (
+              <div className="empty">
+                <h1>로그가 비어있습니다.</h1>
+                <p>JSON을 열거나 ‘블록 추가’로 시작하세요.</p>
+              </div>
+            )}
+            {visible.slice(current * 100, (current + 1) * 100).map((b) => (
+              <MessageBlock
+                key={b.id}
+                block={b}
+                characters={p.characters}
+                display={p.display}
+                editing={editingId === b.id}
+                setEditing={(value) => setEditingId(value ? b.id : null)}
+                selected={selected.has(b.id)}
+                toggle={(keys: SelectionKeys) => {
+                  const next = selectMessage(
+                    selected,
+                    selectionAnchor.current,
+                    visible.map((item) => item.id),
+                    b.id,
+                    keys,
+                  );
+                  selectionAnchor.current = next.anchor;
+                  setSelectedRaw(next.selected);
+                }}
+                save={(next) => edit(b.id, next)}
+                remove={() => {
+                  commit({ ...p, blocks: p.blocks.filter((x) => x.id !== b.id) });
+                  setSelected(new Set([...selected].filter((id) => id !== b.id)));
+                }}
+                drop={(id, after) => {
+                  const blocks = reorder(p.blocks, id, b.id, after);
+                  if (blocks !== p.blocks) commit({ ...p, blocks });
+                }}
+              />
+            ))}
+          </div>
         </main>
       </div>
     </>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <>
+    <ToastHost />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
+  </>,
+);
