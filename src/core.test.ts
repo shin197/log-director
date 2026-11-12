@@ -128,3 +128,45 @@ test('같은 상태의 Shift 클릭은 변경 없음, 필터 밖은 유지, 앵�
     ['a', 'hidden', 'c'],
   );
 });
+
+import { exportLog } from './export.ts';
+import { readFileSync } from 'node:fs';
+test('샘플 JSON 내보내기 구조와 원본 보존', () => {
+  const raw = readFileSync('sample_log/json_sample.json', 'utf8');
+  const p = parse(raw, 'sample.json');
+  const before = JSON.stringify(p);
+  const data = JSON.parse(exportLog(p, 'json'));
+  assert.equal(data.messageCount, p.blocks.length);
+  assert.equal(data.format, undefined);
+  assert.equal(data.original, undefined);
+  assert.deepEqual(
+    data.messages.map((m: any) => m.text),
+    p.blocks.map((b) => b.text),
+  );
+  assert.equal(JSON.stringify(p), before);
+  for (const format of ['html', 'txt', 'md'] as const)
+    assert.ok(exportLog(p, format).includes(p.title));
+});
+test('수정한 판정의 오래된 roll 제거와 HTML 이스케이프', () => {
+  const p = parse(
+    JSON.stringify({
+      title: '<script>bad</script>',
+      messages: [
+        {
+          text: '<img onerror="bad">',
+          speaker: 'GM',
+          diceResult: 'old',
+          roll: { result: 'old' },
+        },
+      ],
+    }),
+    'test.json',
+  );
+  p.blocks[0].diceResult = 'new';
+  const data = JSON.parse(exportLog(p, 'json'));
+  assert.equal(data.messages[0].diceResult, 'new');
+  assert.equal(data.messages[0].roll, undefined);
+  const html = exportLog(p, 'html');
+  assert.ok(!html.includes('<script>'));
+  assert.ok(html.includes('&lt;img'));
+});
