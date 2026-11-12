@@ -12,8 +12,8 @@ export function compileQuery(query: string): (b: Block) => boolean {
       .toLowerCase();
     const fields: Record<string, (b: Block) => string> = {
       all: (b) => [b.speaker, b.text, b.diceResult].join('\n'),
-      speaker: (b) => b.speaker,
-      화자: (b) => b.speaker,
+      speaker: (b) => b.speaker ?? (b.sourceType === 'system' ? '시스템' : ''),
+      화자: (b) => b.speaker ?? (b.sourceType === 'system' ? '시스템' : ''),
       text: (b) => b.text,
       내용: (b) => b.text,
       dice: (b) => b.diceResult,

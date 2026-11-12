@@ -1,3 +1,4 @@
+import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { notifyError } from './Toast';
 import { useState, useRef, useEffect } from 'react';
 import type { Project, Character } from './core';
@@ -125,17 +126,24 @@ export function CharacterPanel({
         </nav>
         <section className="character-editor">
           <div className="character-toolbar">
-            <strong>{draft?.name || ""}{dirty ? ' · 저장하지 않은 변경' : ''}</strong>
+            <strong>
+              {draft?.name || ''}
+              {dirty ? ' · 저장하지 않은 변경' : ''}
+            </strong>
             <div>
-              <button disabled={!draft} onClick={save}>
+              <button
+                disabled={!draft || draft.id === SYSTEM_CHARACTER_ID}
+                onClick={save}
+              >
                 캐릭터 저장
               </button>
               <button
-                disabled={!c}
+                disabled={!c || c.id === SYSTEM_CHARACTER_ID}
                 className="danger"
                 onClick={() => {
                   if (
                     c &&
+                    c.id !== SYSTEM_CHARACTER_ID &&
                     confirm(
                       '캐릭터를 삭제할까요? 연결된 메시지의 이름·이미지는 보존됩니다.',
                     )
@@ -156,7 +164,19 @@ export function CharacterPanel({
             </div>
           </div>
           <div className="character-detail">
-            {draft ? (
+            {draft?.id === SYSTEM_CHARACTER_ID ? (
+              <>
+                <h2>시스템</h2>
+                <p>
+                  연결된 메시지{' '}
+                  {p.blocks.filter((b) => b.characterId === SYSTEM_CHARACTER_ID).length}개
+                </p>
+                <p>
+                  시스템 메시지는 화자 이름과 이미지 없이 표시됩니다. 이름·색상·표정은
+                  지정할 수 없으며 이 캐릭터는 삭제할 수 없습니다.
+                </p>
+              </>
+            ) : draft ? (
               <>
                 {/* <h2>{draft.name || ''}</h2> */}
                 <small>ID: {draft.id}</small>

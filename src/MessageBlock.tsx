@@ -43,7 +43,7 @@ export function MessageBlock({
   };
   return (
     <article
-      className={`log-message ${b.sourceType === 'system' ? 'system' : ''} ${selected ? 'selected' : ''} ${editing ? 'editing' : ''} ${over}`}
+      className={`log-message ${(editing ? draft : b).sourceType === 'system' ? 'system' : ''} ${selected ? 'selected' : ''} ${editing ? 'editing' : ''} ${over}`}
       draggable={!editing}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/log-block', b.id);
@@ -87,17 +87,19 @@ export function MessageBlock({
         }
       }}
     >
-      <div className="avatar">
-        {b.iconUrl && /^https?:\/\//.test(b.iconUrl) && (
-          <img
-            draggable={false}
-            src={b.iconUrl}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
-        )}
-      </div>
+      {(editing ? draft : b).sourceType !== 'system' && (
+        <div className="avatar">
+          {b.iconUrl && /^https?:\/\//.test(b.iconUrl) && (
+            <img
+              draggable={false}
+              src={b.iconUrl}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )}
+        </div>
+      )}
       <div className="message-content">
         {editing ? (
           <div className="block-editor">
@@ -122,15 +124,17 @@ export function MessageBlock({
             )}
             {options && (
               <div className="extra-options">
-                <label>
-                  표정
-                  <input
-                    type="url"
-                    placeholder="https://…"
-                    value={draft.iconUrl ?? ''}
-                    onChange={(e) => setDraft({ ...draft, iconUrl: e.target.value })}
-                  />
-                </label>
+                {draft.sourceType !== 'system' && (
+                  <label>
+                    표정
+                    <input
+                      type="url"
+                      placeholder="https://…"
+                      value={draft.iconUrl ?? ''}
+                      onChange={(e) => setDraft({ ...draft, iconUrl: e.target.value })}
+                    />
+                  </label>
+                )}
                 <label>
                   타임스탬프
                   <input
@@ -168,7 +172,9 @@ export function MessageBlock({
         ) : (
           <div className="message-read">
             <div className="message-header">
-              <strong style={{ color: b.color || '#ddd' }}>{b.speaker}</strong>
+              {b.sourceType !== 'system' && (
+                <strong style={{ color: b.color || '#ddd' }}>{b.speaker}</strong>
+              )}
               <time>{displayTime(b.timestamp, display)}</time>
               <span>{display.showChannel && b.channel && `[${b.channel}]`}</span>
             </div>

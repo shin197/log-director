@@ -21,7 +21,7 @@ header {
   background: #1b222b;
 }
 
-header>div {
+header > div {
   flex: 1;
 }
 
@@ -78,8 +78,8 @@ aside h2:first-child {
   margin-top: 0;
 }
 
-aside>button,
-aside>input {
+aside > button,
+aside > input {
   width: 100%;
   margin-bottom: 10px;
 }
@@ -126,7 +126,7 @@ textarea:focus {
   align-items: center;
 }
 
-.toolbar>input {
+.toolbar > input {
   flex: 1;
 }
 
@@ -153,7 +153,7 @@ article.selected {
   margin-bottom: 10px;
 }
 
-.blockhead>input:not([type='checkbox']) {
+.blockhead > input:not([type='checkbox']) {
   flex: 1;
 }
 
@@ -559,7 +559,7 @@ main {
   flex: 1;
 }
 
-.project-panel>label {
+.project-panel > label {
   display: block;
   margin: 20px 0;
 }
@@ -626,7 +626,7 @@ main {
   object-fit: contain;
 }
 
-.expression-row>div {
+.expression-row > div {
   flex: 1;
   min-width: 0;
 }
@@ -736,7 +736,7 @@ main {
   animation: toast-fade 6.5s linear forwards;
 }
 
-.error-toast>div {
+.error-toast > div {
   flex: 1;
   min-width: 0;
 }
@@ -759,7 +759,6 @@ main {
 }
 
 @keyframes toast-fade {
-
   0%,
   25% {
     opacity: 1;
@@ -772,4 +771,8 @@ main {
   100% {
     opacity: 0;
   }
+}
+.log-message.system {
+  display: block;
+  color: #888;
 }

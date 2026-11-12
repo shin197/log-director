@@ -234,7 +234,7 @@ test('캐릭터 ID 마이그레이션과 이름 변경 격리 및 저장', () =>
     ],
   });
   const p = parse(raw, 'sample.json');
-  assert.equal(p.characters?.length, 2);
+  assert.equal(p.characters?.length, 3);
   const gm = p.characters![0];
   assert.equal(gm.faces.length, 2);
   assert.equal(gm.faces[0].name, '');
@@ -320,4 +320,67 @@ test('코코포리아 붙여넣기는 필요한 필드와 표정만 추출', () 
   );
   assert.equal(fallback.iconUrl, url);
   assert.equal(fallback.faces[0].name, '');
+});
+
+import { SYSTEM_CHARACTER_ID, systemCharacter } from './systemCharacter.ts';
+test('시스템 캐릭터는 고정 ID로 생성되고 화자 키 없이 전용 형식으로 왕복', () => {
+  const p = parse(
+    JSON.stringify({
+      messages: [
+        { type: 'system', text: '알림' },
+        {
+          type: 'normal',
+          speaker: 'GM',
+          text: '대사',
+          iconUrl: 'https://example.com/a',
+          color: '#123456',
+        },
+      ],
+    }),
+    'log.json',
+  );
+  assert.equal(p.characters!.filter((c) => c.id === SYSTEM_CHARACTER_ID).length, 1);
+  assert.equal(Object.hasOwn(p.blocks[0], 'speaker'), false);
+  assert.equal(p.blocks[0].characterId, SYSTEM_CHARACTER_ID);
+  assert.throws(() => updateCharacter(p, { ...systemCharacter(), name: '변경' }));
+  const system = inheritCharacter(p.blocks[1], systemCharacter());
+  assert.equal(Object.hasOwn(system, 'speaker'), false);
+  assert.equal(system.sourceType, 'system');
+  assert.equal(system.iconUrl, '');
+  const next = { ...p, blocks: [system] };
+  const exported = JSON.parse(exportLog(next, 'json'));
+  assert.equal(Object.hasOwn(exported.messages[0], 'speaker'), false);
+  assert.equal(exported.messages[0].type, 'system');
+  assert.equal(exported.messages[0].iconUrl, undefined);
+  assert.equal(exported.messages[0].color, undefined);
+  assert.equal(
+    Object.hasOwn(parse(JSON.stringify(exported), 'log.json').blocks[0], 'speaker'),
+    false,
+  );
+  assert.deepEqual(parse(JSON.stringify(next), 'project.json'), next);
+  assert.ok(exportLog(next, 'html').includes('class="message system"'));
+  assert.ok(!exportLog(next, 'html').includes('<img'));
+  assert.ok(exportLog(next, 'md').includes('> 대사'));
+  const normal = inheritCharacter(
+    system,
+    p.characters!.find((c) => c.name === 'GM')!,
+  );
+  assert.equal(normal.sourceType, 'normal');
+  assert.equal(normal.speaker, 'GM');
+});
+
+test('이전 null 시스템 화자는 불러올 때 키 제거', () => {
+  const p = parse(
+    JSON.stringify({ messages: [{ type: 'system', speaker: null, text: '알림' }] }),
+    'old.json',
+  );
+  assert.equal(Object.hasOwn(p.blocks[0], 'speaker'), false);
+  const oldProject = { ...p, blocks: p.blocks.map((b) => ({ ...b, speaker: null })) };
+  assert.equal(
+    Object.hasOwn(
+      parse(JSON.stringify(oldProject), 'old.project.json').blocks[0],
+      'speaker',
+    ),
+    false,
+  );
 });

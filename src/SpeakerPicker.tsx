@@ -1,3 +1,4 @@
+import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { useState, useId } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
@@ -13,12 +14,19 @@ export function SpeakerPicker({
   const [open, setOpen] = useState(false),
     [index, setIndex] = useState(0);
   const id = useId();
-  const matches = characters.filter((c) => fuzzyName(c.name, draft.speaker));
+  const matches = characters.filter(
+    (c) => c.id === SYSTEM_CHARACTER_ID || fuzzyName(c.name, draft.speaker ?? ''),
+  );
   const current = Math.min(index, matches.length);
   function pick(i: number) {
     onChange(
       i === matches.length
-        ? { ...draft, characterId: null }
+        ? {
+            ...draft,
+            characterId: null,
+            sourceType: 'normal',
+            speaker: draft.speaker ?? '',
+          }
         : inheritCharacter(draft, matches[i]),
     );
     setOpen(false);
@@ -33,11 +41,16 @@ export function SpeakerPicker({
           aria-controls={id}
           aria-autocomplete="list"
           aria-activedescendant={open ? `${id}-${current}` : undefined}
-          value={draft.speaker}
+          value={draft.sourceType === 'system' ? '시스템' : (draft.speaker ?? '')}
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onChange={(e) => {
-            onChange({ ...draft, speaker: e.target.value, characterId: null });
+            onChange({
+              ...draft,
+              speaker: e.target.value,
+              characterId: null,
+              sourceType: 'normal',
+            });
             setIndex(0);
             setOpen(true);
           }}

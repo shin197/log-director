@@ -1,3 +1,8 @@
+import {
+  SYSTEM_CHARACTER_ID,
+  ensureSystemCharacter,
+  asSystemMessage,
+} from './systemCharacter.ts';
 import type { Project, Character, Block } from './core.ts';
 export function migrateCharacters(p: Project): Project {
   if (p.characters) {
@@ -18,7 +23,7 @@ export function migrateCharacters(p: Project): Project {
     }
     if (p.blocks.some((b) => b.characterId && !ids.has(b.characterId)))
       throw Error('존재하지 않는 캐릭터 연결입니다.');
-    return p;
+    return ensureSystemCharacter(p);
   }
   const characters: Character[] = [];
   const blocks = p.blocks.map((b) => {
@@ -43,9 +48,10 @@ export function migrateCharacters(p: Project): Project {
       });
     return { ...b, characterId: c.id, color: c.color };
   });
-  return { ...p, characters, blocks };
+  return ensureSystemCharacter({ ...p, characters, blocks });
 }
 export function inheritCharacter(b: Block, c: Character): Block {
+  if (c.id === SYSTEM_CHARACTER_ID) return asSystemMessage(b);
   return {
     ...b,
     characterId: c.id,
@@ -56,6 +62,8 @@ export function inheritCharacter(b: Block, c: Character): Block {
   };
 }
 export function updateCharacter(p: Project, c: Character): Project {
+  if (c.id === SYSTEM_CHARACTER_ID)
+    throw Error('시스템 캐릭터의 이름·색상·표정은 변경할 수 없습니다.');
   if (
     !c.name.trim() ||
     (p.characters ?? []).some((x) => x.id !== c.id && x.name === c.name)

@@ -1,3 +1,4 @@
+import { systemCharacter } from './systemCharacter.ts';
 import { migrateCharacters } from './characters.ts';
 import type { DisplaySettings } from './presentation';
 export type Character = {
@@ -11,7 +12,7 @@ export type Block = {
   characterId?: string | null;
   id: string;
   sourceIndex?: number;
-  speaker: string;
+  speaker?: string;
   text: string;
   diceResult: string;
   color?: string;
@@ -36,6 +37,7 @@ export const blank = (): Project => ({
   title: '새 로그',
   original: null,
   blocks: [],
+  characters: [systemCharacter()],
 });
 export function parse(raw: string, name: string): Project {
   const d = JSON.parse(raw.replace(/^\uFEFF/, ''));
@@ -48,7 +50,8 @@ export function parse(raw: string, name: string): Project {
         (b: any) =>
           typeof b.id === 'string' &&
           typeof b.text === 'string' &&
-          typeof b.speaker === 'string' &&
+          (typeof b.speaker === 'string' ||
+            (b.speaker == null && b.sourceType === 'system')) &&
           typeof b.diceResult === 'string',
       ) ||
       new Set(d.blocks.map((b: any) => b.id)).size !== d.blocks.length ||
@@ -70,7 +73,9 @@ export function parse(raw: string, name: string): Project {
       if (
         !m ||
         typeof m.text !== 'string' ||
-        (m.speaker !== undefined && typeof m.speaker !== 'string') ||
+        (m.speaker !== undefined &&
+          !(m.type === 'system' && m.speaker === null) &&
+          typeof m.speaker !== 'string') ||
         (m.diceResult !== undefined && typeof m.diceResult !== 'string')
       )
         throw Error(
@@ -79,7 +84,7 @@ export function parse(raw: string, name: string): Project {
       return {
         id: crypto.randomUUID(),
         sourceIndex: i,
-        speaker: m.speaker ?? '시스템',
+        ...(m.type === 'system' ? {} : { speaker: m.speaker ?? '' }),
         text: m.text,
         diceResult: m.diceResult ?? '',
         color: typeof m.color === 'string' ? m.color : '',
