@@ -519,3 +519,118 @@ main {
     padding: 10px;
   }
 }
+
+.top-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #1b222b;
+  border-bottom: 1px solid #344252;
+  flex-shrink: 0;
+}
+.top-tabs [aria-pressed='true'],
+.character-panel nav [aria-pressed='true'] {
+  background: #29544b;
+  border-color: #83d5c2;
+}
+.project-panel {
+  padding: 32px;
+  overflow: auto;
+  flex: 1;
+}
+.project-panel > label {
+  display: block;
+  margin: 20px 0;
+}
+.project-panel fieldset {
+  max-width: 620px;
+}
+.project-panel select {
+  display: block;
+  padding: 10px;
+  margin: 12px 0;
+  background: #202a35;
+  color: #eee;
+}
+.character-panel {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+.character-panel nav {
+  overflow: auto;
+  padding: 20px;
+}
+.character-panel nav button {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+}
+.character-detail {
+  overflow: auto;
+  padding: 24px;
+}
+.character-detail label {
+  display: block;
+  margin-bottom: 10px;
+}
+.character-detail label input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.expression-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #344252;
+  padding: 20px 0;
+}
+.expression-row img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.expression-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.speaker-picker {
+  position: relative;
+}
+.speaker-options {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow: auto;
+  z-index: 20;
+  background: #19232d;
+  border: 1px solid #637587;
+  padding: 6px;
+}
+.speaker-options button {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.speaker-options [aria-selected='true'] {
+  background: #31584f;
+}
+.character-panel nav img {
+  vertical-align: middle;
+  margin-right: 10px;
+}
+.character-panel dialog {
+  background: #19232d;
+  color: #eee;
+  padding: 28px;
+  border: 1px solid #637587;
+}
+.character-panel dialog label {
+  display: block;
+  margin: 16px 0;
+}

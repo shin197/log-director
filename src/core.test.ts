@@ -170,3 +170,101 @@ test('수정한 판정의 오래된 roll 제거와 HTML 이스케이프', () => 
   assert.ok(!html.includes('<script>'));
   assert.ok(html.includes('&lt;img'));
 });
+
+import { defaultDisplay, displayTime } from './presentation.ts';
+test('타임스탬프 형식과 오전 오후 변환', () => {
+  assert.equal(
+    displayTime('2026. 11. 13. 오후 09:05:30', {
+      ...defaultDisplay,
+      timestampFormat: 'YYYY-MM-DD',
+    }),
+    '2026-11-13',
+  );
+  assert.equal(
+    displayTime('2026. 11. 13. 오전 12:05:30', {
+      ...defaultDisplay,
+      timestampFormat: 'HH:mm',
+    }),
+    '00:05',
+  );
+  assert.equal(
+    displayTime('2026. 11. 13. 오후 12:05:30', {
+      ...defaultDisplay,
+      timestampFormat: 'HH:mm',
+    }),
+    '12:05',
+  );
+  assert.equal(displayTime('custom', defaultDisplay), 'custom');
+});
+test('표시 옵션을 모든 출력에 적용하고 프로젝트 설정과 표정 이름 보존', () => {
+  const p = parse(
+    JSON.stringify({
+      title: 'test',
+      messages: [
+        {
+          speaker: 'GM',
+          text: 'hello',
+          channelName: '잡담',
+          timestamp: '2026. 11. 13. 오후 09:05:30',
+          createdAt: 123,
+        },
+      ],
+    }),
+    'test.json',
+  );
+  p.display = { ...defaultDisplay, showChannel: false, showTimestamp: false };
+  p.expressions = [{ speaker: 'GM', iconUrl: 'https://example.com/a.png', name: '' }];
+  for (const format of ['html', 'txt', 'md', 'json'] as const) {
+    const result = exportLog(p, format);
+    assert.ok(!result.includes('잡담'));
+    assert.ok(!result.includes('09:05'));
+  }
+  const json = JSON.parse(exportLog(p, 'json'));
+  assert.equal(json.messages[0].createdAt, undefined);
+  assert.deepEqual(parse(JSON.stringify(p), 'project.json'), p);
+});
+
+import { updateCharacter, inheritCharacter, fuzzyName } from './characters.ts';
+test('캐릭터 ID 마이그레이션과 이름 변경 격리 및 저장', () => {
+  const raw = JSON.stringify({
+    messages: [
+      { speaker: 'GM', text: 'a', iconUrl: 'https://example.com/a', color: '#123456' },
+      { speaker: 'GM', text: 'b', iconUrl: 'https://example.com/b' },
+      { speaker: '메튜', text: 'c' },
+    ],
+  });
+  const p = parse(raw, 'sample.json');
+  assert.equal(p.characters?.length, 2);
+  const gm = p.characters![0];
+  assert.equal(gm.faces.length, 2);
+  assert.equal(gm.faces[0].name, '');
+  assert.equal(p.blocks[0].characterId, p.blocks[1].characterId);
+  assert.throws(() => updateCharacter(p, { ...gm, name: '메튜' }));
+  const changed = updateCharacter(p, { ...gm, name: '진행자', color: '#abcdef' });
+  assert.equal(changed.blocks[0].speaker, '진행자');
+  assert.equal(changed.blocks[2].speaker, '메튜');
+  assert.equal(changed.blocks[0].characterId, gm.id);
+  assert.equal(changed.original?.raw, raw);
+  assert.deepEqual(parse(JSON.stringify(changed), 'project.json'), changed);
+  const custom = { ...p, blocks: p.blocks.map((b) => ({ ...b, characterId: null })) };
+  assert.equal(
+    updateCharacter(custom, { ...gm, name: '다른 이름' }).blocks[0].speaker,
+    'GM',
+  );
+});
+test('캐릭터 상속과 부분 순서 검색', () => {
+  const p = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: 'GM', text: 'a', iconUrl: 'https://example.com/a', color: '#123456' },
+      ],
+    }),
+    'sample.json',
+  );
+  const b = inheritCharacter({ ...p.blocks[0], speaker: 'custom' }, p.characters![0]);
+  assert.equal(b.speaker, 'GM');
+  assert.equal(b.iconUrl, 'https://example.com/a');
+  assert.equal(b.color, '#123456');
+  assert.equal(fuzzyName('사령관 그레샴', '사그샴'), true);
+  assert.equal(fuzzyName('메튜', 'GM'), false);
+});

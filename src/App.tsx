@@ -1,3 +1,4 @@
+import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
@@ -7,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { blank, parse, replaceBlocks, type Project, type Block } from './core';
 import './style.css';
 function App() {
+  const [tab, setTab] = useState('로그');
   const [exportOpen, setExportOpen] = useState(false);
   const [p, setP] = useState<Project>(blank);
   const [past, setPast] = useState<Project[]>([]);
@@ -105,8 +107,17 @@ function App() {
         </button>
         <button onClick={() => setExportOpen(true)}>내보내기</button>
       </header>
+      <nav className="top-tabs">
+        {['로그', '캐릭터', '설정'].map((name) => (
+          <button key={name} aria-pressed={tab === name} onClick={() => setTab(name)}>
+            {name}
+          </button>
+        ))}
+      </nav>
       {exportOpen && <ExportDialog project={p} onClose={() => setExportOpen(false)} />}
-      <div className="workspace">
+      {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
+      {tab === '설정' && <SettingsPanel project={p} commit={commit} />}
+      <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
         <aside>
           <h2>작업 공간</h2>
           <input
@@ -269,6 +280,8 @@ function App() {
             <MessageBlock
               key={b.id}
               block={b}
+              characters={p.characters}
+              display={p.display}
               editing={editingId === b.id}
               setEditing={(value) => setEditingId(value ? b.id : null)}
               selected={selected.has(b.id)}

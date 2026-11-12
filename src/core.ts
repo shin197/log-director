@@ -1,4 +1,14 @@
+import { migrateCharacters } from './characters.ts';
+import type { DisplaySettings } from './presentation';
+export type Character = {
+  id: string;
+  name: string;
+  iconUrl: string;
+  color: string;
+  faces: { name: string; iconUrl: string }[];
+};
 export type Block = {
+  characterId?: string | null;
   id: string;
   sourceIndex?: number;
   speaker: string;
@@ -16,6 +26,9 @@ export type Project = {
   title: string;
   original: { name: string; raw: string } | null;
   blocks: Block[];
+  characters?: Character[];
+  display?: DisplaySettings;
+  expressions?: { speaker: string; iconUrl: string; name: string }[];
 };
 export const blank = (): Project => ({
   format: 'log-studio',
@@ -45,10 +58,10 @@ export function parse(raw: string, name: string): Project {
       )
     )
       throw Error('프로젝트 구조를 확인해주세요.');
-    return d;
+    return migrateCharacters(d);
   }
   if (!Array.isArray(d.messages)) throw Error('messages 배열을 가진 JSON이 필요합니다.');
-  return {
+  return migrateCharacters({
     format: 'log-studio',
     version: 1,
     title: typeof d.title === 'string' ? d.title : name,
@@ -76,7 +89,7 @@ export function parse(raw: string, name: string): Project {
         sourceType: typeof m.type === 'string' ? m.type : '',
       };
     }),
-  };
+  });
 }
 export function replaceBlocks(
   p: Project,

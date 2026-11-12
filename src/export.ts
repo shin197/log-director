@@ -1,3 +1,4 @@
+import { defaultDisplay, displayTime } from './presentation.ts';
 import type { Project, Block } from './core';
 export type ExportFormat = 'html' | 'txt' | 'json' | 'md';
 const escape = (s: string) =>
@@ -6,11 +7,15 @@ const escape = (s: string) =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
 const md = (s: string) => s.replace(/([\\`*_{}\[\]<>#!|])/g, '\\$1');
-const meta = (b: Block) =>
-  [b.timestamp, b.channel && b.channel !== '메인' ? `[${b.channel}]` : '']
-    .filter(Boolean)
-    .join(' ');
 export function exportLog(p: Project, format: ExportFormat): string {
+  const settings = { ...defaultDisplay, ...p.display };
+  const meta = (b: Block) =>
+    [
+      displayTime(b.timestamp, settings),
+      settings.showChannel && b.channel ? `[${b.channel}]` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
   if (format === 'json') {
     let originals: Record<string, unknown>[] = [];
     try {
@@ -46,6 +51,16 @@ export function exportLog(p: Project, format: ExportFormat): string {
       if (b.diceResult) m.diceResult = b.diceResult;
       else delete m.diceResult;
       if (b.diceResult !== source.diceResult) delete m.roll;
+      if (!settings.showChannel) {
+        delete m.channel;
+        delete m.channelName;
+      }
+      const timestamp = displayTime(b.timestamp, settings);
+      if (timestamp) m.timestamp = timestamp;
+      else {
+        delete m.timestamp;
+        delete m.createdAt;
+      }
       return m;
     });
     return JSON.stringify(

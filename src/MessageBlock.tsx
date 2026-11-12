@@ -1,8 +1,12 @@
+import { SpeakerPicker } from './SpeakerPicker';
+import { defaultDisplay, displayTime, type DisplaySettings } from './presentation';
 import type { SelectionKeys } from './selection';
 import { useState, useEffect } from 'react';
-import type { Block } from './core';
+import type { Block, Character } from './core';
 export function MessageBlock({
   block: b,
+  characters = [],
+  display = defaultDisplay,
   editing,
   setEditing,
   selected,
@@ -12,6 +16,8 @@ export function MessageBlock({
   drop,
 }: {
   block: Block;
+  characters?: Character[];
+  display?: DisplaySettings;
   editing: boolean;
   setEditing: (v: boolean) => void;
   selected: boolean;
@@ -95,13 +101,7 @@ export function MessageBlock({
       <div className="message-content">
         {editing ? (
           <div className="block-editor">
-            <label>
-              화자
-              <input
-                value={draft.speaker}
-                onChange={(e) => setDraft({ ...draft, speaker: e.target.value })}
-              />
-            </label>
+            <SpeakerPicker draft={draft} characters={characters} onChange={setDraft} />
             <label>
               본문
               <textarea
@@ -169,8 +169,8 @@ export function MessageBlock({
           <div className="message-read">
             <div className="message-header">
               <strong style={{ color: b.color || '#ddd' }}>{b.speaker}</strong>
-              <time>{b.timestamp}</time>
-              <span>{b.channel && `[${b.channel}]`}</span>
+              <time>{displayTime(b.timestamp, display)}</time>
+              <span>{display.showChannel && b.channel && `[${b.channel}]`}</span>
             </div>
             <div className="message-text">
               {b.text || (!b.diceResult ? '빈 메시지 · 더블클릭하여 작성' : '')}
