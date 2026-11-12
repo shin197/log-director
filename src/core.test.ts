@@ -22,3 +22,29 @@ test('원본과 빈 본문 판정 및 알 수 없는 필드 보존',()=>{
  assert.deepEqual(parse(JSON.stringify(next),'project.json'),next);
 });
 test('유효하지 않은 로그를 조용히 버리지 않음',()=>{assert.throws(()=>parse('{"messages":[{"text":null}]}','bad.json'));});
+
+import {selectMessage} from './selection.ts';
+test('일반 클릭 단일 선택과 Ctrl 추가 및 해제',()=>{
+ const order=['a','b','c','d'];
+ let result=selectMessage(new Set(['b','c']),null,order,'a',{ctrlKey:false,shiftKey:false});
+ assert.deepEqual([...result.selected],['a']);
+ result=selectMessage(result.selected,result.anchor,order,'c',{ctrlKey:true,shiftKey:false});
+ assert.deepEqual([...result.selected],['a','c']);
+ result=selectMessage(result.selected,result.anchor,order,'a',{ctrlKey:true,shiftKey:false});
+ assert.deepEqual([...result.selected],['c']);assert.equal(result.anchor.selected,false);
+});
+test('Shift 구간 선택 및 해제, 역방향, 구간 밖 보존',()=>{
+ const order=['a','b','c','d','e'];
+ let result=selectMessage(new Set(['b','e']),{id:'b',selected:true},order,'d',{ctrlKey:false,shiftKey:true});
+ assert.deepEqual([...result.selected].sort(),['b','c','d','e']);
+ result=selectMessage(result.selected,result.anchor,order,'d',{ctrlKey:true,shiftKey:false});
+ result=selectMessage(result.selected,result.anchor,order,'b',{ctrlKey:false,shiftKey:true});
+ assert.deepEqual([...result.selected],['e']);
+});
+test('같은 상태의 Shift 클릭은 변경 없음, 필터 밖은 유지, 앵커 누락은 단일 선택',()=>{
+ const selected=new Set(['a','c','hidden']);
+ const result=selectMessage(selected,{id:'a',selected:true},['a','b','c'],'c',{ctrlKey:false,shiftKey:true});
+ assert.deepEqual(result.selected,selected);
+ assert.deepEqual([...selectMessage(selected,{id:'missing',selected:true},['a','b'],'b',{ctrlKey:false,shiftKey:true}).selected],['b']);
+ assert.deepEqual([...selectMessage(new Set(['a','hidden']),{id:'a',selected:true},['a','c'],'c',{ctrlKey:false,shiftKey:true}).selected],['a','hidden','c']);
+});
