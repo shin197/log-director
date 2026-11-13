@@ -503,6 +503,15 @@ code {
   border-radius: var(--radius-md);
 }
 
+.log-message.bulk-rep {
+  border-color: var(--accent);
+}
+
+.log-message.bulk-target {
+  background: rgba(240, 195, 109, 0.06);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+
 .log-message .avatar {
   width: 36px;
   height: 36px;
@@ -716,6 +725,11 @@ code {
 
 .speaker-badge.is-system {
   color: var(--warn);
+}
+
+.speaker-badge.is-mixed {
+  color: var(--warn);
+  background: rgba(240, 195, 109, 0.14);
 }
 
 .speaker-options {

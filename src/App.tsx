@@ -7,6 +7,14 @@ import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, reorder } from './query';
+import {
+  applyBulkEditToProject,
+  applyBulkPatch,
+  createBulkEditState,
+  getBulkFaceCharacter,
+  pickRepresentativeId,
+  type BulkEditState,
+} from './bulkEdit';
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { blank, parse, replaceBlocks, type Project, type Block } from './core';
@@ -43,6 +51,8 @@ function App() {
   };
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [bulkEdit, setBulkEdit] = useState<BulkEditState | null>(null);
+
   const commit = (next: Project) => {
     setPast((x) => [...x, p].slice(-100));
     setFuture([]);
@@ -92,6 +102,7 @@ function App() {
     if (index < 0) return;
     disableSearch();
     setEditingId(null);
+    setBulkEdit(null);
     setSelected(new Set([id]));
     pendingFocus.current = { id, direction: 1, center: true };
     setPage(Math.floor(index / PAGE_SIZE));
@@ -100,6 +111,7 @@ function App() {
   function resetInteraction() {
     setSelected(new Set());
     setEditingId(null);
+    setBulkEdit(null);
     pendingFocus.current = null;
   }
 
@@ -120,11 +132,33 @@ function App() {
   }
 
   function deleteSelected() {
-    if (!selected.size) return;
-    const count = selected.size;
-    commit({ ...p, blocks: p.blocks.filter((b) => !selected.has(b.id)) });
+    const ids = bulkEdit ? bulkEdit.selectedIds : selected;
+    if (!ids.size) return;
+    const count = ids.size;
+    commit({ ...p, blocks: p.blocks.filter((b) => !ids.has(b.id)) });
     resetInteraction();
     setNotice(`${count}개 블록을 삭제했습니다.`);
+  }
+
+  function startBulkEdit() {
+    if (selected.size < 2) return;
+    const repId = pickRepresentativeId(p.blocks, visible, selected, cursorId.current);
+    if (!repId) return;
+    const repBlock = p.blocks.find((b) => b.id === repId);
+    if (!repBlock) return;
+    setEditingId(null);
+    setBulkEdit(createBulkEditState(repId, selected, repBlock));
+    const visibleIdx = visible.findIndex((b) => b.id === repId);
+    if (visibleIdx >= 0) setPage(Math.floor(visibleIdx / PAGE_SIZE));
+    pendingFocus.current = { id: repId, direction: 1 };
+  }
+
+  function saveBulkEdit() {
+    if (!bulkEdit) return;
+    const count = bulkEdit.selectedIds.size;
+    commit(applyBulkEditToProject(p, bulkEdit));
+    setBulkEdit(null);
+    setNotice(`${count}개 블록을 일괄 편집했습니다.`);
   }
 
   function addMessage(b: Block) {
@@ -134,6 +168,7 @@ function App() {
     blocks.splice(index, 0, b);
     commit({ ...p, blocks });
     setSelected(new Set([b.id]));
+    setBulkEdit(null);
     setQuery('');
     setSearchActive(false);
     setPage(Math.floor(index / PAGE_SIZE));
@@ -158,6 +193,10 @@ function App() {
       }
       if (e.key === 'Escape') {
         setHelpOpen(false);
+        if (bulkEdit) {
+          setBulkEdit(null);
+          return;
+        }
         setSelected(new Set());
         setEditingId(null);
         return;
@@ -166,11 +205,17 @@ function App() {
       if (
         target.closest('input,textarea,select,[contenteditable=true]') ||
         editingId ||
+        bulkEdit ||
         e.isComposing
       )
         return;
       if (e.ctrlKey && !e.altKey) {
         const key = e.key.toLowerCase();
+        if (e.shiftKey && e.key === 'Enter' && selected.size >= 2) {
+          e.preventDefault();
+          startBulkEdit();
+          return;
+        }
         if (key === 'z' || key === 'y') {
           e.preventDefault();
           if (key === 'y' || e.shiftKey) redo();
@@ -221,8 +266,10 @@ function App() {
       );
       if (!next) return;
       e.preventDefault();
-      if (wholeLog) setQuery('');
-      setSearchActive(false);
+      if (wholeLog) {
+        setQuery('');
+        setSearchActive(false);
+      }
       cursorId.current = next.id;
       selectionAnchor.current = { id: next.id, selected: true };
       pendingFocus.current = { id: next.id, direction: next.direction };
@@ -231,7 +278,7 @@ function App() {
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [tab, visible, selected, editingId, past, future, searchActive]);
+  }, [tab, visible, selected, editingId, bulkEdit, past, future, searchActive]);
 
   useEffect(() => {
     const request = pendingFocus.current;
@@ -277,7 +324,7 @@ function App() {
       scroller.scrollTop += rect.bottom + margin - bounds.bottom;
     else if (request.direction < 0 && rect.top - margin < bounds.top)
       scroller.scrollTop += rect.top - margin - bounds.top;
-  }, [selected, current, p.blocks, searchActive, query]);
+  }, [selected, current, p.blocks, searchActive, query, bulkEdit]);
 
   function save(value: string, name: string) {
     const u = URL.createObjectURL(
@@ -289,6 +336,23 @@ function App() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(u), 1000);
   }
+
+  const bulkTargetBlocks = bulkEdit
+    ? p.blocks.filter((b) => bulkEdit.selectedIds.has(b.id))
+    : [];
+  const bulkFaceCharacter = bulkEdit
+    ? getBulkFaceCharacter(p.blocks, bulkEdit, p.characters ?? [])
+    : undefined;
+  const bulkMixedSpeakers = bulkEdit
+    ? new Set(
+        bulkTargetBlocks.map((b) =>
+          b.sourceType === 'system'
+            ? 'system'
+            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+        ),
+      ).size > 1
+    : false;
+  const bulkHasAnyDice = bulkEdit ? bulkTargetBlocks.some((b) => !!b.diceResult) : false;
 
   return (
     <>
@@ -341,7 +405,7 @@ function App() {
                   setP(next);
                   setPast([]);
                   setFuture([]);
-                  setSelected(new Set());
+                  resetInteraction();
                   setQuery('');
                   setSearchActive(false);
                   setPage(0);
@@ -511,8 +575,11 @@ function App() {
                   <div>
                     <strong>조작 및 단축키</strong>
                     <ul>
-                      <li>더블클릭: 편집 · 드래그: 순서 변경</li>
-                      <li>클릭 / Ctrl+클릭 / Shift+클릭: 선택</li>
+                      <li>더블클릭: 편집 · 선택 후 따옴표/괄호 자동 감싸기</li>
+                      <li>클릭 / Ctrl+클릭 / Shift+클릭 · 드래그 이동</li>
+                      <li>
+                        <code>Ctrl+Shift+Enter</code>: 다중 선택 일괄 편집
+                      </li>
                       <li>
                         <code>↑↓</code> / <code>Ctrl+↑↓</code> / <code>Alt+↑↓</code>
                       </li>
@@ -536,7 +603,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!past.length}
+                disabled={!past.length || !!bulkEdit}
                 onClick={undo}
                 title="되돌리기 (Ctrl+Z)"
               >
@@ -545,7 +612,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!future.length}
+                disabled={!future.length || !!bulkEdit}
                 onClick={redo}
                 title="다시 하기 (Ctrl+Y / Ctrl+Shift+Z)"
               >
@@ -554,7 +621,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!visible.length}
+                disabled={!visible.length || !!bulkEdit}
                 onClick={() => setSelected(new Set(visible.map((b) => b.id)))}
                 title="현재 목록 전체 선택"
               >
@@ -563,7 +630,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!selected.size}
+                disabled={!selected.size || !!bulkEdit}
                 onClick={() => setSelected(new Set())}
               >
                 해제
@@ -571,7 +638,17 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!p.blocks.length}
+                disabled={selected.size < 2 || !!bulkEdit}
+                aria-pressed={!!bulkEdit}
+                onClick={startBulkEdit}
+                title="선택한 여러 메시지 일괄 편집 (Ctrl+Shift+Enter)"
+              >
+                일괄 편집
+              </button>
+              <button
+                type="button"
+                className="compact-btn"
+                disabled={!p.blocks.length || !!bulkEdit}
                 title="화자·채널·유형이 같은 연속 메시지 병합"
                 onClick={() => {
                   const blocks = mergeConsecutive(p.blocks);
@@ -586,6 +663,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
+                disabled={!!bulkEdit}
                 aria-pressed={replaceOpen}
                 onClick={() => setReplaceOpen(!replaceOpen)}
                 title="선택 블록 일괄 치환 열기/닫기"
@@ -595,11 +673,15 @@ function App() {
               <button
                 type="button"
                 className="compact-btn danger"
-                disabled={!selected.size}
+                disabled={!selected.size && !bulkEdit}
                 onClick={deleteSelected}
                 title="선택 블록 삭제 (Delete)"
               >
-                {selected.size ? `삭제 (${selected.size})` : '삭제'}
+                {bulkEdit
+                  ? `삭제 (${bulkEdit.selectedIds.size})`
+                  : selected.size
+                    ? `삭제 (${selected.size})`
+                    : '삭제'}
               </button>
             </div>
 
@@ -700,43 +782,73 @@ function App() {
                   </p>
                 </div>
               )}
-              {visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((b) => (
-                <MessageBlock
-                  key={b.id}
-                  block={b}
-                  characters={p.characters}
-                  display={p.display}
-                  editing={editingId === b.id}
-                  setEditing={(value) => setEditingId(value ? b.id : null)}
-                  selected={selected.has(b.id)}
-                  onJump={
-                    searchActive && query.trim() && selected.has(b.id)
-                      ? () => jumpToMessage(b.id)
-                      : undefined
-                  }
-                  toggle={(keys: SelectionKeys) => {
-                    const next = selectMessage(
-                      selected,
-                      selectionAnchor.current,
-                      visible.map((item) => item.id),
-                      b.id,
-                      keys,
-                    );
-                    cursorId.current = b.id;
-                    selectionAnchor.current = next.anchor;
-                    setSelectedRaw(next.selected);
-                  }}
-                  save={(next) => edit(b.id, next)}
-                  remove={() => {
-                    commit({ ...p, blocks: p.blocks.filter((x) => x.id !== b.id) });
-                    setSelected(new Set([...selected].filter((id) => id !== b.id)));
-                  }}
-                  drop={(id, after) => {
-                    const blocks = reorder(p.blocks, id, b.id, after);
-                    if (blocks !== p.blocks) commit({ ...p, blocks });
-                  }}
-                />
-              ))}
+              {visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((b) => {
+                const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
+                const isBulkRep = bulkEdit?.repId === b.id;
+                const displayBlock =
+                  isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit, isBulkRep) : b;
+
+                return (
+                  <MessageBlock
+                    key={b.id}
+                    block={displayBlock}
+                    characters={p.characters}
+                    display={p.display}
+                    editing={!bulkEdit && editingId === b.id}
+                    setEditing={(value) => {
+                      if (bulkEdit) return;
+                      setEditingId(value ? b.id : null);
+                    }}
+                    selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
+                    bulkTarget={isBulkTarget && !isBulkRep}
+                    bulkDisabled={!!bulkEdit && !isBulkRep}
+                    bulkContext={
+                      isBulkRep && bulkEdit
+                        ? {
+                            count: bulkEdit.selectedIds.size,
+                            state: bulkEdit,
+                            faceCharacter: bulkFaceCharacter,
+                            mixedSpeakers: bulkMixedSpeakers,
+                            hasAnyDice: bulkHasAnyDice,
+                            onChangeState: (updater) =>
+                              setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                            onSave: saveBulkEdit,
+                            onCancel: () => setBulkEdit(null),
+                            onDelete: deleteSelected,
+                          }
+                        : undefined
+                    }
+                    onJump={
+                      !bulkEdit && searchActive && query.trim() && selected.has(b.id)
+                        ? () => jumpToMessage(b.id)
+                        : undefined
+                    }
+                    toggle={(keys: SelectionKeys) => {
+                      if (bulkEdit) return;
+                      const next = selectMessage(
+                        selected,
+                        selectionAnchor.current,
+                        visible.map((item) => item.id),
+                        b.id,
+                        keys,
+                      );
+                      cursorId.current = b.id;
+                      selectionAnchor.current = next.anchor;
+                      setSelectedRaw(next.selected);
+                    }}
+                    save={(next) => edit(b.id, next)}
+                    remove={() => {
+                      commit({ ...p, blocks: p.blocks.filter((x) => x.id !== b.id) });
+                      setSelected(new Set([...selected].filter((id) => id !== b.id)));
+                    }}
+                    drop={(id, after) => {
+                      if (bulkEdit) return;
+                      const blocks = reorder(p.blocks, id, b.id, after);
+                      if (blocks !== p.blocks) commit({ ...p, blocks });
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 

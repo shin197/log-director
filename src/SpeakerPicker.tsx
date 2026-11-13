@@ -7,37 +7,61 @@ export function SpeakerPicker({
   draft,
   characters,
   onChange,
+  onPickCharacter,
+  onUnlink,
+  onCustomSpeaker,
+  mixed = false,
 }: {
   draft: Block;
   characters: Character[];
-  onChange: (b: Block) => void;
+  onChange?: (b: Block) => void;
+  onPickCharacter?: (c: Character) => void;
+  onUnlink?: () => void;
+  onCustomSpeaker?: (name: string) => void;
+  mixed?: boolean;
 }) {
   const [open, setOpen] = useState(false),
     [index, setIndex] = useState(0);
   const id = useId();
+  const queryText = mixed ? '' : (draft.speaker ?? '');
   const matches = characters.filter(
-    (c) => c.id === SYSTEM_CHARACTER_ID || fuzzyName(c.name, draft.speaker ?? ''),
+    (c) => c.id === SYSTEM_CHARACTER_ID || fuzzyName(c.name, queryText),
   );
   const current = Math.min(index, matches.length);
 
   function pick(i: number) {
-    onChange(
-      i === matches.length
-        ? {
-            ...draft,
-            characterId: null,
-            sourceType: 'normal',
-            speaker: draft.speaker ?? '',
-          }
-        : inheritCharacter(draft, matches[i]),
-    );
+    if (i === matches.length) {
+      if (onUnlink) {
+        onUnlink();
+      } else {
+        onChange?.({
+          ...draft,
+          characterId: null,
+          sourceType: 'normal',
+          speaker: draft.speaker ?? '',
+        });
+      }
+    } else {
+      const target = matches[i];
+      if (onPickCharacter) {
+        onPickCharacter(target);
+      } else {
+        onChange?.(inheritCharacter(draft, target));
+      }
+    }
     setOpen(false);
   }
 
-  const statusText =
-    draft.sourceType === 'system' ? '시스템' : draft.characterId ? '캐릭터' : '직접 입력';
-  const statusClass =
-    draft.sourceType === 'system'
+  const statusText = mixed
+    ? '다중 화자'
+    : draft.sourceType === 'system'
+      ? '시스템'
+      : draft.characterId
+        ? '캐릭터'
+        : '직접 입력';
+  const statusClass = mixed
+    ? 'is-mixed'
+    : draft.sourceType === 'system'
       ? 'is-system'
       : draft.characterId
         ? 'is-linked'
@@ -49,21 +73,27 @@ export function SpeakerPicker({
         <input
           role="combobox"
           aria-label="화자"
-          placeholder="화자 이름"
+          placeholder={mixed ? '여러 화자 (선택/입력으로 통일)' : '화자 이름'}
           aria-expanded={open}
           aria-controls={id}
           aria-autocomplete="list"
           aria-activedescendant={open ? `${id}-${current}` : undefined}
-          value={draft.sourceType === 'system' ? '시스템' : (draft.speaker ?? '')}
+          value={
+            mixed ? '' : draft.sourceType === 'system' ? '시스템' : (draft.speaker ?? '')
+          }
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onChange={(e) => {
-            onChange({
-              ...draft,
-              speaker: e.target.value,
-              characterId: null,
-              sourceType: 'normal',
-            });
+            if (onCustomSpeaker) {
+              onCustomSpeaker(e.target.value);
+            } else {
+              onChange?.({
+                ...draft,
+                speaker: e.target.value,
+                characterId: null,
+                sourceType: 'normal',
+              });
+            }
             setIndex(0);
             setOpen(true);
           }}

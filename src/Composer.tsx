@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
 import { FacePicker } from './FacePicker';
+import { handleWrapKeyDown } from './textEdit';
 
 export function Composer({
   characters,
@@ -136,6 +137,7 @@ export function Composer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
+            if (handleWrapKeyDown(e, text, setText)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();

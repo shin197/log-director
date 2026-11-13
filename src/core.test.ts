@@ -464,3 +464,201 @@ test('Alt 이동은 인접 메시지만 교환하며 입력과 원본은 보존'
     ['a', 'b', 'c'],
   );
 });
+
+import { wrapSelectedText } from './textEdit.ts';
+test('선택 텍스트 따옴표·괄호 자동 감싸기', () => {
+  assert.deepEqual(wrapSelectedText('안녕 세상', 3, 5, '"'), {
+    text: '안녕 "세상"',
+    selectionStart: 4,
+    selectionEnd: 6,
+  });
+  assert.deepEqual(wrapSelectedText('대사', 0, 2, '('), {
+    text: '(대사)',
+    selectionStart: 1,
+    selectionEnd: 3,
+  });
+  assert.deepEqual(wrapSelectedText('대사', 0, 2, '['), {
+    text: '[대사]',
+    selectionStart: 1,
+    selectionEnd: 3,
+  });
+  assert.deepEqual(wrapSelectedText('대사', 0, 2, '{'), {
+    text: '{대사}',
+    selectionStart: 1,
+    selectionEnd: 3,
+  });
+  assert.deepEqual(wrapSelectedText('대사', 0, 2, "'"), {
+    text: "'대사'",
+    selectionStart: 1,
+    selectionEnd: 3,
+  });
+  assert.deepEqual(wrapSelectedText('대사', 2, 0, '「'), {
+    text: '「대사」',
+    selectionStart: 1,
+    selectionEnd: 3,
+  });
+  assert.equal(wrapSelectedText('대사', 1, 1, '"'), null);
+  assert.equal(wrapSelectedText('대사', 0, 2, 'a'), null);
+});
+
+import {
+  applyBulkEditToProject,
+  createBulkEditState,
+  getBulkFaceCharacter,
+  pickRepresentativeId,
+} from './bulkEdit.ts';
+test('일괄 편집 대표 선택, 표정 조건, 일괄 패치 및 단일 적용', () => {
+  const charA = {
+    id: 'c-a',
+    name: '제타',
+    color: '#112233',
+    iconUrl: 'https://example.com/a1.png',
+    faces: [
+      { name: '기본', iconUrl: 'https://example.com/a1.png' },
+      { name: '웃음', iconUrl: 'https://example.com/a2.png' },
+    ],
+  };
+  const charB = {
+    id: 'c-b',
+    name: '알파',
+    color: '#445566',
+    iconUrl: 'https://example.com/b1.png',
+    faces: [{ name: '기본', iconUrl: 'https://example.com/b1.png' }],
+  };
+  const sys = systemCharacter();
+  const baseProject = {
+    format: 'log-studio' as const,
+    version: 1 as const,
+    title: '테스트',
+    original: null,
+    characters: [charA, charB, sys],
+    blocks: [
+      {
+        id: 'm1',
+        characterId: 'c-a',
+        speaker: '제타',
+        color: '#112233',
+        iconUrl: 'https://example.com/a1.png',
+        text: '첫 대사',
+        diceResult: '성공',
+        channel: '메인',
+        timestamp: '10:00',
+        sourceType: 'normal',
+      },
+      {
+        id: 'm2',
+        characterId: 'c-b',
+        speaker: '알파',
+        color: '#445566',
+        iconUrl: 'https://example.com/b1.png',
+        text: '둘째 대사',
+        diceResult: '',
+        channel: '잡담',
+        timestamp: '10:01',
+        sourceType: 'normal',
+      },
+      {
+        id: 'm3',
+        characterId: 'c-a',
+        speaker: '제타',
+        color: '#112233',
+        iconUrl: 'https://example.com/a1.png',
+        text: '셋째 대사',
+        diceResult: '실패',
+        channel: '메인',
+        timestamp: '10:02',
+        sourceType: 'normal',
+      },
+    ],
+  };
+
+  // 대표 메시지 선택: 커서가 선택 안에 있으면 커서, 없으면 맨 위 선택 메시지
+  assert.equal(
+    pickRepresentativeId(
+      baseProject.blocks,
+      baseProject.blocks,
+      new Set(['m2', 'm3']),
+      'm3',
+    ),
+    'm3',
+  );
+  assert.equal(
+    pickRepresentativeId(
+      baseProject.blocks,
+      baseProject.blocks,
+      new Set(['m2', 'm3']),
+      'm1',
+    ),
+    'm2',
+  );
+  assert.equal(
+    pickRepresentativeId(
+      baseProject.blocks,
+      [baseProject.blocks[2]],
+      new Set(['m2', 'm3']),
+      'm2',
+    ),
+    'm3',
+  );
+
+  // 같은 캐릭터만 선택했을 때만 표정 일괄 변경 가능
+  const sameCharBulk = createBulkEditState(
+    'm1',
+    new Set(['m1', 'm3']),
+    baseProject.blocks[0],
+  );
+  assert.equal(
+    getBulkFaceCharacter(baseProject.blocks, sameCharBulk, baseProject.characters)?.id,
+    'c-a',
+  );
+
+  const mixedBulk = createBulkEditState(
+    'm1',
+    new Set(['m1', 'm2']),
+    baseProject.blocks[0],
+  );
+  assert.equal(
+    getBulkFaceCharacter(baseProject.blocks, mixedBulk, baseProject.characters),
+    undefined,
+  );
+
+  // 캐릭터를 일괄 지정하면 그 시점부터 표정 변경 가능 + 대표 대사만 변경 + 채널/표정 일괄 적용
+  const edited = applyBulkEditToProject(baseProject, {
+    ...mixedBulk,
+    speakerAction: { type: 'character', character: charA },
+    iconUrl: 'https://example.com/a2.png',
+    channel: '정보',
+    repText: '수정된 첫 대사',
+    diceMode: 'remove',
+  });
+  assert.equal(edited.blocks[0].text, '수정된 첫 대사');
+  assert.equal(edited.blocks[1].text, '둘째 대사');
+  assert.equal(edited.blocks[0].characterId, 'c-a');
+  assert.equal(edited.blocks[1].characterId, 'c-a');
+  assert.equal(edited.blocks[1].iconUrl, 'https://example.com/a2.png');
+  assert.equal(edited.blocks[0].channel, '정보');
+  assert.equal(edited.blocks[1].channel, '정보');
+  assert.equal(edited.blocks[0].diceResult, '');
+  assert.equal(edited.blocks[2].channel, '메인');
+  // 원본 project는 불변 유지
+  assert.equal(baseProject.blocks[1].speaker, '알파');
+
+  // 사용자 지정으로 연결 해제 시 기존 화자 이름은 유지하고 characterId만 해제
+  const unlinked = applyBulkEditToProject(baseProject, {
+    ...mixedBulk,
+    speakerAction: { type: 'unlink' },
+  });
+  assert.equal(unlinked.blocks[0].characterId, null);
+  assert.equal(unlinked.blocks[0].speaker, '제타');
+  assert.equal(unlinked.blocks[1].characterId, null);
+  assert.equal(unlinked.blocks[1].speaker, '알파');
+
+  // 시스템 전환 시 speaker 키 제거 불변 조건 준수
+  const systemConverted = applyBulkEditToProject(baseProject, {
+    ...mixedBulk,
+    speakerAction: { type: 'character', character: sys },
+  });
+  assert.equal('speaker' in systemConverted.blocks[0], false);
+  assert.equal('speaker' in systemConverted.blocks[1], false);
+  assert.equal(systemConverted.blocks[1].sourceType, 'system');
+});

@@ -4,6 +4,20 @@ import { defaultDisplay, displayTime, type DisplaySettings } from './presentatio
 import type { SelectionKeys } from './selection';
 import { useState, useEffect } from 'react';
 import type { Block, Character } from './core';
+import type { BulkEditState } from './bulkEdit';
+import { handleWrapKeyDown } from './textEdit';
+
+export type BulkEditContext = {
+  count: number;
+  state: BulkEditState;
+  faceCharacter?: Character;
+  mixedSpeakers: boolean;
+  hasAnyDice: boolean;
+  onChangeState: (updater: (prev: BulkEditState) => BulkEditState) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+};
 
 export function MessageBlock({
   block: b,
@@ -12,6 +26,9 @@ export function MessageBlock({
   editing,
   setEditing,
   selected,
+  bulkTarget = false,
+  bulkDisabled = false,
+  bulkContext,
   toggle,
   save,
   remove,
@@ -25,6 +42,9 @@ export function MessageBlock({
   editing: boolean;
   setEditing: (v: boolean) => void;
   selected: boolean;
+  bulkTarget?: boolean;
+  bulkDisabled?: boolean;
+  bulkContext?: BulkEditContext;
   toggle: (keys: SelectionKeys) => void;
   save: (b: Block) => void;
   remove: () => void;
@@ -35,33 +55,97 @@ export function MessageBlock({
   const [dice, setDice] = useState(!!b.diceResult);
   const [over, setOver] = useState('');
 
+  const isBulk = !!bulkContext;
+  const isEditing = editing || isBulk;
+
   useEffect(() => {
-    if (editing) {
+    if (editing && !isBulk) {
       setDraft(b);
       setDice(!!b.diceResult);
       setOptions(false);
     }
-  }, [editing, b]);
+  }, [editing, isBulk, b]);
+
+  useEffect(() => {
+    if (isBulk) {
+      setOptions(false);
+    }
+  }, [isBulk]);
 
   const finish = () => {
+    if (bulkContext) {
+      bulkContext.onSave();
+      return;
+    }
     save({ ...draft, diceResult: dice ? draft.diceResult : '' });
     setEditing(false);
   };
 
-  const activeBlock = editing ? draft : b;
+  const cancel = () => {
+    if (bulkContext) {
+      bulkContext.onCancel();
+      return;
+    }
+    setEditing(false);
+  };
+
+  const removeAction = () => {
+    if (bulkContext) {
+      bulkContext.onDelete();
+      return;
+    }
+    remove();
+  };
+
+  const activeBlock = isBulk ? b : editing ? draft : b;
   const isSystem = activeBlock.sourceType === 'system';
   const timeText = displayTime(b.timestamp, display);
+
+  const bulkDiceOpen =
+    bulkContext &&
+    (bulkContext.state.diceMode === 'set' ||
+      (bulkContext.state.diceMode === 'unchanged' && !!b.diceResult));
+  const showDiceEditor = isBulk ? !!bulkDiceOpen : dice;
+
+  const faceCharacter = isBulk
+    ? bulkContext.faceCharacter
+    : characters.find((c) => c.id === activeBlock.characterId);
+  const canEditFace = isBulk ? !!bulkContext.faceCharacter : !isSystem;
+
+  const textValue = isBulk ? (bulkContext.state.repText ?? b.text) : draft.text;
+  const setTextValue = (nextText: string) => {
+    if (bulkContext) {
+      bulkContext.onChangeState((prev) => ({ ...prev, repText: nextText }));
+    } else {
+      setDraft({ ...draft, text: nextText });
+    }
+  };
+
+  const diceValue = isBulk ? bulkContext.state.diceResult : draft.diceResult;
+  const setDiceValue = (nextDice: string) => {
+    if (bulkContext) {
+      bulkContext.onChangeState((prev) => ({
+        ...prev,
+        diceMode: 'set',
+        diceResult: nextDice,
+      }));
+    } else {
+      setDraft({ ...draft, diceResult: nextDice });
+    }
+  };
 
   return (
     <article
       data-message-id={b.id}
-      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${editing ? 'editing' : ''} ${onJump ? 'has-jump' : ''} ${over}`}
-      draggable={!editing}
+      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${over}`}
+      draggable={!isEditing && !bulkDisabled}
       onDragStart={(e) => {
+        if (bulkDisabled) return;
         e.dataTransfer.setData('text/log-block', b.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
       onDragOver={(e) => {
+        if (bulkDisabled) return;
         e.preventDefault();
         setOver(
           e.clientY <
@@ -72,28 +156,40 @@ export function MessageBlock({
       }}
       onDragLeave={() => setOver('')}
       onDrop={(e) => {
+        if (bulkDisabled) return;
         e.preventDefault();
         drop(e.dataTransfer.getData('text/log-block'), over === 'drop-after');
         setOver('');
       }}
       onDragEnd={() => setOver('')}
       onClick={(e) => {
-        if (editing || (e.target as HTMLElement).closest('button,input,textarea')) return;
+        if (
+          isEditing ||
+          bulkDisabled ||
+          (e.target as HTMLElement).closest('button,input,textarea')
+        )
+          return;
         if (e.detail === 1) toggle({ ctrlKey: e.ctrlKey, shiftKey: e.shiftKey });
       }}
       onDoubleClick={(e) => {
         if ((e.target as HTMLElement).closest('button')) return;
+        if (isBulk) {
+          finish();
+          return;
+        }
+        if (bulkDisabled) return;
         editing ? finish() : setEditing(true);
       }}
       tabIndex={0}
       aria-label={`${b.speaker || '시스템'} 메시지`}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
+        if (bulkDisabled) return;
         if (e.key === ' ') {
           e.preventDefault();
           toggle({ ctrlKey: e.ctrlKey, shiftKey: e.shiftKey });
         }
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
           e.preventDefault();
           editing ? finish() : setEditing(true);
         }
@@ -101,17 +197,23 @@ export function MessageBlock({
     >
       {!isSystem && (
         <div className="avatar">
-          {editing && draft.characterId ? (
+          {isEditing && faceCharacter ? (
             <FacePicker
-              character={characters.find((c) => c.id === draft.characterId)}
-              value={draft.iconUrl ?? ''}
-              onChange={(iconUrl) => setDraft({ ...draft, iconUrl })}
+              character={faceCharacter}
+              value={activeBlock.iconUrl ?? ''}
+              onChange={(iconUrl) => {
+                if (bulkContext) {
+                  bulkContext.onChangeState((prev) => ({ ...prev, iconUrl }));
+                } else {
+                  setDraft({ ...draft, iconUrl });
+                }
+              }}
               imageButton
             />
-          ) : b.iconUrl && /^https?:\/\//.test(b.iconUrl) ? (
+          ) : activeBlock.iconUrl && /^https?:\/\//.test(activeBlock.iconUrl) ? (
             <img
               draggable={false}
-              src={b.iconUrl}
+              src={activeBlock.iconUrl}
               alt=""
               loading="lazy"
               referrerPolicy="no-referrer"
@@ -119,48 +221,160 @@ export function MessageBlock({
           ) : (
             <span
               className="avatar-placeholder"
-              style={{ borderColor: b.color || undefined }}
+              style={{ borderColor: activeBlock.color || undefined }}
             >
-              {(b.speaker || '?').slice(0, 1)}
+              {(activeBlock.speaker || '?').slice(0, 1)}
             </span>
           )}
         </div>
       )}
       <div className="message-content">
-        {editing ? (
+        {isEditing ? (
           <div className="block-editor">
             <div className="editor-meta-row">
-              <SpeakerPicker draft={draft} characters={characters} onChange={setDraft} />
+              {bulkContext ? (
+                <SpeakerPicker
+                  draft={activeBlock}
+                  characters={characters}
+                  mixed={bulkContext.mixedSpeakers && !bulkContext.state.speakerAction}
+                  onPickCharacter={(character) =>
+                    bulkContext.onChangeState((prev) => ({
+                      ...prev,
+                      speakerAction: { type: 'character', character },
+                      iconUrl: undefined,
+                    }))
+                  }
+                  onUnlink={() =>
+                    bulkContext.onChangeState((prev) => ({
+                      ...prev,
+                      speakerAction: { type: 'unlink' },
+                      iconUrl: undefined,
+                    }))
+                  }
+                  onCustomSpeaker={(speaker) =>
+                    bulkContext.onChangeState((prev) => ({
+                      ...prev,
+                      speakerAction: { type: 'custom', speaker },
+                      iconUrl: undefined,
+                    }))
+                  }
+                />
+              ) : (
+                <SpeakerPicker
+                  draft={draft}
+                  characters={characters}
+                  onChange={setDraft}
+                />
+              )}
+
               <input
                 className="meta-channel"
                 aria-label="채널"
-                placeholder="채널"
-                value={draft.channel ?? ''}
-                onChange={(e) => setDraft({ ...draft, channel: e.target.value })}
+                placeholder={isBulk ? '채널 (일괄)' : '채널'}
+                value={
+                  isBulk
+                    ? (bulkContext.state.channel ?? b.channel ?? '')
+                    : (draft.channel ?? '')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (bulkContext) {
+                    bulkContext.onChangeState((prev) => ({ ...prev, channel: val }));
+                  } else {
+                    setDraft({ ...draft, channel: val });
+                  }
+                }}
               />
               <input
                 className="meta-time"
                 aria-label="타임스탬프"
-                placeholder="타임스탬프"
-                value={draft.timestamp ?? ''}
-                onChange={(e) => setDraft({ ...draft, timestamp: e.target.value })}
+                placeholder={isBulk ? '타임스탬프 (일괄)' : '타임스탬프'}
+                value={
+                  isBulk
+                    ? (bulkContext.state.timestamp ?? b.timestamp ?? '')
+                    : (draft.timestamp ?? '')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (bulkContext) {
+                    bulkContext.onChangeState((prev) => ({ ...prev, timestamp: val }));
+                  } else {
+                    setDraft({ ...draft, timestamp: val });
+                  }
+                }}
               />
-              <button
-                type="button"
-                className="compact-btn"
-                aria-pressed={dice}
-                title={dice ? '주사위 판정 제거' : '주사위 판정 추가'}
-                onClick={() => setDice(!dice)}
-              >
-                판정
-              </button>
+
+              {bulkContext ? (
+                <>
+                  <button
+                    type="button"
+                    className="compact-btn"
+                    aria-pressed={showDiceEditor}
+                    title={
+                      showDiceEditor
+                        ? '선택 메시지에서 주사위 판정 모두 제거'
+                        : '선택 메시지에 주사위 판정 일괄 설정'
+                    }
+                    onClick={() => {
+                      if (showDiceEditor) {
+                        bulkContext.onChangeState((prev) => ({
+                          ...prev,
+                          diceMode: 'remove',
+                          diceResult: '',
+                        }));
+                      } else {
+                        bulkContext.onChangeState((prev) => ({
+                          ...prev,
+                          diceMode: 'set',
+                        }));
+                      }
+                    }}
+                  >
+                    판정
+                  </button>
+                  {!showDiceEditor &&
+                    bulkContext.hasAnyDice &&
+                    bulkContext.state.diceMode !== 'remove' && (
+                      <button
+                        type="button"
+                        className="compact-btn danger ghost"
+                        title="선택된 다른 메시지에 있는 주사위 판정을 모두 제거"
+                        onClick={() =>
+                          bulkContext.onChangeState((prev) => ({
+                            ...prev,
+                            diceMode: 'remove',
+                            diceResult: '',
+                          }))
+                        }
+                      >
+                        판정 제거
+                      </button>
+                    )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="compact-btn"
+                  aria-pressed={dice}
+                  title={dice ? '주사위 판정 제거' : '주사위 판정 추가'}
+                  onClick={() => setDice(!dice)}
+                >
+                  판정
+                </button>
+              )}
+
               {!isSystem && (
                 <button
                   type="button"
                   className="compact-btn"
+                  disabled={!canEditFace}
                   aria-label="표정 URL 직접 입력"
                   aria-expanded={options}
-                  title="표정 이미지 URL"
+                  title={
+                    canEditFace
+                      ? '표정 이미지 URL'
+                      : '선택된 메시지의 캐릭터가 모두 같을 때 표정을 일괄 변경할 수 있습니다'
+                  }
                   onClick={() => setOptions(!options)}
                 >
                   URL
@@ -168,14 +382,25 @@ export function MessageBlock({
               )}
             </div>
 
-            {options && !isSystem && (
+            {options && canEditFace && !isSystem && (
               <input
                 className="editor-url-input"
                 type="url"
                 aria-label="표정 이미지 URL"
                 placeholder="표정 이미지 URL (https://…)"
-                value={draft.iconUrl ?? ''}
-                onChange={(e) => setDraft({ ...draft, iconUrl: e.target.value })}
+                value={
+                  isBulk
+                    ? (bulkContext.state.iconUrl ?? activeBlock.iconUrl ?? '')
+                    : (draft.iconUrl ?? '')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (bulkContext) {
+                    bulkContext.onChangeState((prev) => ({ ...prev, iconUrl: val }));
+                  } else {
+                    setDraft({ ...draft, iconUrl: val });
+                  }
+                }}
               />
             )}
 
@@ -183,10 +408,11 @@ export function MessageBlock({
               autoFocus
               aria-label="메시지 본문"
               placeholder="메시지 본문…"
-              rows={Math.max(2, Math.min(18, draft.text.split('\n').length))}
-              value={draft.text}
-              onChange={(e) => setDraft({ ...draft, text: e.target.value })}
+              rows={Math.max(2, Math.min(18, textValue.split('\n').length))}
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
               onKeyDown={(e) => {
+                if (handleWrapKeyDown(e, textValue, setTextValue)) return;
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
                   finish();
@@ -194,18 +420,18 @@ export function MessageBlock({
               }}
             />
 
-            {dice && (
+            {showDiceEditor && (
               <textarea
                 className="dice-textarea"
                 aria-label="주사위 판정"
-                placeholder="주사위 판정 결과…"
-                rows={Math.max(
-                  1,
-                  Math.min(6, (draft.diceResult || '').split('\n').length),
-                )}
-                value={draft.diceResult}
-                onChange={(e) => setDraft({ ...draft, diceResult: e.target.value })}
+                placeholder={
+                  isBulk ? '모든 선택 메시지에 적용할 주사위 판정…' : '주사위 판정 결과…'
+                }
+                rows={Math.max(1, Math.min(6, (diceValue || '').split('\n').length))}
+                value={diceValue}
+                onChange={(e) => setDiceValue(e.target.value)}
                 onKeyDown={(e) => {
+                  if (handleWrapKeyDown(e, diceValue, setDiceValue)) return;
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     finish();
@@ -215,15 +441,19 @@ export function MessageBlock({
             )}
 
             <div className="editor-actions">
-              <span className="editor-hint">Ctrl+Enter 저장 · Esc 취소</span>
-              <button type="button" className="danger ghost" onClick={remove}>
-                삭제
+              <span className="editor-hint">
+                {bulkContext
+                  ? `Ctrl+Enter 저장 · Esc 취소 · 일괄 편집 (${bulkContext.count}개)`
+                  : 'Ctrl+Enter 저장 · Esc 취소'}
+              </span>
+              <button type="button" className="danger ghost" onClick={removeAction}>
+                {bulkContext ? `일괄 삭제 (${bulkContext.count})` : '삭제'}
               </button>
-              <button type="button" className="ghost" onClick={() => setEditing(false)}>
+              <button type="button" className="ghost" onClick={cancel}>
                 취소
               </button>
               <button type="button" className="primary" onClick={finish}>
-                저장
+                {bulkContext ? '일괄 저장' : '저장'}
               </button>
             </div>
           </div>
@@ -253,7 +483,7 @@ export function MessageBlock({
           </div>
         )}
       </div>
-      {!editing && (
+      {!isEditing && !bulkDisabled && (
         <div className="message-hover-actions">
           {onJump && (
             <button

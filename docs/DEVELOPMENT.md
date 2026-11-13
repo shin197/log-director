@@ -16,6 +16,8 @@
 | src/selection.ts                           | 클릭/Ctrl/Shift 선택 규칙                                        |
 | src/keyboardNavigation.ts                  | 키보드 커서 이동, 인접 교환                                      |
 | src/logOperations.ts                       | 페이지 크기와 연속 병합                                          |
+| src/bulkEdit.ts                            | 다중 선택 일괄 편집 상태, 대표 선정, 실시간 패치 및 단일 적용    |
+| src/textEdit.ts                            | 선택 텍스트 따옴표·괄호 자동 감싸기                              |
 | src/query.ts                               | 검색 문법, 드래그 순서 변경                                      |
 | src/ProjectPanels.tsx, src/presentation.ts | 설정 UI와 시각 표시                                              |
 | src/export.ts, src/ExportDialog.tsx        | 내보내기 직렬화 및 미리보기/다운로드                             |
