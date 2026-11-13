@@ -512,6 +512,60 @@ code {
   box-shadow: inset 3px 0 0 var(--warn);
 }
 
+.log-message.is-cut {
+  border: 1px dashed var(--accent);
+  background: rgba(77, 184, 154, 0.04);
+}
+
+.log-message.is-cut > :not(.paste-indicator) {
+  opacity: 0.42;
+}
+
+.paste-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.paste-indicator.before {
+  top: -1px;
+}
+
+.paste-indicator.after {
+  bottom: -1px;
+}
+
+.paste-here-btn {
+  pointer-events: auto;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.paste-here-btn:hover {
+  background: var(--accent);
+  color: #0b0e14;
+}
+
 .log-message .avatar {
   width: 36px;
   height: 36px;

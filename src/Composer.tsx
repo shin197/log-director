@@ -7,9 +7,11 @@ import { handleWrapKeyDown } from './textEdit';
 export function Composer({
   characters,
   send,
+  disabled = false,
 }: {
   characters: Character[];
   send: (b: Block) => void;
+  disabled?: boolean;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
@@ -31,7 +33,7 @@ export function Composer({
   }
 
   function submit() {
-    if (!text.trim()) return;
+    if (disabled || !text.trim()) return;
     const c = character ?? characters.find((c) => c.name === name) ?? matches[0];
     let b: Block = {
       id: crypto.randomUUID(),
@@ -132,7 +134,12 @@ export function Composer({
 
         <textarea
           aria-label="전송 내용"
-          placeholder="새 메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)"
+          disabled={disabled}
+          placeholder={
+            disabled
+              ? '편집 또는 오려붙이기 완료 후 새 메시지를 입력할 수 있습니다.'
+              : '새 메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
+          }
           rows={2}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -150,7 +157,7 @@ export function Composer({
             type="button"
             className="primary"
             onClick={submit}
-            disabled={!text.trim()}
+            disabled={disabled || !text.trim()}
           >
             전송
           </button>

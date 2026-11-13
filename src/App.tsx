@@ -1,4 +1,8 @@
-import { navigateMessages, swapMessage, type NavigationKey } from './keyboardNavigation';
+import {
+  navigateMessages,
+  moveSelectedMessages,
+  type NavigationKey,
+} from './keyboardNavigation';
 import { Composer } from './Composer';
 import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
@@ -6,7 +10,7 @@ import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
-import { compileQuery, reorder } from './query';
+import { compileQuery, moveBlocks } from './query';
 import {
   applyBulkEditToProject,
   applyBulkPatch,
@@ -53,6 +57,10 @@ function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bulkEdit, setBulkEdit] = useState<BulkEditState | null>(null);
   const [bulkReplaceOpen, setBulkReplaceOpen] = useState(false);
+  const [cutIds, setCutIds] = useState<Set<string> | null>(null);
+  const [pasteTarget, setPasteTarget] = useState<{ id: string; after: boolean } | null>(
+    null,
+  );
 
   const commit = (next: Project) => {
     setPast((x) => [...x, p].slice(-100));
@@ -105,6 +113,7 @@ function App() {
     setEditingId(null);
     setBulkEdit(null);
     setSelected(new Set([id]));
+    if (cutIds) setPasteTarget({ id, after: true });
     pendingFocus.current = { id, direction: 1, center: true };
     setPage(Math.floor(index / PAGE_SIZE));
   }
@@ -114,7 +123,42 @@ function App() {
     setEditingId(null);
     setBulkEdit(null);
     setBulkReplaceOpen(false);
+    setCutIds(null);
+    setPasteTarget(null);
     pendingFocus.current = null;
+  }
+
+  function startCutMode() {
+    if (!selected.size || editingId || bulkEdit || cutIds) return;
+    const ids = new Set(selected);
+    setCutIds(ids);
+    setReplaceOpen(false);
+    const anchorId = cursorId.current ?? [...selected].at(-1) ?? null;
+    setPasteTarget(anchorId ? { id: anchorId, after: true } : null);
+    setNotice(
+      `${ids.size}개 블록을 오려두었습니다. 이동할 위치에서 Ctrl+V 또는 ‘이 곳에 붙여넣기’를 누르세요.`,
+    );
+  }
+
+  function cancelCutMode() {
+    setCutIds(null);
+    setPasteTarget(null);
+    setNotice('오려붙이기를 취소했습니다.');
+  }
+
+  function executePaste(targetId?: string, after?: boolean) {
+    if (!cutIds || !cutIds.size) return;
+    const resolvedId =
+      targetId ?? pasteTarget?.id ?? cursorId.current ?? [...selected].at(-1);
+    const resolvedAfter = after ?? pasteTarget?.after ?? true;
+    if (!resolvedId) return;
+    const count = cutIds.size;
+    const blocks = moveBlocks(p.blocks, cutIds, resolvedId, resolvedAfter);
+    if (blocks !== p.blocks) commit({ ...p, blocks });
+    setSelected(new Set(cutIds));
+    setCutIds(null);
+    setPasteTarget(null);
+    setNotice(`${count}개 블록을 붙여넣었습니다.`);
   }
 
   function undo() {
@@ -196,6 +240,7 @@ function App() {
         return;
       }
       if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'h') {
+        if (cutIds) return;
         e.preventDefault();
         if (!e.repeat) {
           if (bulkEdit) setBulkReplaceOpen((v) => !v);
@@ -205,6 +250,10 @@ function App() {
       }
       if (e.key === 'Escape') {
         setHelpOpen(false);
+        if (cutIds) {
+          cancelCutMode();
+          return;
+        }
         if (bulkEdit) {
           setBulkEdit(null);
           setBulkReplaceOpen(false);
@@ -224,6 +273,25 @@ function App() {
         return;
       if (e.ctrlKey && !e.altKey) {
         const key = e.key.toLowerCase();
+        if (cutIds) {
+          if (key === 'v') {
+            e.preventDefault();
+            executePaste();
+            return;
+          }
+          if (key === 'a') {
+            e.preventDefault();
+            setQuery('');
+            setSearchActive(false);
+            setSelected(new Set(p.blocks.map((b) => b.id)));
+          }
+          return;
+        }
+        if (key === 'x' && selected.size) {
+          e.preventDefault();
+          startCutMode();
+          return;
+        }
         if (e.shiftKey && e.key === 'Enter' && selected.size >= 2) {
           e.preventDefault();
           startBulkEdit();
@@ -245,17 +313,19 @@ function App() {
       }
       if (target.closest('button')) return;
       if (e.key === 'Delete') {
+        if (cutIds) return;
         if (selected.size) e.preventDefault();
         deleteSelected();
         return;
       }
       const arrow = e.key === 'ArrowUp' || e.key === 'ArrowDown';
       if (e.altKey && arrow) {
+        if (cutIds) return;
         const id = cursorId.current ?? [...selected].at(-1);
         if (!id || !selected.has(id)) return;
         e.preventDefault();
         const direction = e.key === 'ArrowDown' ? 1 : -1;
-        const blocks = swapMessage(p.blocks, id, direction);
+        const blocks = moveSelectedMessages(p.blocks, selected, direction);
         if (blocks === p.blocks) return;
         commit({ ...p, blocks });
         pendingFocus.current = { id, direction };
@@ -287,11 +357,26 @@ function App() {
       selectionAnchor.current = { id: next.id, selected: true };
       pendingFocus.current = { id: next.id, direction: next.direction };
       setSelectedRaw(next.selected);
+      if (cutIds) {
+        const beforeFirst = e.key === 'Home' || (e.key === 'ArrowUp' && next.index === 0);
+        setPasteTarget({ id: next.id, after: !beforeFirst });
+      }
       setPage(Math.floor(next.index / PAGE_SIZE));
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [tab, visible, selected, editingId, bulkEdit, past, future, searchActive]);
+  }, [
+    tab,
+    visible,
+    selected,
+    editingId,
+    bulkEdit,
+    cutIds,
+    pasteTarget,
+    past,
+    future,
+    searchActive,
+  ]);
 
   useEffect(() => {
     const request = pendingFocus.current;
@@ -384,6 +469,7 @@ function App() {
               <button
                 type="button"
                 key={name}
+                disabled={!!cutIds && name !== '로그'}
                 aria-pressed={tab === name}
                 onClick={() => setTab(name)}
               >
@@ -396,6 +482,7 @@ function App() {
             aria-label="프로젝트 제목"
             title="프로젝트 제목 편집"
             placeholder="제목 없는 로그"
+            disabled={!!cutIds}
             value={p.title}
             onChange={(e) => commit({ ...p, title: e.target.value })}
           />
@@ -598,7 +685,8 @@ function App() {
                       <li>더블클릭: 편집 · 선택 후 따옴표/괄호 자동 감싸기</li>
                       <li>클릭 / Ctrl+클릭 / Shift+클릭 · 드래그 이동</li>
                       <li>
-                        <code>Ctrl+Shift+Enter</code>: 다중 선택 일괄 편집
+                        <code>Ctrl+Shift+Enter</code>: 일괄 편집 · <code>Ctrl+X/V</code>:
+                        오려붙이기
                       </li>
                       <li>
                         <code>↑↓</code> / <code>Ctrl+↑↓</code> / <code>Alt+↑↓</code>
@@ -623,7 +711,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!past.length || !!bulkEdit}
+                disabled={!past.length || !!bulkEdit || !!cutIds}
                 onClick={undo}
                 title="되돌리기 (Ctrl+Z)"
               >
@@ -632,7 +720,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!future.length || !!bulkEdit}
+                disabled={!future.length || !!bulkEdit || !!cutIds}
                 onClick={redo}
                 title="다시 하기 (Ctrl+Y / Ctrl+Shift+Z)"
               >
@@ -658,7 +746,19 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={selected.size < 2 || !!bulkEdit}
+                disabled={(!selected.size && !cutIds) || !!bulkEdit || !!editingId}
+                aria-pressed={!!cutIds}
+                onClick={() => (cutIds ? cancelCutMode() : startCutMode())}
+                title={
+                  cutIds ? '오려붙이기 취소 (Esc)' : '선택한 메시지 오려붙이기 (Ctrl+X)'
+                }
+              >
+                {cutIds ? '오리기 취소' : '오려붙이기'}
+              </button>
+              <button
+                type="button"
+                className="compact-btn"
+                disabled={selected.size < 2 || !!bulkEdit || !!cutIds}
                 aria-pressed={!!bulkEdit}
                 onClick={startBulkEdit}
                 title="선택한 여러 메시지 일괄 편집 (Ctrl+Shift+Enter)"
@@ -668,7 +768,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={selected.size < 2 || !!bulkEdit}
+                disabled={selected.size < 2 || !!bulkEdit || !!cutIds}
                 title="선택한 메시지 중 화자·채널·유형이 같은 연속 메시지 병합"
                 onClick={() => {
                   const blocks = mergeConsecutive(p.blocks, selected);
@@ -688,6 +788,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
+                disabled={!!cutIds}
                 aria-pressed={bulkEdit ? bulkReplaceOpen : replaceOpen}
                 onClick={() =>
                   bulkEdit ? setBulkReplaceOpen((v) => !v) : setReplaceOpen((v) => !v)
@@ -699,7 +800,7 @@ function App() {
               <button
                 type="button"
                 className="compact-btn danger"
-                disabled={!selected.size && !bulkEdit}
+                disabled={(!selected.size && !bulkEdit) || !!cutIds}
                 onClick={deleteSelected}
                 title="선택 블록 삭제 (Delete)"
               >
@@ -820,12 +921,34 @@ function App() {
                     block={displayBlock}
                     characters={p.characters}
                     display={p.display}
-                    editing={!bulkEdit && editingId === b.id}
+                    editing={!bulkEdit && !cutIds && editingId === b.id}
                     setEditing={(value) => {
-                      if (bulkEdit) return;
+                      if (bulkEdit || cutIds) return;
                       setEditingId(value ? b.id : null);
                     }}
                     selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
+                    cut={!!cutIds?.has(b.id)}
+                    cutMode={!!cutIds}
+                    pasteIndicator={
+                      cutIds && pasteTarget?.id === b.id
+                        ? pasteTarget.after
+                          ? 'after'
+                          : 'before'
+                        : undefined
+                    }
+                    onPasteHover={
+                      cutIds
+                        ? (after) =>
+                            setPasteTarget((prev) =>
+                              prev?.id === b.id && prev.after === after
+                                ? prev
+                                : { id: b.id, after },
+                            )
+                        : undefined
+                    }
+                    onPasteHere={
+                      cutIds ? (after) => executePaste(b.id, after) : undefined
+                    }
                     bulkTarget={isBulkTarget && !isBulkRep}
                     bulkDisabled={!!bulkEdit && !isBulkRep}
                     bulkContext={
@@ -869,6 +992,7 @@ function App() {
                       cursorId.current = b.id;
                       selectionAnchor.current = next.anchor;
                       setSelectedRaw(next.selected);
+                      if (cutIds) setPasteTarget({ id: b.id, after: true });
                     }}
                     save={(next) => edit(b.id, next)}
                     remove={() => {
@@ -876,8 +1000,10 @@ function App() {
                       setSelected(new Set([...selected].filter((id) => id !== b.id)));
                     }}
                     drop={(id, after) => {
-                      if (bulkEdit) return;
-                      const blocks = reorder(p.blocks, id, b.id, after);
+                      if (bulkEdit || cutIds) return;
+                      const movingIds =
+                        selected.has(id) && selected.size > 1 ? selected : new Set([id]);
+                      const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
                       if (blocks !== p.blocks) commit({ ...p, blocks });
                     }}
                   />
@@ -886,7 +1012,11 @@ function App() {
             </div>
           </div>
 
-          <Composer characters={p.characters ?? []} send={addMessage} />
+          <Composer
+            characters={p.characters ?? []}
+            send={addMessage}
+            disabled={!!cutIds || !!bulkEdit}
+          />
 
           <div className="status-bar">
             <span role="status" className="status-notice">

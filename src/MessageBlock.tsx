@@ -32,6 +32,11 @@ export function MessageBlock({
   editing,
   setEditing,
   selected,
+  cut = false,
+  cutMode = false,
+  pasteIndicator,
+  onPasteHover,
+  onPasteHere,
   bulkTarget = false,
   bulkDisabled = false,
   bulkContext,
@@ -48,6 +53,11 @@ export function MessageBlock({
   editing: boolean;
   setEditing: (v: boolean) => void;
   selected: boolean;
+  cut?: boolean;
+  cutMode?: boolean;
+  pasteIndicator?: 'before' | 'after';
+  onPasteHover?: (after: boolean) => void;
+  onPasteHere?: (after: boolean) => void;
   bulkTarget?: boolean;
   bulkDisabled?: boolean;
   bulkContext?: BulkEditContext;
@@ -131,18 +141,20 @@ export function MessageBlock({
     }
   };
 
+  const dropClass = pasteIndicator ? `drop-${pasteIndicator}` : over;
+
   return (
     <article
       data-message-id={b.id}
-      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${over}`}
-      draggable={!isEditing && !bulkDisabled}
+      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${dropClass}`}
+      draggable={!isEditing && !bulkDisabled && !cutMode}
       onDragStart={(e) => {
-        if (bulkDisabled) return;
+        if (bulkDisabled || cutMode) return;
         e.dataTransfer.setData('text/log-block', b.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
       onDragOver={(e) => {
-        if (bulkDisabled) return;
+        if (bulkDisabled || cutMode) return;
         e.preventDefault();
         setOver(
           e.clientY <
@@ -153,12 +165,18 @@ export function MessageBlock({
       }}
       onDragLeave={() => setOver('')}
       onDrop={(e) => {
-        if (bulkDisabled) return;
+        if (bulkDisabled || cutMode) return;
         e.preventDefault();
         drop(e.dataTransfer.getData('text/log-block'), over === 'drop-after');
         setOver('');
       }}
       onDragEnd={() => setOver('')}
+      onMouseMove={(e) => {
+        if (!cutMode || !onPasteHover) return;
+        if ((e.target as HTMLElement).closest('.paste-indicator')) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        onPasteHover(e.clientY >= rect.top + rect.height / 2);
+      }}
       onClick={(e) => {
         if (
           isEditing ||
@@ -174,7 +192,7 @@ export function MessageBlock({
           finish();
           return;
         }
-        if (bulkDisabled) return;
+        if (bulkDisabled || cutMode) return;
         editing ? finish() : setEditing(true);
       }}
       tabIndex={0}
@@ -186,12 +204,32 @@ export function MessageBlock({
           e.preventDefault();
           toggle({ ctrlKey: e.ctrlKey, shiftKey: e.shiftKey });
         }
-        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        if (!cutMode && e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
           e.preventDefault();
           editing ? finish() : setEditing(true);
         }
       }}
     >
+      {pasteIndicator && onPasteHere && (
+        <div
+          className={`paste-indicator ${pasteIndicator}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPasteHere(pasteIndicator === 'after');
+          }}
+        >
+          <button
+            type="button"
+            className="paste-here-btn primary compact-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPasteHere(pasteIndicator === 'after');
+            }}
+          >
+            이 곳에 붙여넣기
+          </button>
+        </div>
+      )}
       {!isSystem && (
         <div className="avatar">
           {isEditing && faceCharacter ? (
@@ -550,18 +588,20 @@ export function MessageBlock({
               위치 이동 ↗
             </button>
           )}
-          <button
-            type="button"
-            className="message-edit-trigger"
-            title="메시지 편집 (더블클릭)"
-            aria-label="메시지 편집"
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditing(true);
-            }}
-          >
-            편집
-          </button>
+          {!cutMode && (
+            <button
+              type="button"
+              className="message-edit-trigger"
+              title="메시지 편집 (더블클릭)"
+              aria-label="메시지 편집"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+              }}
+            >
+              편집
+            </button>
+          )}
         </div>
       )}
     </article>

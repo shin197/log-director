@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse, replaceBlocks } from './core.ts';
-import { compileQuery, reorder } from './query.ts';
+import { compileQuery, moveBlocks, reorder } from './query.ts';
 test('쿼리 조건 조합, 제외, 인용문과 오류', () => {
   const b = {
     id: '1',
@@ -671,4 +671,53 @@ test('일괄 편집 대표 선택, 표정 조건, 일괄 패치 및 단일 적�
   assert.equal('speaker' in systemConverted.blocks[0], false);
   assert.equal('speaker' in systemConverted.blocks[1], false);
   assert.equal(systemConverted.blocks[1].sourceType, 'system');
+});
+
+import { moveSelectedMessages } from './keyboardNavigation.ts';
+test('일괄 이동(moveBlocks, moveSelectedMessages): 떨어진 선택 블록 응집 및 사이 틈 삽입', () => {
+  const blocks = ['1', '2', '3', '4'].map((id) => ({
+    id,
+    speaker: 'A',
+    text: id,
+    diceResult: '',
+  }));
+
+  // [1, 2, 3, 4]에서 [1, 2, 4]를 선택해 [3] 바로 앞으로 이동 -> [1, 2, 4, 3]
+  assert.deepEqual(
+    moveBlocks(blocks, new Set(['1', '2', '4']), '3', false).map((b) => b.id),
+    ['1', '2', '4', '3'],
+  );
+
+  // [1, 2, 3, 4]에서 [1, 2, 4]를 선택해 [3] 바로 뒤로 이동 -> [3, 1, 2, 4]
+  assert.deepEqual(
+    moveBlocks(blocks, new Set(['1', '2', '4']), '3', true).map((b) => b.id),
+    ['3', '1', '2', '4'],
+  );
+
+  // 떨어진 블록 [1, 3]을 [4] 뒤로 이동 -> [2, 4, 1, 3]
+  assert.deepEqual(
+    moveBlocks(blocks, new Set(['1', '3']), '4', true).map((b) => b.id),
+    ['2', '4', '1,3'.split(',')[0], '3'],
+  );
+
+  // 순서 변화가 없는 경우 원본 배열 참조를 그대로 반환 (불필요한 히스토리 방지)
+  assert.equal(moveBlocks(blocks, new Set(['1', '2']), '3', false), blocks);
+
+  // Alt+방향키 일괄 이동: 떨어진 [1, 3]을 위로 이동 시 첫 비선택 [2] 앞으로 응집 -> [1, 3, 2, 4]
+  assert.deepEqual(
+    moveSelectedMessages(blocks, new Set(['1', '3']), -1).map((b) => b.id),
+    ['1', '3', '2', '4'],
+  );
+
+  // Alt+방향키 일괄 이동: 떨어진 [2, 4]를 아래로 이동 시 마지막 비선택 [3] 뒤로 응집 -> [1, 3, 2, 4]
+  assert.deepEqual(
+    moveSelectedMessages(blocks, new Set(['2', '4']), 1).map((b) => b.id),
+    ['1', '3', '2', '4'],
+  );
+
+  // 원본 배열 불변 유지
+  assert.deepEqual(
+    blocks.map((b) => b.id),
+    ['1', '2', '3', '4'],
+  );
 });

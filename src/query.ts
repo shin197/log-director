@@ -27,16 +27,28 @@ export function compileQuery(query: string): (b: Block) => boolean {
   });
   return (b) => checks.every((check) => check(b));
 }
+export function moveBlocks(
+  blocks: Block[],
+  ids: Set<string>,
+  target: string,
+  after: boolean,
+): Block[] {
+  const targetIndex = blocks.findIndex((b) => b.id === target);
+  if (targetIndex < 0 || !ids.size) return blocks;
+  const moving = blocks.filter((b) => ids.has(b.id));
+  if (!moving.length) return blocks;
+  const rest = blocks.filter((b) => !ids.has(b.id));
+  const boundary = after ? targetIndex + 1 : targetIndex;
+  const insertAt = blocks.slice(0, boundary).filter((b) => !ids.has(b.id)).length;
+  const result = [...rest];
+  result.splice(insertAt, 0, ...moving);
+  return result.every((b, i) => b.id === blocks[i].id) ? blocks : result;
+}
 export function reorder(
   blocks: Block[],
   id: string,
   target: string,
   after: boolean,
 ): Block[] {
-  const item = blocks.find((b) => b.id === id);
-  if (!item || id === target || !blocks.some((b) => b.id === target)) return blocks;
-  const result = blocks.filter((b) => b.id !== id);
-  const index = result.findIndex((b) => b.id === target);
-  result.splice(index + (after ? 1 : 0), 0, item);
-  return result;
+  return moveBlocks(blocks, new Set([id]), target, after);
 }

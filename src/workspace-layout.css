@@ -52,7 +52,7 @@ body,
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px 16px 24px;
+  padding: 14px 16px 24px;
 }
 
 .log-editor > .composer {
