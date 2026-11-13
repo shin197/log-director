@@ -1,19 +1,86 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse, replaceBlocks } from './core.ts';
-import { compileQuery, moveBlocks, reorder } from './query.ts';
-test('쿼리 조건 조합, 제외, 인용문과 오류', () => {
+import {
+  compileQuery,
+  formatChipDisplay,
+  formatChipToken,
+  moveBlocks,
+  parseQueryToChipsAndText,
+  reorder,
+  sanitizeLiveQuery,
+} from './query.ts';
+test('쿼리 조건 조합, 제외, 인용문과 오류 (Discord/GitHub 스타일)', () => {
   const b = {
     id: '1',
+    characterId: 'c-zeta',
     speaker: '제타',
     text: '급한 일 공격',
-    diceResult: '성공',
+    diceResult: '1D100<=50 성공',
     channel: '메인',
+    sourceType: 'normal',
   };
-  assert.equal(compileQuery('화자:제타 text:"급한 일" -내용:실패')(b), true);
-  assert.equal(compileQuery('speaker:GM')(b), false);
+  const sysBlock = {
+    id: '2',
+    characterId: 'builtin:system',
+    text: '전투가 시작됩니다.',
+    diceResult: '',
+    channel: '메인',
+    sourceType: 'system',
+  };
+  const charNamedSystem = {
+    id: '3',
+    characterId: null,
+    speaker: 'system',
+    text: '내 이름은 system입니다.',
+    diceResult: '',
+    channel: '잡담',
+    sourceType: 'normal',
+  };
+
+  // 일반 텍스트(캐릭터/대사/판정 통합), from:, in:, dice:, is:, 제외(-) 조합
+  assert.equal(
+    compileQuery('from:제타 in:메인 dice:성공 "급한 일" -실패 -from:GM')(b),
+    true,
+  );
+  assert.equal(compileQuery('from:GM')(b), false);
+  assert.equal(compileQuery('-from:제타')(b), false);
+  assert.equal(compileQuery('-from:제타')(sysBlock), true);
+
+  // from:system은 캐릭터/화자 이름이 "system"인 메시지만 매칭하며 시스템 메시지는 매칭하지 않음
+  assert.equal(compileQuery('from:system')(sysBlock), false);
+  assert.equal(compileQuery('from:system')(charNamedSystem), true);
+
+  // is:dice, is:system, is:normal, is:unlinked 검증
+  assert.equal(compileQuery('is:dice')(b), true);
+  assert.equal(compileQuery('is:dice')(sysBlock), false);
+  assert.equal(compileQuery('is:system')(sysBlock), true);
+  assert.equal(compileQuery('is:system')(charNamedSystem), false);
+  assert.equal(compileQuery('is:normal')(b), true);
+  assert.equal(compileQuery('is:normal')(sysBlock), false);
+  assert.equal(compileQuery('is:unlinked')(charNamedSystem), true);
+  assert.equal(compileQuery('is:unlinked')(b), false);
+  assert.equal(compileQuery('is:unlinked')(sysBlock), false);
+
+  // 기존 한글 문법 및 알 수 없는 필드/조건 거부
+  assert.throws(() => compileQuery('화자:제타'));
+  assert.throws(() => compileQuery('내용:공격'));
   assert.throws(() => compileQuery('unknown:value'));
-  assert.throws(() => compileQuery('text:"미완성'));
+  assert.throws(() => compileQuery('is:unknown'));
+  assert.throws(() => compileQuery('from:"미완성'));
+
+  // 칩 파싱 및 포맷팅, 실시간 입력 보정 검증
+  const parsed = parseQueryToChipsAndText('from:제타 -in:잡담 is:dice "급한 일"');
+  assert.equal(parsed.chips.length, 3);
+  assert.equal(formatChipToken(parsed.chips[0]), 'from:제타');
+  assert.deepEqual(formatChipDisplay(parsed.chips[0]), { icon: '👤', label: '제타' });
+  assert.equal(formatChipToken(parsed.chips[1]), '-in:잡담');
+  assert.deepEqual(formatChipDisplay(parsed.chips[2]), {
+    icon: '🎲',
+    label: '판정 있음',
+  });
+  assert.equal(parsed.text, '"급한 일"');
+  assert.equal(sanitizeLiveQuery('from:제타 in:'), 'from:제타');
 });
 test('드래그 앞뒤 이동은 원본 배열을 변경하지 않음', () => {
   const blocks = ['a', 'b', 'c', 'd'].map((id) => ({

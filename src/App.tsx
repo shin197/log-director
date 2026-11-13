@@ -10,8 +10,9 @@ import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
-import { compileQuery, moveBlocks } from './query';
+import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
 import { collectChannels } from './channels';
+import { SearchBar } from './SearchBar';
 import {
   applyBulkEditToProject,
   applyBulkPatch,
@@ -74,7 +75,10 @@ function App() {
   let queryError = '';
   let predicate: (b: Block) => boolean = () => false;
   try {
-    predicate = compileQuery(searchActive ? query : '');
+    predicate = compileQuery(
+      searchActive ? sanitizeLiveQuery(query) : '',
+      p.characters ?? [],
+    );
   } catch (error) {
     queryError = String(error);
   }
@@ -618,35 +622,21 @@ function App() {
         <main className="log-editor">
           <div className="toolbar">
             <div className="toolbar-search" ref={helpRef}>
-              <div className="search-input-wrap">
-                <input
-                  ref={searchInput}
-                  aria-label="로그 검색"
-                  onFocus={() => setSearchActive(true)}
-                  placeholder="검색 (화자: 본문: dice: channel: -제외)"
-                  value={query}
-                  onChange={(e) => {
-                    selectionAnchor.current = null;
-                    setSearchActive(true);
-                    setQuery(e.target.value);
-                    setPage(0);
-                  }}
-                />
-                {query && (
-                  <button
-                    type="button"
-                    className="search-clear"
-                    aria-label="검색어 지우기"
-                    onClick={() => {
-                      setQuery('');
-                      setPage(0);
-                      searchInput.current?.focus();
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
+              <SearchBar
+                inputRef={searchInput}
+                query={query}
+                searchActive={searchActive}
+                blocks={p.blocks}
+                characters={p.characters ?? []}
+                channels={channels}
+                onActivate={() => setSearchActive(true)}
+                onChangeQuery={(nextQuery) => {
+                  selectionAnchor.current = null;
+                  setSearchActive(true);
+                  setQuery(nextQuery);
+                  setPage(0);
+                }}
+              />
               <button
                 type="button"
                 className="compact-btn"
@@ -671,17 +661,19 @@ function App() {
                   <div>
                     <strong>검색 문법</strong>
                     <ul>
+                      <li>일반 텍스트: 캐릭터·대사·판정 통합 검색</li>
                       <li>
-                        <code>speaker:제타</code> / <code>화자:GM</code>
+                        <code>from:제타</code> (캐릭터) · <code>in:메인</code> (채널)
                       </li>
                       <li>
-                        <code>text:"급한 일"</code> / <code>내용:공격</code>
+                        <code>dice:성공</code> (주사위 판정 텍스트)
                       </li>
                       <li>
-                        <code>dice:성공</code> · <code>channel:메인</code>
+                        <code>is:dice</code> · <code>is:system</code> ·{' '}
+                        <code>is:normal</code> · <code>is:unlinked</code>
                       </li>
                       <li>
-                        <code>-내용:잡담</code> (제외) · 공백은 AND
+                        <code>-from:제타</code> (제외) · <code>Tab/Enter</code> 자동완성
                       </li>
                     </ul>
                   </div>
