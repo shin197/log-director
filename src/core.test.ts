@@ -721,3 +721,34 @@ test('일괄 이동(moveBlocks, moveSelectedMessages): 떨어진 선택 블록 �
     ['1', '2', '3', '4'],
   );
 });
+
+import { collectChannels } from './channels.ts';
+test('채널 집계: 기본 채널 유지, 메시지 수 카운트, 빈 커스텀 채널 자동 제거', () => {
+  const blocks = [
+    { id: '1', speaker: 'A', text: '1', diceResult: '', channel: '메인' },
+    { id: '2', speaker: 'A', text: '2', diceResult: '', channel: '잡담' },
+    { id: '3', speaker: 'A', text: '3', diceResult: '', channel: '잡담' },
+    { id: '4', speaker: 'A', text: '4', diceResult: '', channel: '비밀' },
+  ];
+
+  assert.deepEqual(collectChannels(blocks), [
+    { name: '', count: 0, isDefault: true },
+    { name: '메인', count: 1, isDefault: true },
+    { name: '잡담', count: 2, isDefault: false },
+    { name: '비밀', count: 1, isDefault: false },
+  ]);
+
+  // '비밀' 채널의 마지막 메시지가 다른 채널로 변경되거나 삭제되면 집계에서 자연스럽게 제거됨
+  const afterMove = blocks.map((b) => (b.id === '4' ? { ...b, channel: '메인' } : b));
+  assert.deepEqual(collectChannels(afterMove), [
+    { name: '', count: 0, isDefault: true },
+    { name: '메인', count: 2, isDefault: true },
+    { name: '잡담', count: 2, isDefault: false },
+  ]);
+
+  // 빈 로그에서도 기본 채널('', '메인')은 항상 존재
+  assert.deepEqual(collectChannels([]), [
+    { name: '', count: 0, isDefault: true },
+    { name: '메인', count: 0, isDefault: true },
+  ]);
+});

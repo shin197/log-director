@@ -1,5 +1,7 @@
 import { FacePicker } from './FacePicker';
 import { SpeakerPicker } from './SpeakerPicker';
+import { ChannelPicker } from './ChannelPicker';
+import type { ChannelSummary } from './channels';
 import { defaultDisplay, displayTime, type DisplaySettings } from './presentation';
 import type { SelectionKeys } from './selection';
 import { useState, useEffect } from 'react';
@@ -14,6 +16,7 @@ export type BulkEditContext = {
   originalRepText: string;
   faceCharacter?: Character;
   mixedSpeakers: boolean;
+  mixedChannels: boolean;
   hasAnyDice: boolean;
   replaceOpen: boolean;
   replaceMatchCount: number;
@@ -28,6 +31,7 @@ export type BulkEditContext = {
 export function MessageBlock({
   block: b,
   characters = [],
+  channels = [],
   display = defaultDisplay,
   editing,
   setEditing,
@@ -49,6 +53,7 @@ export function MessageBlock({
   block: Block;
   onJump?: () => void;
   characters?: Character[];
+  channels?: ChannelSummary[];
   display?: DisplaySettings;
   editing: boolean;
   setEditing: (v: boolean) => void;
@@ -302,17 +307,19 @@ export function MessageBlock({
                 />
               )}
 
-              <input
-                className="meta-channel"
-                aria-label="채널"
-                placeholder={isBulk ? '채널 (일괄)' : '채널'}
+              <ChannelPicker
                 value={
                   isBulk
                     ? (bulkContext.state.channel ?? b.channel ?? '')
                     : (draft.channel ?? '')
                 }
-                onChange={(e) => {
-                  const val = e.target.value;
+                channels={channels}
+                mixed={
+                  isBulk &&
+                  bulkContext.mixedChannels &&
+                  bulkContext.state.channel === undefined
+                }
+                onChange={(val) => {
                   if (bulkContext) {
                     bulkContext.onChangeState((prev) => ({ ...prev, channel: val }));
                   } else {

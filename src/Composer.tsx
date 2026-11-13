@@ -2,20 +2,25 @@ import { useState } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
 import { FacePicker } from './FacePicker';
+import { ChannelPicker } from './ChannelPicker';
+import type { ChannelSummary } from './channels';
 import { handleWrapKeyDown } from './textEdit';
 
 export function Composer({
   characters,
+  channels = [],
   send,
   disabled = false,
 }: {
   characters: Character[];
+  channels?: ChannelSummary[];
   send: (b: Block) => void;
   disabled?: boolean;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
     [icon, setIcon] = useState(''),
+    [channel, setChannel] = useState('메인'),
     [text, setText] = useState(''),
     [open, setOpen] = useState(false),
     [index, setIndex] = useState(0),
@@ -44,7 +49,7 @@ export function Composer({
       text,
       diceResult: '',
       timestamp: '',
-      channel: '메인',
+      channel,
     };
     if (c) {
       b = inheritCharacter(b, c);
@@ -130,6 +135,12 @@ export function Composer({
             )}
           </div>
           <FacePicker character={character} value={icon} onChange={setIcon} />
+          <ChannelPicker
+            value={channel}
+            channels={channels}
+            onChange={setChannel}
+            compact
+          />
         </div>
 
         <textarea

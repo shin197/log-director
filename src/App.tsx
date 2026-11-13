@@ -11,6 +11,7 @@ import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, moveBlocks } from './query';
+import { collectChannels } from './channels';
 import {
   applyBulkEditToProject,
   applyBulkPatch,
@@ -19,7 +20,7 @@ import {
   pickRepresentativeId,
   type BulkEditState,
 } from './bulkEdit';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { blank, parse, replaceBlocks, type Project, type Block } from './core';
 import './style.css';
@@ -435,6 +436,8 @@ function App() {
     setTimeout(() => URL.revokeObjectURL(u), 1000);
   }
 
+  const channels = useMemo(() => collectChannels(p.blocks), [p.blocks]);
+
   const bulkTargetBlocks = bulkEdit
     ? p.blocks.filter((b) => bulkEdit.selectedIds.has(b.id))
     : [];
@@ -449,6 +452,9 @@ function App() {
             : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
         ),
       ).size > 1
+    : false;
+  const bulkMixedChannels = bulkEdit
+    ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
     : false;
   const bulkHasAnyDice = bulkEdit ? bulkTargetBlocks.some((b) => !!b.diceResult) : false;
   const bulkRepOriginalText = bulkEdit
@@ -920,6 +926,7 @@ function App() {
                     key={b.id}
                     block={displayBlock}
                     characters={p.characters}
+                    channels={channels}
                     display={p.display}
                     editing={!bulkEdit && !cutIds && editingId === b.id}
                     setEditing={(value) => {
@@ -959,6 +966,7 @@ function App() {
                             originalRepText: bulkRepOriginalText,
                             faceCharacter: bulkFaceCharacter,
                             mixedSpeakers: bulkMixedSpeakers,
+                            mixedChannels: bulkMixedChannels,
                             hasAnyDice: bulkHasAnyDice,
                             replaceOpen: bulkReplaceOpen,
                             replaceMatchCount: bulkReplaceMatchCount,
@@ -1014,6 +1022,7 @@ function App() {
 
           <Composer
             characters={p.characters ?? []}
+            channels={channels}
             send={addMessage}
             disabled={!!cutIds || !!bulkEdit}
           />

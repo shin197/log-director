@@ -924,6 +924,128 @@ code {
   background: var(--bg-hover);
 }
 
+/* Channel Picker */
+.channel-picker {
+  position: relative;
+  min-width: 108px;
+}
+
+.channel-picker.is-compact {
+  min-width: 86px;
+}
+
+.channel-trigger {
+  width: 100%;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.channel-trigger:hover {
+  border-color: var(--border-strong);
+}
+
+.channel-trigger.is-empty {
+  color: var(--text-muted);
+}
+
+.channel-trigger.is-mixed {
+  color: var(--warn);
+}
+
+.channel-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-trigger-caret {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.channel-custom-input {
+  width: 120px;
+  height: 30px;
+}
+
+.channel-picker.is-compact .channel-custom-input {
+  width: 96px;
+}
+
+.channel-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 164px;
+  max-height: 240px;
+  overflow: auto;
+  z-index: 45;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+}
+
+.composer-speaker-group .channel-options {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.channel-options button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+
+.channel-options button.is-current .channel-option-name {
+  font-weight: 600;
+}
+
+.channel-options button[aria-selected='true'] {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.channel-options button:hover:not([aria-selected='true']) {
+  background: var(--bg-hover);
+}
+
+.channel-option-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.channel-options-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 2px;
+}
+
+.channel-add-btn {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Face Picker */
 .face-picker {
   position: relative;
