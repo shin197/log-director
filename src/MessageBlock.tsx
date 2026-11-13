@@ -49,9 +49,11 @@ export function MessageBlock({
   remove,
   drop,
   onJump,
+  onEyedrop,
 }: {
   block: Block;
   onJump?: () => void;
+  onEyedrop?: () => void;
   characters?: Character[];
   channels?: ChannelSummary[];
   display?: DisplaySettings;
@@ -189,6 +191,12 @@ export function MessageBlock({
           (e.target as HTMLElement).closest('button,input,textarea')
         )
           return;
+        if (e.altKey && onEyedrop) {
+          e.preventDefault();
+          e.stopPropagation();
+          onEyedrop();
+          return;
+        }
         if (e.detail === 1) toggle({ ctrlKey: e.ctrlKey, shiftKey: e.shiftKey });
       }}
       onDoubleClick={(e) => {

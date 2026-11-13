@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
 import { FacePicker } from './FacePicker';
@@ -6,16 +6,26 @@ import { ChannelPicker } from './ChannelPicker';
 import type { ChannelSummary } from './channels';
 import { handleWrapKeyDown } from './textEdit';
 
+export type EyedropPayload = {
+  speaker: string;
+  characterId: string | null;
+  iconUrl: string;
+  channel: string;
+  key: number;
+};
+
 export function Composer({
   characters,
   channels = [],
   send,
   disabled = false,
+  eyedrop = null,
 }: {
   characters: Character[];
   channels?: ChannelSummary[];
   send: (b: Block) => void;
   disabled?: boolean;
+  eyedrop?: EyedropPayload | null;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
@@ -25,6 +35,16 @@ export function Composer({
     [open, setOpen] = useState(false),
     [index, setIndex] = useState(0),
     [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (!eyedrop) return;
+    setName(eyedrop.speaker);
+    setId(eyedrop.characterId);
+    setIcon(eyedrop.iconUrl);
+    setChannel(eyedrop.channel);
+    setOpen(false);
+    setCollapsed(false);
+  }, [eyedrop]);
 
   const character = characters.find((c) => c.id === id);
   const matches = characters.filter((c) => fuzzyName(c.name, name));

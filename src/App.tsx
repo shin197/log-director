@@ -3,7 +3,7 @@ import {
   moveSelectedMessages,
   type NavigationKey,
 } from './keyboardNavigation';
-import { Composer } from './Composer';
+import { Composer, type EyedropPayload } from './Composer';
 import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
@@ -12,6 +12,7 @@ import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selec
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
 import { collectChannels } from './channels';
+import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { SearchBar } from './SearchBar';
 import {
   applyBulkEditToProject,
@@ -63,6 +64,7 @@ function App() {
   const [pasteTarget, setPasteTarget] = useState<{ id: string; after: boolean } | null>(
     null,
   );
+  const [eyedrop, setEyedrop] = useState<EyedropPayload | null>(null);
 
   const commit = (next: Project) => {
     setPast((x) => [...x, p].slice(-100));
@@ -134,6 +136,25 @@ function App() {
     setCutIds(null);
     setPasteTarget(null);
     pendingFocus.current = null;
+  }
+
+  function eyedropBlock(b: Block) {
+    const isSystem = b.sourceType === 'system' || b.characterId === SYSTEM_CHARACTER_ID;
+    const linked = b.characterId
+      ? (p.characters ?? []).find((c) => c.id === b.characterId)
+      : undefined;
+    const speaker = isSystem ? '시스템' : (linked?.name ?? b.speaker ?? '');
+    const characterId = isSystem ? SYSTEM_CHARACTER_ID : (b.characterId ?? null);
+    const iconUrl = isSystem ? '' : (b.iconUrl ?? '');
+    const channel = b.channel ?? '';
+    setEyedrop({
+      speaker,
+      characterId,
+      iconUrl,
+      channel,
+      key: Date.now() + Math.random(),
+    });
+    setNotice(`‘${speaker || '화자 없음'}’ 캐릭터 정보를 입력창에 가져왔습니다.`);
   }
 
   function startCutMode() {
@@ -294,6 +315,17 @@ function App() {
             setSelected(new Set(p.blocks.map((b) => b.id)));
           }
           return;
+        }
+        if (key === 'c' && !e.shiftKey && !window.getSelection()?.toString()) {
+          const targetId = cursorId.current ?? [...selected][0];
+          const targetBlock = targetId
+            ? p.blocks.find((b) => b.id === targetId)
+            : undefined;
+          if (targetBlock) {
+            e.preventDefault();
+            eyedropBlock(targetBlock);
+            return;
+          }
         }
         if (key === 'x' && selected.size) {
           e.preventDefault();
@@ -983,6 +1015,7 @@ function App() {
                         ? () => jumpToMessage(b.id)
                         : undefined
                     }
+                    onEyedrop={() => eyedropBlock(b)}
                     toggle={(keys: SelectionKeys) => {
                       if (bulkEdit) return;
                       const next = selectMessage(
@@ -1020,6 +1053,7 @@ function App() {
             channels={channels}
             send={addMessage}
             disabled={!!cutIds || !!bulkEdit}
+            eyedrop={eyedrop}
           />
 
           <div className="status-bar">
