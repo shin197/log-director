@@ -450,12 +450,12 @@ function App() {
     : undefined;
   const bulkMixedSpeakers = bulkEdit
     ? new Set(
-        bulkTargetBlocks.map((b) =>
-          b.sourceType === 'system'
-            ? 'system'
-            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
-        ),
-      ).size > 1
+      bulkTargetBlocks.map((b) =>
+        b.sourceType === 'system'
+          ? 'system'
+          : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+      ),
+    ).size > 1
     : false;
   const bulkMixedChannels = bulkEdit
     ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
@@ -644,7 +644,7 @@ function App() {
                 onClick={toggleSearch}
                 title="검색 필터 켜기/끄기 (Ctrl+F)"
               >
-                {searchActive ? '필터 켜짐' : '필터'}
+                {searchActive ? '필터 ON' : '필터 OFF'}
               </button>
               <button
                 type="button"
@@ -938,11 +938,11 @@ function App() {
                     onPasteHover={
                       cutIds
                         ? (after) =>
-                            setPasteTarget((prev) =>
-                              prev?.id === b.id && prev.after === after
-                                ? prev
-                                : { id: b.id, after },
-                            )
+                          setPasteTarget((prev) =>
+                            prev?.id === b.id && prev.after === after
+                              ? prev
+                              : { id: b.id, after },
+                          )
                         : undefined
                     }
                     onPasteHere={
@@ -953,26 +953,26 @@ function App() {
                     bulkContext={
                       isBulkRep && bulkEdit
                         ? {
-                            count: bulkEdit.selectedIds.size,
-                            state: bulkEdit,
-                            originalRepText: bulkRepOriginalText,
-                            faceCharacter: bulkFaceCharacter,
-                            mixedSpeakers: bulkMixedSpeakers,
-                            mixedChannels: bulkMixedChannels,
-                            hasAnyDice: bulkHasAnyDice,
-                            replaceOpen: bulkReplaceOpen,
-                            replaceMatchCount: bulkReplaceMatchCount,
-                            onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                            onCloseReplace: () => setBulkReplaceOpen(false),
-                            onChangeState: (updater) =>
-                              setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                            onSave: saveBulkEdit,
-                            onCancel: () => {
-                              setBulkEdit(null);
-                              setBulkReplaceOpen(false);
-                            },
-                            onDelete: deleteSelected,
-                          }
+                          count: bulkEdit.selectedIds.size,
+                          state: bulkEdit,
+                          originalRepText: bulkRepOriginalText,
+                          faceCharacter: bulkFaceCharacter,
+                          mixedSpeakers: bulkMixedSpeakers,
+                          mixedChannels: bulkMixedChannels,
+                          hasAnyDice: bulkHasAnyDice,
+                          replaceOpen: bulkReplaceOpen,
+                          replaceMatchCount: bulkReplaceMatchCount,
+                          onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                          onCloseReplace: () => setBulkReplaceOpen(false),
+                          onChangeState: (updater) =>
+                            setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                          onSave: saveBulkEdit,
+                          onCancel: () => {
+                            setBulkEdit(null);
+                            setBulkReplaceOpen(false);
+                          },
+                          onDelete: deleteSelected,
+                        }
                         : undefined
                     }
                     onJump={

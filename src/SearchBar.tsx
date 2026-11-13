@@ -17,41 +17,41 @@ const MAX_HISTORY = 6;
 
 type SuggestionItem =
   | {
-      id: string;
-      section: string;
-      kind: 'prefix';
-      prefix: string;
-      icon: string;
-      label: string;
-      syntax: string;
-      description: string;
-    }
+    id: string;
+    section: string;
+    kind: 'prefix';
+    prefix: string;
+    icon: string;
+    label: string;
+    syntax: string;
+    description: string;
+  }
   | {
-      id: string;
-      section: string;
-      kind: 'chip';
-      chip: Omit<SearchChip, 'id'>;
-      icon: string;
-      label: string;
-      syntax: string;
-      meta?: string;
-    }
+    id: string;
+    section: string;
+    kind: 'chip';
+    chip: Omit<SearchChip, 'id'>;
+    icon: string;
+    label: string;
+    syntax: string;
+    meta?: string;
+  }
   | {
-      id: string;
-      section: string;
-      kind: 'text-commit';
-      icon: string;
-      label: string;
-      syntax: string;
-    }
+    id: string;
+    section: string;
+    kind: 'text-commit';
+    icon: string;
+    label: string;
+    syntax: string;
+  }
   | {
-      id: string;
-      section: string;
-      kind: 'history';
-      query: string;
-      icon: string;
-      label: string;
-    };
+    id: string;
+    section: string;
+    kind: 'history';
+    query: string;
+    icon: string;
+    label: string;
+  };
 
 function loadSearchHistory(): string[] {
   try {
@@ -148,7 +148,8 @@ export function SearchBar({
   useEffect(() => {
     if (!dropdownOpen) return;
     function handleOutside(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (target.isConnected && !containerRef.current?.contains(target)) {
         setDropdownOpen(false);
         setFocusedChipIndex(null);
       }
@@ -405,31 +406,31 @@ export function SearchBar({
         label: string;
         description: string;
       }[] = [
-        {
-          prefix: '-from:',
-          icon: '-👤',
-          label: '특정 캐릭터 제외',
-          description: '화자가 해당 캐릭터가 아닌 메시지',
-        },
-        {
-          prefix: '-in:',
-          icon: '-#',
-          label: '특정 채널 제외',
-          description: '해당 탭/채널이 아닌 메시지',
-        },
-        {
-          prefix: '-dice:',
-          icon: '-🎲',
-          label: '특정 주사위 판정 제외',
-          description: '판정 결과에 특정 텍스트가 없는 메시지',
-        },
-        {
-          prefix: '-is:',
-          icon: '-✨',
-          label: '특정 상태 메시지 제외',
-          description: '시스템·판정·미연결 등 제외',
-        },
-      ];
+          {
+            prefix: '-from:',
+            icon: '-👤',
+            label: '특정 캐릭터 제외',
+            description: '화자가 해당 캐릭터가 아닌 메시지',
+          },
+          {
+            prefix: '-in:',
+            icon: '-#',
+            label: '특정 채널 제외',
+            description: '해당 탭/채널이 아닌 메시지',
+          },
+          {
+            prefix: '-dice:',
+            icon: '-🎲',
+            label: '특정 주사위 판정 제외',
+            description: '판정 결과에 특정 텍스트가 없는 메시지',
+          },
+          {
+            prefix: '-is:',
+            icon: '-✨',
+            label: '특정 상태 메시지 제외',
+            description: '시스템·판정·미연결 등 제외',
+          },
+        ];
 
       for (const np of negPrefixes) {
         if (!sub || np.prefix.includes(lowerToken)) {
@@ -456,42 +457,42 @@ export function SearchBar({
       description: string;
       keywords: string[];
     }[] = [
-      {
-        prefix: 'from:',
-        icon: '👤',
-        label: '캐릭터로 검색',
-        description: '특정 캐릭터/화자의 메시지 필터링',
-        keywords: ['from', 'character', 'speaker', '캐릭터', '화자'],
-      },
-      {
-        prefix: 'in:',
-        icon: '#',
-        label: '채널로 검색',
-        description: '특정 탭/채널의 메시지 필터링',
-        keywords: ['in', 'channel', 'tab', '채널', '탭'],
-      },
-      {
-        prefix: 'dice:',
-        icon: '🎲',
-        label: '주사위 필터',
-        description: '주사위 판정 내부 텍스트 필터링',
-        keywords: ['dice', 'roll', '주사위', '판정'],
-      },
-      {
-        prefix: 'is:',
-        icon: '✨',
-        label: '상태 필터',
-        description: 'is:dice, is:system, is:normal, is:unlinked',
-        keywords: ['is', 'system', 'normal', 'unlinked', '상태', '시스템', '미연결'],
-      },
-      {
-        prefix: '-',
-        icon: '🚫',
-        label: '제외 조건',
-        description: '-from:제타 등 조건에 해당하지 않는 메시지',
-        keywords: ['-', 'not', 'exclude', '제외'],
-      },
-    ];
+        {
+          prefix: 'from:',
+          icon: '👤',
+          label: '캐릭터로 검색',
+          description: '특정 캐릭터/화자의 메시지 필터링',
+          keywords: ['from', 'character', 'speaker', '캐릭터', '화자'],
+        },
+        {
+          prefix: 'in:',
+          icon: '#',
+          label: '채널로 검색',
+          description: '특정 탭/채널의 메시지 필터링',
+          keywords: ['in', 'channel', 'tab', '채널', '탭'],
+        },
+        {
+          prefix: 'dice:',
+          icon: '🎲',
+          label: '주사위 필터',
+          description: '주사위 판정 내부 텍스트 필터링',
+          keywords: ['dice', 'roll', '주사위', '판정'],
+        },
+        {
+          prefix: 'is:',
+          icon: '✨',
+          label: '상태 필터',
+          description: 'is:dice, is:system, is:normal, is:unlinked',
+          keywords: ['is', 'system', 'normal', 'unlinked', '상태', '시스템', '미연결'],
+        },
+        {
+          prefix: '-',
+          icon: '🚫',
+          label: '제외 조건',
+          description: '-from:제타 등 조건에 해당하지 않는 메시지',
+          keywords: ['-', 'not', 'exclude', '제외'],
+        },
+      ];
 
     const matchingRoot = rootOptions.filter(
       (opt) =>
@@ -560,24 +561,18 @@ export function SearchBar({
           });
         }
       }
-    }
-
-    // 상태 필터 빠른 선택
-    for (const flag of IS_FLAGS) {
-      if (
-        !lowerToken ||
-        flag.value.includes(lowerToken) ||
-        flag.label.includes(lowerToken)
-      ) {
-        items.push({
-          id: `quick-is-${flag.value}`,
-          section: '상태 필터',
-          kind: 'chip',
-          chip: { key: 'is', value: flag.value, negative: false },
-          icon: flag.icon,
-          label: `${flag.label} (${flag.description})`,
-          syntax: `is:${flag.value}`,
-        });
+      for (const flag of IS_FLAGS) {
+        if (flag.value.includes(lowerToken) || flag.label.includes(lowerToken)) {
+          items.push({
+            id: `quick-is-${flag.value}`,
+            section: '상태 필터',
+            kind: 'chip',
+            chip: { key: 'is', value: flag.value, negative: false },
+            icon: flag.icon,
+            label: `${flag.label} (${flag.description})`,
+            syntax: `is:${flag.value}`,
+          });
+        }
       }
     }
 
@@ -746,7 +741,7 @@ export function SearchBar({
               : undefined
           }
           placeholder={
-            chips.length ? '검색어 또는 필터 추가...' : '검색 (from: in: dice: is: -제외)'
+            chips.length ? '검색어 또는 필터 추가...' : '검색 필터'
           }
           value={text}
           onFocus={() => {
@@ -812,7 +807,7 @@ export function SearchBar({
               } else if (suggestions.length > 0) {
                 setActiveIndex(
                   (safeIndex + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) %
-                    suggestions.length,
+                  suggestions.length,
                 );
               }
               return;
@@ -900,6 +895,10 @@ export function SearchBar({
                   onMouseEnter={() => setActiveIndex(idx)}
                   onMouseDown={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     applySuggestion(item);
                   }}
                 >

@@ -9,7 +9,7 @@ export type ChannelSummary = {
 export const DEFAULT_CHANNELS = ['', '메인'] as const;
 
 export function formatChannelLabel(name: string): string {
-  return name === '' ? '(채널 없음)' : name;
+  return name === '' ? '빈 채널' : name;
 }
 
 export function collectChannels(blocks: Block[]): ChannelSummary[] {
