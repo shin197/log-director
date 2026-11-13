@@ -498,7 +498,7 @@ export function MessageBlock({
                 autoFocus
                 aria-label="메시지 본문"
                 placeholder="메시지 본문…"
-                rows={Math.max(2, Math.min(18, draft.text.split('\n').length))}
+                rows={Math.max(1, Math.min(18, draft.text.split('\n').length))}
                 value={draft.text}
                 onChange={(e) => setDraft({ ...draft, text: e.target.value })}
                 onKeyDown={(e) => {
