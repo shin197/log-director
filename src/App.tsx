@@ -1,3 +1,5 @@
+import { Composer } from './Composer';
+import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
@@ -46,8 +48,79 @@ function App() {
     if (queryError) notifyError(queryError);
   }, [queryError]);
   const visible = p.blocks.filter(predicate);
-  const pages = Math.max(1, Math.ceil(visible.length / 100)),
+  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
     current = Math.min(page, pages - 1);
+  const pendingFocus = useRef<{ id: string; direction: number } | null>(null);
+  function addMessage(b: Block) {
+    const last = p.blocks.findLastIndex((x) => selected.has(x.id));
+    const index = last < 0 ? p.blocks.length : last + 1;
+    const blocks = [...p.blocks];
+    blocks.splice(index, 0, b);
+    commit({ ...p, blocks });
+    setSelected(new Set([b.id]));
+    setQuery('');
+    setPage(Math.floor(index / PAGE_SIZE));
+  }
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => {
+      if (tab !== '로그' || document.querySelector('dialog[open]')) return;
+      if (e.key === 'Escape') {
+        setSelected(new Set());
+        setEditingId(null);
+        return;
+      }
+      if (
+        (e.target as HTMLElement).closest(
+          'input,textarea,select,button,[contenteditable=true]',
+        ) ||
+        editingId
+      )
+        return;
+      if (!['ArrowUp', 'ArrowDown'].includes(e.key) || !visible.length) return;
+      e.preventDefault();
+      const direction = e.key === 'ArrowDown' ? 1 : -1;
+      const anchor = selectionAnchor.current?.id ?? [...selected].at(-1);
+      const old = visible.findIndex((b) => b.id === anchor);
+      const index = Math.max(
+        0,
+        Math.min(visible.length - 1, old < 0 ? 0 : old + direction),
+      );
+      const id = visible[index].id;
+      pendingFocus.current = { id, direction };
+      setSelected(new Set([id]));
+      setPage(Math.floor(index / PAGE_SIZE));
+    };
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, [tab, visible, selected, editingId]);
+  useEffect(() => {
+    const request = pendingFocus.current;
+    if (!request) return;
+    const nodes = Array.from(
+      document.querySelectorAll<HTMLElement>('.log-scroll [data-message-id]'),
+    );
+    const index = nodes.findIndex((n) => n.dataset.messageId === request.id);
+    const node = nodes[index];
+    const scroller = document.querySelector<HTMLElement>('.log-scroll');
+    if (!node || !scroller) return;
+    pendingFocus.current = null;
+    node.focus({ preventScroll: true });
+    const rect = node.getBoundingClientRect(),
+      bounds = scroller.getBoundingClientRect();
+    const neighbors = [
+      nodes[index + request.direction],
+      nodes[index + 2 * request.direction],
+    ].filter(Boolean);
+    const margin = Math.min(
+      300,
+      neighbors.reduce((sum, n) => sum + n.getBoundingClientRect().height, 0),
+      Math.max(0, scroller.clientHeight - rect.height),
+    );
+    if (request.direction > 0 && rect.bottom + margin > bounds.bottom)
+      scroller.scrollTop += rect.bottom + margin - bounds.bottom;
+    else if (request.direction < 0 && rect.top - margin < bounds.top)
+      scroller.scrollTop += rect.top - margin - bounds.top;
+  }, [selected, current]);
   function save(value: string, name: string) {
     const u = URL.createObjectURL(
       new Blob([value], { type: 'application/json;charset=utf-8' }),
@@ -121,118 +194,123 @@ function App() {
       </nav>
       {exportOpen && <ExportDialog project={p} onClose={() => setExportOpen(false)} />}
       {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
-      {tab === '설정' && <SettingsPanel project={p} commit={commit} />}
-      <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
-        <aside>
-          <h2>작업 공간</h2>
-          <input
-            aria-label="프로젝트 제목"
-            value={p.title}
-            onChange={(e) => commit({ ...p, title: e.target.value })}
-          />
-          <p>
-            {p.blocks.length.toLocaleString()}개 블록 · {selected.size}개 선택
-          </p>
-          <button
-            onClick={() => {
-              const b = {
-                id: crypto.randomUUID(),
-                speaker: '',
-                text: '',
-                diceResult: '',
-              };
-              const last = p.blocks.findLastIndex((b) => selected.has(b.id));
-              const bs = [...p.blocks];
-              bs.splice(last < 0 ? bs.length : last + 1, 0, b);
-              commit({ ...p, blocks: bs });
-              setSelected(new Set([b.id]));
-              setQuery('');
-              setPage(Math.floor((last < 0 ? bs.length - 1 : last + 1) / 100));
-            }}
-          >
-            ＋ 블록 추가
-          </button>
-          <button
-            disabled={!selected.size}
-            onClick={() => {
-              commit({ ...p, blocks: p.blocks.filter((b) => !selected.has(b.id)) });
-              setSelected(new Set());
-            }}
-          >
-            선택 블록 제거
-          </button>
-          <div className="row">
+      {tab === '설정' && (
+        <div className="settings-scroll">
+          <SettingsPanel project={p} commit={commit} />
+          <section className="project-panel">
+            {' '}
+            <h2>작업 공간</h2>
+            <input
+              aria-label="프로젝트 제목"
+              value={p.title}
+              onChange={(e) => commit({ ...p, title: e.target.value })}
+            />
+            <p>
+              {p.blocks.length.toLocaleString()}개 블록 · {selected.size}개 선택
+            </p>
             <button
-              disabled={!past.length}
+              disabled={!selected.size}
               onClick={() => {
-                setFuture([p, ...future]);
-                setP(past[past.length - 1]);
-                setPast(past.slice(0, -1));
+                commit({ ...p, blocks: p.blocks.filter((b) => !selected.has(b.id)) });
                 setSelected(new Set());
               }}
             >
-              ↶ 취소
+              선택 블록 제거
+            </button>
+            <div className="row">
+              <button
+                disabled={!past.length}
+                onClick={() => {
+                  setFuture([p, ...future]);
+                  setP(past[past.length - 1]);
+                  setPast(past.slice(0, -1));
+                  setSelected(new Set());
+                }}
+              >
+                ↶ 취소
+              </button>
+              <button
+                disabled={!future.length}
+                onClick={() => {
+                  setPast([...past, p]);
+                  setP(future[0]);
+                  setFuture(future.slice(1));
+                  setSelected(new Set());
+                }}
+              >
+                ↷ 다시
+              </button>
+            </div>
+            <h2>원본 보관함</h2>
+            <p>{p.original?.name ?? '새로 작성한 로그'}</p>
+            <button disabled={!p.original} onClick={() => setOriginal(!original)}>
+              원본 보기 / 닫기
             </button>
             <button
-              disabled={!future.length}
+              disabled={!p.original}
+              onClick={() => p.original && save(p.original.raw, p.original.name)}
+            >
+              보관된 원문 내려받기
+            </button>
+            <small>
+              원본 문자열과 모든 원본 필드는 프로젝트 안에 별도로 보존됩니다. 제거는
+              편집본에만 적용됩니다.
+            </small>
+            {original && <pre className="original">{p.original?.raw}</pre>}
+          </section>
+        </div>
+      )}
+      <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
+        <aside className="log-sidebar">
+          <div className="log-sidebar-tools">
+            <h2>일괄 치환</h2>
+            <p>선택한 블록의 본문에 적용합니다.</p>
+            <input
+              aria-label="찾을 문자열"
+              placeholder="찾을 문자열"
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+            />
+            <input
+              aria-label="바꿀 문자열"
+              placeholder="바꿀 문자열"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+            <button
+              disabled={!find || !selected.size}
               onClick={() => {
-                setPast([...past, p]);
-                setP(future[0]);
-                setFuture(future.slice(1));
-                setSelected(new Set());
+                const count = p.blocks.filter(
+                  (b) => selected.has(b.id) && b.text.includes(find),
+                ).length;
+                if (
+                  count &&
+                  confirm(
+                    `${count}개 블록의 본문에서 “${find}” → “${to}”로 모두 치환할까요?`,
+                  )
+                ) {
+                  commit(replaceBlocks(p, selected, find, to));
+                  setNotice(
+                    `${count}개 블록 치환 완료. 한 번에 실행 취소할 수 있습니다.`,
+                  );
+                }
               }}
             >
-              ↷ 다시
+              치환 검토 및 적용
+            </button>
+            <button
+              onClick={() => {
+                const blocks = mergeConsecutive(p.blocks);
+                commit({ ...p, blocks });
+                setSelected(new Set());
+                setEditingId(null);
+                setNotice(`${p.blocks.length - blocks.length}개 블록을 병합했습니다.`);
+              }}
+            >
+              연속 메시지 병합
             </button>
           </div>
-          <h2>일괄 치환</h2>
-          <p>선택한 블록의 본문에 적용합니다.</p>
-          <input
-            aria-label="찾을 문자열"
-            placeholder="찾을 문자열"
-            value={find}
-            onChange={(e) => setFind(e.target.value)}
-          />
-          <input
-            aria-label="바꿀 문자열"
-            placeholder="바꿀 문자열"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-          <button
-            disabled={!find || !selected.size}
-            onClick={() => {
-              const count = p.blocks.filter(
-                (b) => selected.has(b.id) && b.text.includes(find),
-              ).length;
-              if (
-                count &&
-                confirm(
-                  `${count}개 블록의 본문에서 “${find}” → “${to}”로 모두 치환할까요?`,
-                )
-              ) {
-                commit(replaceBlocks(p, selected, find, to));
-                setNotice(`${count}개 블록 치환 완료. 한 번에 실행 취소할 수 있습니다.`);
-              }
-            }}
-          >
-            치환 검토 및 적용
-          </button>
-          <h2>원본 보관함</h2>
-          <p>{p.original?.name ?? '새로 작성한 로그'}</p>
-          <button disabled={!p.original} onClick={() => setOriginal(!original)}>
-            원본 보기 / 닫기
-          </button>
-          <button
-            disabled={!p.original}
-            onClick={() => p.original && save(p.original.raw, p.original.name)}
-          >
-            보관된 원문 내려받기
-          </button>
-          <small>
-            원본 문자열과 모든 원본 필드는 프로젝트 안에 별도로 보존됩니다. 제거는
-            편집본에만 적용됩니다.
-          </small>
+          <Composer characters={p.characters ?? []} send={addMessage} />
         </aside>
         <main className="log-editor">
           <div className="toolbar">
@@ -263,7 +341,7 @@ function App() {
             <p role="status" className="notice">
               {notice}
             </p>
-            {original && <pre className="original">{p.original?.raw}</pre>}
+
             <div className="row">
               <span>검색 결과 {visible.length}개</span>
               <button disabled={!current} onClick={() => setPage(current - 1)}>
@@ -282,10 +360,10 @@ function App() {
             {!visible.length && (
               <div className="empty">
                 <h1>로그가 비어있습니다.</h1>
-                <p>JSON을 열거나 ‘블록 추가’로 시작하세요.</p>
+                <p>JSON을 열거나 왼쪽 채팅창에서 메시지를 입력하세요.</p>
               </div>
             )}
-            {visible.slice(current * 100, (current + 1) * 100).map((b) => (
+            {visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((b) => (
               <MessageBlock
                 key={b.id}
                 block={b}

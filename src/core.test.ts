@@ -384,3 +384,41 @@ test('이전 null 시스템 화자는 불러올 때 키 제거', () => {
     false,
   );
 });
+
+import { mergeConsecutive, PAGE_SIZE } from './logOperations.ts';
+test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각을 유지', () => {
+  const p = parse(
+    JSON.stringify({
+      messages: [
+        {
+          speaker: 'GM',
+          text: '첫 줄',
+          channelName: '메인',
+          iconUrl: 'https://example.com/a',
+          timestamp: 'first',
+        },
+        {
+          speaker: 'GM',
+          text: '다음 줄',
+          channelName: '메인',
+          iconUrl: 'https://example.com/b',
+          timestamp: 'second',
+        },
+        { speaker: 'GM', text: '잡담', channelName: '잡담' },
+        { type: 'system', text: '공지1', channelName: '메인' },
+        { type: 'system', text: '공지2', channelName: '메인' },
+      ],
+    }),
+    'sample.json',
+  );
+  const before = JSON.stringify(p);
+  const blocks = mergeConsecutive(p.blocks);
+  assert.equal(blocks.length, 3);
+  assert.equal(blocks[0].text, '첫 줄\n다음 줄');
+  assert.equal(blocks[0].timestamp, 'first');
+  assert.equal(blocks[0].iconUrl, 'https://example.com/a');
+  assert.equal(blocks[2].text, '공지1\n공지2');
+  assert.equal(Object.hasOwn(blocks[2], 'speaker'), false);
+  assert.equal(JSON.stringify(p), before);
+  assert.equal(PAGE_SIZE, 1000);
+});

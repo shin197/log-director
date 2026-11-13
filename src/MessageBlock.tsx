@@ -1,3 +1,4 @@
+import { FacePicker } from './FacePicker';
 import { SpeakerPicker } from './SpeakerPicker';
 import { defaultDisplay, displayTime, type DisplaySettings } from './presentation';
 import type { SelectionKeys } from './selection';
@@ -43,6 +44,7 @@ export function MessageBlock({
   };
   return (
     <article
+      data-message-id={b.id}
       className={`log-message ${(editing ? draft : b).sourceType === 'system' ? 'system' : ''} ${selected ? 'selected' : ''} ${editing ? 'editing' : ''} ${over}`}
       draggable={!editing}
       onDragStart={(e) => {
@@ -89,15 +91,26 @@ export function MessageBlock({
     >
       {(editing ? draft : b).sourceType !== 'system' && (
         <div className="avatar">
-          {b.iconUrl && /^https?:\/\//.test(b.iconUrl) && (
-            <img
-              draggable={false}
-              src={b.iconUrl}
-              alt=""
-              loading="lazy"
-              referrerPolicy="no-referrer"
+          {editing && draft.characterId ? (
+            <FacePicker
+              character={characters.find((c) => c.id === draft.characterId)}
+              value={draft.iconUrl ?? ''}
+              onChange={(iconUrl) => setDraft({ ...draft, iconUrl })}
+              imageButton
             />
-          )}
+          ) : (
+            <>
+              {b.iconUrl && /^https?:\/\//.test(b.iconUrl) && (
+                <img
+                  draggable={false}
+                  src={b.iconUrl}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+            </>
+          )}{' '}
         </div>
       )}
       <div className="message-content">
