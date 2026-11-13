@@ -103,7 +103,10 @@ function App() {
 
   function toggleSearch() {
     if (searchActive) {
-      disableSearch();
+      setSearchActive(false);
+      selectionAnchor.current = null;
+      setPage(0);
+      searchInput.current?.blur();
     } else {
       setSearchActive(true);
       searchInput.current?.focus();
@@ -450,12 +453,12 @@ function App() {
     : undefined;
   const bulkMixedSpeakers = bulkEdit
     ? new Set(
-      bulkTargetBlocks.map((b) =>
-        b.sourceType === 'system'
-          ? 'system'
-          : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
-      ),
-    ).size > 1
+        bulkTargetBlocks.map((b) =>
+          b.sourceType === 'system'
+            ? 'system'
+            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+        ),
+      ).size > 1
     : false;
   const bulkMixedChannels = bulkEdit
     ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
@@ -639,7 +642,7 @@ function App() {
               />
               <button
                 type="button"
-                className="compact-btn"
+                className="compact-btn filter-toggle-btn"
                 aria-pressed={searchActive}
                 onClick={toggleSearch}
                 title="검색 필터 켜기/끄기 (Ctrl+F)"
@@ -938,11 +941,11 @@ function App() {
                     onPasteHover={
                       cutIds
                         ? (after) =>
-                          setPasteTarget((prev) =>
-                            prev?.id === b.id && prev.after === after
-                              ? prev
-                              : { id: b.id, after },
-                          )
+                            setPasteTarget((prev) =>
+                              prev?.id === b.id && prev.after === after
+                                ? prev
+                                : { id: b.id, after },
+                            )
                         : undefined
                     }
                     onPasteHere={
@@ -953,26 +956,26 @@ function App() {
                     bulkContext={
                       isBulkRep && bulkEdit
                         ? {
-                          count: bulkEdit.selectedIds.size,
-                          state: bulkEdit,
-                          originalRepText: bulkRepOriginalText,
-                          faceCharacter: bulkFaceCharacter,
-                          mixedSpeakers: bulkMixedSpeakers,
-                          mixedChannels: bulkMixedChannels,
-                          hasAnyDice: bulkHasAnyDice,
-                          replaceOpen: bulkReplaceOpen,
-                          replaceMatchCount: bulkReplaceMatchCount,
-                          onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                          onCloseReplace: () => setBulkReplaceOpen(false),
-                          onChangeState: (updater) =>
-                            setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                          onSave: saveBulkEdit,
-                          onCancel: () => {
-                            setBulkEdit(null);
-                            setBulkReplaceOpen(false);
-                          },
-                          onDelete: deleteSelected,
-                        }
+                            count: bulkEdit.selectedIds.size,
+                            state: bulkEdit,
+                            originalRepText: bulkRepOriginalText,
+                            faceCharacter: bulkFaceCharacter,
+                            mixedSpeakers: bulkMixedSpeakers,
+                            mixedChannels: bulkMixedChannels,
+                            hasAnyDice: bulkHasAnyDice,
+                            replaceOpen: bulkReplaceOpen,
+                            replaceMatchCount: bulkReplaceMatchCount,
+                            onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                            onCloseReplace: () => setBulkReplaceOpen(false),
+                            onChangeState: (updater) =>
+                              setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                            onSave: saveBulkEdit,
+                            onCancel: () => {
+                              setBulkEdit(null);
+                              setBulkReplaceOpen(false);
+                            },
+                            onDelete: deleteSelected,
+                          }
                         : undefined
                     }
                     onJump={

@@ -323,6 +323,12 @@ code {
   min-width: 200px;
 }
 
+.filter-toggle-btn {
+  min-width: 72px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .search-bar-container {
   position: relative;
   flex: 1;
@@ -714,7 +720,7 @@ code {
   background: rgba(77, 184, 154, 0.04);
 }
 
-.log-message.is-cut > :not(.paste-indicator) {
+.log-message.is-cut> :not(.paste-indicator) {
   opacity: 0.42;
 }
 
@@ -880,7 +886,7 @@ code {
 
 .message-edit-trigger,
 .message-jump {
-  padding: 2px 8px;
+  padding: 3px 8px;
   font-size: 11.5px;
   background: var(--bg-elevated);
   border-color: var(--border-default);
@@ -960,7 +966,7 @@ code {
   color: var(--text-secondary);
 }
 
-.bulk-replace-summary > span {
+.bulk-replace-summary>span {
   margin-right: auto;
 }
 
@@ -1637,7 +1643,7 @@ code {
   gap: 8px;
 }
 
-.field-inline > input {
+.field-inline>input {
   flex: 1;
   min-width: 0;
 }
@@ -1780,7 +1786,7 @@ code {
   flex-wrap: wrap;
 }
 
-.settings-row > .stack-field {
+.settings-row>.stack-field {
   flex: 1 1 200px;
 }
 
@@ -1828,7 +1834,7 @@ code {
   flex-wrap: wrap;
 }
 
-.original-box-head > div:first-child {
+.original-box-head>div:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2053,7 +2059,7 @@ dialog::backdrop {
   animation: toast-fade 6.5s linear forwards;
 }
 
-.error-toast > div {
+.error-toast>div {
   flex: 1;
   min-width: 0;
 }
@@ -2079,6 +2085,7 @@ dialog::backdrop {
 }
 
 @keyframes toast-fade {
+
   0%,
   25% {
     opacity: 1;
