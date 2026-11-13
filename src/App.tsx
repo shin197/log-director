@@ -1,3 +1,4 @@
+import { navigateMessages, swapMessage, type NavigationKey } from './keyboardNavigation';
 import { Composer } from './Composer';
 import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
@@ -24,9 +25,11 @@ function App() {
   const [notice, setNotice] = useState('로그를 열거나 새 블록을 추가하세요.');
   const [page, setPage] = useState(0);
   const [original, setOriginal] = useState(false);
+  const cursorId = useRef<string | null>(null);
   const selectionAnchor = useRef<SelectionAnchor>(null);
   const setSelected = (value: Set<string>) => {
     selectionAnchor.current = null;
+    cursorId.current = [...value].at(-1) ?? null;
     setSelectedRaw(value);
   };
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,6 +54,30 @@ function App() {
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
     current = Math.min(page, pages - 1);
   const pendingFocus = useRef<{ id: string; direction: number } | null>(null);
+  function resetInteraction() {
+    setSelected(new Set());
+    setEditingId(null);
+    pendingFocus.current = null;
+  }
+  function undo() {
+    if (!past.length) return;
+    setFuture([p, ...future]);
+    setP(past[past.length - 1]);
+    setPast(past.slice(0, -1));
+    resetInteraction();
+  }
+  function redo() {
+    if (!future.length) return;
+    setPast([...past, p].slice(-100));
+    setP(future[0]);
+    setFuture(future.slice(1));
+    resetInteraction();
+  }
+  function deleteSelected() {
+    if (!selected.size) return;
+    commit({ ...p, blocks: p.blocks.filter((b) => !selected.has(b.id)) });
+    resetInteraction();
+  }
   function addMessage(b: Block) {
     const last = p.blocks.findLastIndex((x) => selected.has(x.id));
     const index = last < 0 ? p.blocks.length : last + 1;
@@ -69,30 +96,74 @@ function App() {
         setEditingId(null);
         return;
       }
+      const target = e.target as HTMLElement;
       if (
-        (e.target as HTMLElement).closest(
-          'input,textarea,select,button,[contenteditable=true]',
-        ) ||
-        editingId
+        target.closest('input,textarea,select,[contenteditable=true]') ||
+        editingId ||
+        e.isComposing
       )
         return;
-      if (!['ArrowUp', 'ArrowDown'].includes(e.key) || !visible.length) return;
-      e.preventDefault();
-      const direction = e.key === 'ArrowDown' ? 1 : -1;
-      const anchor = selectionAnchor.current?.id ?? [...selected].at(-1);
-      const old = visible.findIndex((b) => b.id === anchor);
-      const index = Math.max(
-        0,
-        Math.min(visible.length - 1, old < 0 ? 0 : old + direction),
+      if (e.ctrlKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'z' || key === 'y') {
+          e.preventDefault();
+          if (key === 'y' || e.shiftKey) redo();
+          else undo();
+          return;
+        }
+        if (key === 'a') {
+          e.preventDefault();
+          setQuery('');
+          setSelected(new Set(p.blocks.map((b) => b.id)));
+          return;
+        }
+      }
+      if (target.closest('button')) return;
+      if (e.key === 'Delete') {
+        if (selected.size) e.preventDefault();
+        deleteSelected();
+        return;
+      }
+      const arrow = e.key === 'ArrowUp' || e.key === 'ArrowDown';
+      if (e.altKey && arrow) {
+        const id = cursorId.current ?? [...selected].at(-1);
+        if (!id || !selected.has(id)) return;
+        e.preventDefault();
+        const direction = e.key === 'ArrowDown' ? 1 : -1;
+        const blocks = swapMessage(p.blocks, id, direction);
+        if (blocks === p.blocks) return;
+        commit({ ...p, blocks });
+        pendingFocus.current = { id, direction };
+        const index = blocks.filter(predicate).findIndex((b) => b.id === id);
+        if (index >= 0) setPage(Math.floor(index / PAGE_SIZE));
+        return;
+      }
+      if (
+        e.altKey ||
+        !['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)
+      )
+        return;
+      const wholeLog = e.key === 'Home' || e.key === 'End';
+      const order = (wholeLog ? p.blocks : visible).map((b) => b.id);
+      const next = navigateMessages(
+        order,
+        cursorId.current,
+        selected,
+        e.key as NavigationKey,
+        e.ctrlKey && arrow,
       );
-      const id = visible[index].id;
-      pendingFocus.current = { id, direction };
-      setSelected(new Set([id]));
-      setPage(Math.floor(index / PAGE_SIZE));
+      if (!next) return;
+      e.preventDefault();
+      if (wholeLog) setQuery('');
+      cursorId.current = next.id;
+      selectionAnchor.current = { id: next.id, selected: true };
+      pendingFocus.current = { id: next.id, direction: next.direction };
+      setSelectedRaw(next.selected);
+      setPage(Math.floor(next.index / PAGE_SIZE));
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [tab, visible, selected, editingId]);
+  }, [tab, visible, selected, editingId, past, future]);
   useEffect(() => {
     const request = pendingFocus.current;
     if (!request) return;
@@ -120,7 +191,7 @@ function App() {
       scroller.scrollTop += rect.bottom + margin - bounds.bottom;
     else if (request.direction < 0 && rect.top - margin < bounds.top)
       scroller.scrollTop += rect.top - margin - bounds.top;
-  }, [selected, current]);
+  }, [selected, current, p.blocks]);
   function save(value: string, name: string) {
     const u = URL.createObjectURL(
       new Blob([value], { type: 'application/json;charset=utf-8' }),
@@ -208,39 +279,6 @@ function App() {
             <p>
               {p.blocks.length.toLocaleString()}개 블록 · {selected.size}개 선택
             </p>
-            <button
-              disabled={!selected.size}
-              onClick={() => {
-                commit({ ...p, blocks: p.blocks.filter((b) => !selected.has(b.id)) });
-                setSelected(new Set());
-              }}
-            >
-              선택 블록 제거
-            </button>
-            <div className="row">
-              <button
-                disabled={!past.length}
-                onClick={() => {
-                  setFuture([p, ...future]);
-                  setP(past[past.length - 1]);
-                  setPast(past.slice(0, -1));
-                  setSelected(new Set());
-                }}
-              >
-                ↶ 취소
-              </button>
-              <button
-                disabled={!future.length}
-                onClick={() => {
-                  setPast([...past, p]);
-                  setP(future[0]);
-                  setFuture(future.slice(1));
-                  setSelected(new Set());
-                }}
-              >
-                ↷ 다시
-              </button>
-            </div>
             <h2>원본 보관함</h2>
             <p>{p.original?.name ?? '새로 작성한 로그'}</p>
             <button disabled={!p.original} onClick={() => setOriginal(!original)}>
@@ -263,6 +301,23 @@ function App() {
       <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
         <aside className="log-sidebar">
           <div className="log-sidebar-tools">
+            <h2>편집</h2>
+            <div className="row">
+              <button disabled={!past.length} onClick={undo} title="Ctrl+Z">
+                ↶ 되돌리기
+              </button>
+              <button
+                disabled={!future.length}
+                onClick={redo}
+                title="Ctrl+Y / Ctrl+Shift+Z"
+              >
+                ↷ 다시 하기
+              </button>
+            </div>
+            <p>{selected.size}개 선택</p>
+            <button disabled={!selected.size} onClick={deleteSelected} title="Delete">
+              선택 블록 제거
+            </button>
             <h2>일괄 치환</h2>
             <p>선택한 블록의 본문에 적용합니다.</p>
             <input
@@ -313,7 +368,10 @@ function App() {
           <Composer characters={p.characters ?? []} send={addMessage} />
         </aside>
         <main className="log-editor">
-          <div className="toolbar">
+          <div
+            className="toolbar"
+            title="Del: 선택 삭제 · Home/End: 전체 로그 처음/끝 · PgUp/PgDn: 10개 이동 · Ctrl+↑↓: 선택 확장 · Alt+↑↓: 현재 메시지 이동"
+          >
             <input
               aria-label="로그 검색"
               placeholder="화자, 본문, 판정 검색…"
@@ -380,6 +438,7 @@ function App() {
                     b.id,
                     keys,
                   );
+                  cursorId.current = b.id;
                   selectionAnchor.current = next.anchor;
                   setSelectedRaw(next.selected);
                 }}

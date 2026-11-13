@@ -118,17 +118,16 @@ export function MessageBlock({
           <div className="block-editor">
             <SpeakerPicker draft={draft} characters={characters} onChange={setDraft} />
             <label>
-              대사
               <textarea
                 autoFocus
-                rows={Math.max(3, Math.min(15, draft.text.split('\n').length + 1))}
+                rows={Math.max(1, Math.min(15, draft.text.split('\n').length))}
                 value={draft.text}
                 onChange={(e) => setDraft({ ...draft, text: e.target.value })}
               />
             </label>
             {dice && (
               <label>
-                판정 결과
+                주사위 판정
                 <textarea
                   value={draft.diceResult}
                   onChange={(e) => setDraft({ ...draft, diceResult: e.target.value })}
@@ -173,7 +172,7 @@ export function MessageBlock({
                 aria-expanded={options}
                 onClick={() => setOptions(!options)}
               >
-                …
+                확장
               </button>
               <button onClick={() => setEditing(false)}>취소</button>
               <button onClick={finish}>저장</button>

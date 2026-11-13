@@ -422,3 +422,45 @@ test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각
   assert.equal(JSON.stringify(p), before);
   assert.equal(PAGE_SIZE, 1000);
 });
+
+import { navigateMessages, swapMessage } from './keyboardNavigation.ts';
+test('Ctrl 방향키는 커서를 되돌려도 선택을 보존하고 일반 방향키는 단일 선택', () => {
+  const order = ['a', 'b', 'c', 'd'];
+  let next = navigateMessages(order, 'a', new Set(['a']), 'ArrowDown', true)!;
+  next = navigateMessages(order, next.id, next.selected, 'ArrowDown', true)!;
+  next = navigateMessages(order, next.id, next.selected, 'ArrowUp', true)!;
+  assert.equal(next.id, 'b');
+  assert.deepEqual([...next.selected], ['a', 'b', 'c']);
+  next = navigateMessages(order, next.id, next.selected, 'ArrowDown', false)!;
+  assert.deepEqual([...next.selected], ['c']);
+});
+test('Home End와 10개 이동 및 페이지 경계', () => {
+  const order = Array.from({ length: 1012 }, (_, i) => String(i));
+  assert.equal(navigateMessages(order, '999', new Set(), 'PageDown', false)?.index, 1009);
+  assert.equal(navigateMessages(order, '1009', new Set(), 'PageUp', false)?.index, 999);
+  assert.equal(navigateMessages(order, '999', new Set(), 'Home', false)?.index, 0);
+  assert.equal(navigateMessages(order, '999', new Set(), 'End', false)?.index, 1011);
+  assert.equal(navigateMessages(order, '0', new Set(), 'ArrowUp', false)?.index, 0);
+  assert.equal(navigateMessages([], null, new Set(), 'Home', false), null);
+});
+test('Alt 이동은 인접 메시지만 교환하며 입력과 원본은 보존', () => {
+  const blocks = ['a', 'b', 'c'].map((id) => ({
+    id,
+    speaker: 'GM',
+    text: id,
+    diceResult: '',
+  }));
+  assert.deepEqual(
+    swapMessage(blocks, 'b', 1).map((b) => b.id),
+    ['a', 'c', 'b'],
+  );
+  assert.deepEqual(
+    swapMessage(blocks, 'b', -1).map((b) => b.id),
+    ['b', 'a', 'c'],
+  );
+  assert.equal(swapMessage(blocks, 'a', -1), blocks);
+  assert.deepEqual(
+    blocks.map((b) => b.id),
+    ['a', 'b', 'c'],
+  );
+});

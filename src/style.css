@@ -772,6 +772,7 @@ main {
     opacity: 0;
   }
 }
+
 .log-message.system {
   display: block;
   color: #888;
@@ -782,53 +783,63 @@ main {
   min-height: 0;
   overflow: auto;
 }
+
 .workspace > aside.log-sidebar {
   padding: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+
 .log-sidebar-tools {
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 24px;
 }
+
 .log-sidebar-tools > input,
 .log-sidebar-tools > button {
   width: 100%;
   margin-bottom: 10px;
 }
+
 .composer {
   flex-shrink: 0;
   padding: 10px;
   background: #202020;
   border-top: 1px solid #435065;
 }
+
 .composer-top {
   display: flex;
   align-items: center;
   gap: 5px;
   margin-bottom: 8px;
 }
+
 .composer-top > img {
   width: 32px;
   height: 40px;
   object-fit: contain;
 }
+
 .composer-speaker {
   flex: 1;
   min-width: 0;
   position: relative;
 }
+
 .composer-speaker input {
   width: 100%;
   font-weight: bold;
 }
+
 .composer textarea {
   height: 140px;
   max-height: 35vh;
 }
+
 .composer-candidates,
 .face-options {
   position: absolute;
@@ -839,34 +850,42 @@ main {
   overflow: auto;
   min-width: 200px;
 }
+
 .composer-candidates {
   bottom: 100%;
   left: 0;
   right: 0;
 }
+
 .composer-candidates button {
   display: block;
   width: 100%;
   text-align: left;
 }
+
 .composer-candidates [aria-selected='true'] {
   background: #31584f;
 }
+
 .face-picker {
   position: relative;
 }
+
 .face-picker > button {
   padding: 4px;
 }
+
 .face-picker img {
   width: 40px;
   height: 40px;
   object-fit: contain;
 }
+
 .face-options {
   top: 100%;
   left: 0;
 }
+
 .face-options button {
   display: flex;
   align-items: center;
@@ -874,12 +893,14 @@ main {
   width: 100%;
   text-align: left;
 }
+
 .composer .face-options {
   top: auto;
   bottom: 100%;
   left: auto;
   right: 0;
 }
+
 .log-message:focus-visible {
-  outline: 2px solid #83d5c2;
+  outline: none;
 }
