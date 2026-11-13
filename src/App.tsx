@@ -668,14 +668,19 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!p.blocks.length || !!bulkEdit}
-                title="화자·채널·유형이 같은 연속 메시지 병합"
+                disabled={selected.size < 2 || !!bulkEdit}
+                title="선택한 메시지 중 화자·채널·유형이 같은 연속 메시지 병합"
                 onClick={() => {
-                  const blocks = mergeConsecutive(p.blocks);
+                  const blocks = mergeConsecutive(p.blocks, selected);
+                  const mergedCount = p.blocks.length - blocks.length;
+                  if (!mergedCount) {
+                    setNotice('선택한 메시지 중 병합할 연속 메시지가 없습니다.');
+                    return;
+                  }
                   commit({ ...p, blocks });
                   setSelected(new Set());
                   setEditingId(null);
-                  setNotice(`${p.blocks.length - blocks.length}개 블록을 병합했습니다.`);
+                  setNotice(`${mergedCount}개 블록을 병합했습니다.`);
                 }}
               >
                 연속 병합

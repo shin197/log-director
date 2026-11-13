@@ -419,6 +419,12 @@ test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각
   assert.equal(blocks[0].iconUrl, 'https://example.com/a');
   assert.equal(blocks[2].text, '공지1\n공지2');
   assert.equal(Object.hasOwn(blocks[2], 'speaker'), false);
+  // 선택된 메시지만 병합하고 선택되지 않은 연속 메시지는 유지
+  const partial = mergeConsecutive(p.blocks, new Set([p.blocks[0].id, p.blocks[1].id]));
+  assert.equal(partial.length, 4);
+  assert.equal(partial[0].text, '첫 줄\n다음 줄');
+  assert.equal(partial[2].text, '공지1');
+  assert.equal(partial[3].text, '공지2');
   assert.equal(JSON.stringify(p), before);
   assert.equal(PAGE_SIZE, 1000);
 });
