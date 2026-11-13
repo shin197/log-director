@@ -904,3 +904,17 @@ main {
 .log-message:focus-visible {
   outline: none;
 }
+
+.log-message.has-jump {
+  padding-right: 100px;
+}
+.message-jump {
+  position: absolute;
+  right: 12px;
+  top: 16px;
+  white-space: nowrap;
+}
+.log-editor > .toolbar > button[aria-pressed='true'] {
+  border-color: #83d5c2;
+  color: #83d5c2;
+}

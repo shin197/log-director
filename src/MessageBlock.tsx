@@ -15,8 +15,10 @@ export function MessageBlock({
   save,
   remove,
   drop,
+  onJump,
 }: {
   block: Block;
+  onJump?: () => void;
   characters?: Character[];
   display?: DisplaySettings;
   editing: boolean;
@@ -45,7 +47,7 @@ export function MessageBlock({
   return (
     <article
       data-message-id={b.id}
-      className={`log-message ${(editing ? draft : b).sourceType === 'system' ? 'system' : ''} ${selected ? 'selected' : ''} ${editing ? 'editing' : ''} ${over}`}
+      className={`log-message ${(editing ? draft : b).sourceType === 'system' ? 'system' : ''} ${selected ? 'selected' : ''} ${editing ? 'editing' : ''} ${onJump ? 'has-jump' : ''} ${over}`}
       draggable={!editing}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/log-block', b.id);
@@ -197,6 +199,20 @@ export function MessageBlock({
           </div>
         )}
       </div>
+      {onJump && (
+        <button
+          className="message-jump"
+          title="필터를 해제하고 전체 로그의 이 메시지로 이동"
+          aria-label="전체 로그에서 이 메시지로 이동"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (editing) save({ ...draft, diceResult: dice ? draft.diceResult : '' });
+            onJump();
+          }}
+        >
+          이동 ↗
+        </button>
+      )}
     </article>
   );
 }

@@ -20,6 +20,8 @@ function App() {
   const [future, setFuture] = useState<Project[]>([]);
   const [selected, setSelectedRaw] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [find, setFind] = useState('');
   const [to, setTo] = useState('');
   const [notice, setNotice] = useState('로그를 열거나 새 블록을 추가하세요.');
@@ -43,7 +45,7 @@ function App() {
   let queryError = '';
   let predicate: (b: Block) => boolean = () => false;
   try {
-    predicate = compileQuery(query);
+    predicate = compileQuery(searchActive ? query : '');
   } catch (error) {
     queryError = String(error);
   }
@@ -53,7 +55,34 @@ function App() {
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
     current = Math.min(page, pages - 1);
-  const pendingFocus = useRef<{ id: string; direction: number } | null>(null);
+  const pendingFocus = useRef<{ id: string; direction: number; center?: boolean } | null>(
+    null,
+  );
+  function disableSearch() {
+    setQuery('');
+    setSearchActive(false);
+    selectionAnchor.current = null;
+    setPage(0);
+    searchInput.current?.blur();
+  }
+  function toggleSearch() {
+    if (searchActive) {
+      disableSearch();
+    } else {
+      setSearchActive(true);
+      searchInput.current?.focus();
+      searchInput.current?.select();
+    }
+  }
+  function jumpToMessage(id: string) {
+    const index = p.blocks.findIndex((b) => b.id === id);
+    if (index < 0) return;
+    disableSearch();
+    setEditingId(null);
+    setSelected(new Set([id]));
+    pendingFocus.current = { id, direction: 1, center: true };
+    setPage(Math.floor(index / PAGE_SIZE));
+  }
   function resetInteraction() {
     setSelected(new Set());
     setEditingId(null);
@@ -86,11 +115,17 @@ function App() {
     commit({ ...p, blocks });
     setSelected(new Set([b.id]));
     setQuery('');
+    setSearchActive(false);
     setPage(Math.floor(index / PAGE_SIZE));
   }
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (tab !== '로그' || document.querySelector('dialog[open]')) return;
+      if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        if (!e.repeat) toggleSearch();
+        return;
+      }
       if (e.key === 'Escape') {
         setSelected(new Set());
         setEditingId(null);
@@ -114,6 +149,7 @@ function App() {
         if (key === 'a') {
           e.preventDefault();
           setQuery('');
+          setSearchActive(false);
           setSelected(new Set(p.blocks.map((b) => b.id)));
           return;
         }
@@ -155,6 +191,7 @@ function App() {
       if (!next) return;
       e.preventDefault();
       if (wholeLog) setQuery('');
+      setSearchActive(false);
       cursorId.current = next.id;
       selectionAnchor.current = { id: next.id, selected: true };
       pendingFocus.current = { id: next.id, direction: next.direction };
@@ -163,7 +200,7 @@ function App() {
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [tab, visible, selected, editingId, past, future]);
+  }, [tab, visible, selected, editingId, past, future, searchActive]);
   useEffect(() => {
     const request = pendingFocus.current;
     if (!request) return;
@@ -175,9 +212,26 @@ function App() {
     const scroller = document.querySelector<HTMLElement>('.log-scroll');
     if (!node || !scroller) return;
     pendingFocus.current = null;
+    // Allow the first and last messages to reach the center as well.
+    if (request.center) {
+      const room = Math.max(
+        0,
+        (scroller.clientHeight - node.getBoundingClientRect().height) / 2,
+      );
+      scroller.style.paddingTop = `${room}px`;
+      scroller.style.paddingBottom = `${room}px`;
+    } else {
+      scroller.style.paddingTop = '';
+      scroller.style.paddingBottom = '';
+    }
     node.focus({ preventScroll: true });
     const rect = node.getBoundingClientRect(),
       bounds = scroller.getBoundingClientRect();
+    if (request.center) {
+      scroller.scrollTop +=
+        rect.top - bounds.top - (scroller.clientHeight - rect.height) / 2;
+      return;
+    }
     const neighbors = [
       nodes[index + request.direction],
       nodes[index + 2 * request.direction],
@@ -191,7 +245,7 @@ function App() {
       scroller.scrollTop += rect.bottom + margin - bounds.bottom;
     else if (request.direction < 0 && rect.top - margin < bounds.top)
       scroller.scrollTop += rect.top - margin - bounds.top;
-  }, [selected, current, p.blocks]);
+  }, [selected, current, p.blocks, searchActive, query]);
   function save(value: string, name: string) {
     const u = URL.createObjectURL(
       new Blob([value], { type: 'application/json;charset=utf-8' }),
@@ -239,6 +293,7 @@ function App() {
                 setFuture([]);
                 setSelected(new Set());
                 setQuery('');
+                setSearchActive(false);
                 setPage(0);
                 setNotice(`${next.blocks.length}개 블록을 불러왔습니다.`);
               } catch (err) {
@@ -373,15 +428,21 @@ function App() {
             title="Del: 선택 삭제 · Home/End: 전체 로그 처음/끝 · PgUp/PgDn: 10개 이동 · Ctrl+↑↓: 선택 확장 · Alt+↑↓: 현재 메시지 이동"
           >
             <input
+              ref={searchInput}
               aria-label="로그 검색"
+              onFocus={() => setSearchActive(true)}
               placeholder="화자, 본문, 판정 검색…"
               value={query}
               onChange={(e) => {
                 selectionAnchor.current = null;
+                setSearchActive(true);
                 setQuery(e.target.value);
                 setPage(0);
               }}
             />
+            <button aria-pressed={searchActive} onClick={toggleSearch} title="Ctrl+F">
+              {searchActive ? '검색 끄기' : '검색 켜기'}
+            </button>
             <button onClick={() => setSelected(new Set(visible.map((b) => b.id)))}>
               검색 결과 전체 선택
             </button>
@@ -430,6 +491,11 @@ function App() {
                 editing={editingId === b.id}
                 setEditing={(value) => setEditingId(value ? b.id : null)}
                 selected={selected.has(b.id)}
+                onJump={
+                  searchActive && query.trim() && selected.has(b.id)
+                    ? () => jumpToMessage(b.id)
+                    : undefined
+                }
                 toggle={(keys: SelectionKeys) => {
                   const next = selectMessage(
                     selected,
