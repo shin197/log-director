@@ -2,6 +2,7 @@ import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { useState, useId } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
+
 export function SpeakerPicker({
   draft,
   characters,
@@ -18,6 +19,7 @@ export function SpeakerPicker({
     (c) => c.id === SYSTEM_CHARACTER_ID || fuzzyName(c.name, draft.speaker ?? ''),
   );
   const current = Math.min(index, matches.length);
+
   function pick(i: number) {
     onChange(
       i === matches.length
@@ -31,12 +33,23 @@ export function SpeakerPicker({
     );
     setOpen(false);
   }
+
+  const statusText =
+    draft.sourceType === 'system' ? '시스템' : draft.characterId ? '캐릭터' : '직접 입력';
+  const statusClass =
+    draft.sourceType === 'system'
+      ? 'is-system'
+      : draft.characterId
+        ? 'is-linked'
+        : 'is-custom';
+
   return (
     <div className="speaker-picker" onDoubleClick={(e) => e.stopPropagation()}>
-      <label>
-        <small>{draft.characterId ? '연결된 캐릭터' : '사용자 지정 화자'}</small>
+      <div className="speaker-input-wrap">
         <input
           role="combobox"
+          aria-label="화자"
+          placeholder="화자 이름"
           aria-expanded={open}
           aria-controls={id}
           aria-autocomplete="list"
@@ -74,7 +87,8 @@ export function SpeakerPicker({
             }
           }}
         />
-      </label>
+        <span className={`speaker-badge ${statusClass}`}>{statusText}</span>
+      </div>
       {open && (
         <div id={id} role="listbox" className="speaker-options">
           {[...matches.map((c) => c.name), '사용자 지정...'].map((name, i) => (

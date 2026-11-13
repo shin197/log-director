@@ -1,7 +1,66 @@
-/* Shared sidebar width and independently scrolling editor columns. */
-.workspace,
-.character-workspace > .character-panel {
-  grid-template-columns: var(--sidebar-width, 320px) minmax(0, 1fr);
+/* Viewport shell and independently scrolling editor columns. */
+:root {
+  --header-height: 46px;
+  --sidebar-width: 260px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  height: var(--header-height);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace > main.log-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.log-editor > .toolbar {
+  flex-shrink: 0;
+}
+
+.log-editor > .replace-bar {
+  flex-shrink: 0;
+}
+
+.log-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 16px 24px;
+}
+
+.log-editor > .composer {
+  flex-shrink: 0;
+}
+
+.log-editor > .status-bar {
+  flex-shrink: 0;
 }
 
 .character-workspace {
@@ -15,11 +74,21 @@
 .character-workspace > .character-panel {
   flex: 1;
   min-height: 0;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 
-.character-panel > nav {
+.character-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.character-sidebar > nav {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -34,20 +103,7 @@
 }
 
 .character-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
   flex-shrink: 0;
-  padding: 16px 24px;
-  background: #1b222b;
-  border-bottom: 1px solid #344252;
-}
-
-.character-toolbar > div {
-  display: flex;
-  gap: 8px;
 }
 
 .character-editor > .character-detail {
@@ -57,26 +113,27 @@
   overscroll-behavior: contain;
 }
 
-.workspace > main.log-editor {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.log-editor > .toolbar {
-  flex-shrink: 0;
-  padding: 16px 24px;
-  background: #1b222b;
-  border-bottom: 1px solid #344252;
-}
-
-.log-scroll {
+.settings-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 24px 24px;
   overscroll-behavior: contain;
+  padding: 24px 20px;
+}
+
+@media (max-width: 820px) {
+  :root {
+    --sidebar-width: 200px;
+  }
+
+  .log-scroll {
+    padding: 6px 8px 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .character-workspace > .character-panel {
+    grid-template-columns: 1fr;
+    grid-template-rows: 180px minmax(0, 1fr);
+  }
 }

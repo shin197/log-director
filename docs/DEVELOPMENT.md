@@ -20,8 +20,8 @@
 | src/ProjectPanels.tsx, src/presentation.ts | 설정 UI와 시각 표시                                              |
 | src/export.ts, src/ExportDialog.tsx        | 내보내기 직렬화 및 미리보기/다운로드                             |
 | src/Toast.tsx                              | 공통 오류 통보, 전역 오류 및 렌더 오류 경계                      |
-| src/style.css                              | 화면 스타일. 기존 중복 규칙/후행 덮어쓰기 존재                   |
-| src/workspace-layout.css                   | 독립 스크롤, 공통 사이드바 폭, 우측 고정 툴바                    |
+| src/style.css                              | 통합 디자인 토큰 기반 화면 스타일                                |
+| src/workspace-layout.css                   | 뷰포트 셸, 독립 스크롤, 상단·하단 도킹, 공통 사이드바 폭         |
 | src/core.test.ts                           | 데이터/검색/선택/키보드/출력 회귀 테스트                         |
 
 ## 작업 순서

@@ -4,14 +4,17 @@ import { useState, useRef, useEffect } from 'react';
 import type { Project, Character } from './core';
 import { updateCharacter } from './characters';
 import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
+
 type FaceDraft = { name: string; iconUrl: string; originalUrl: string };
 type Draft = Omit<Character, 'faces'> & { faces: FaceDraft[] };
+
 function makeDraft(c: Character): Draft {
   const faces = c.faces.map((f) => ({ ...f, originalUrl: f.iconUrl }));
   if (c.iconUrl && !faces.some((f) => f.iconUrl === c.iconUrl))
     faces.unshift({ name: '', iconUrl: c.iconUrl, originalUrl: c.iconUrl });
   return { ...c, faces, iconUrl: c.iconUrl || faces[0]?.iconUrl || '' };
 }
+
 export function CharacterPanel({
   project: p,
   commit,
@@ -25,20 +28,23 @@ export function CharacterPanel({
   const [draft, setDraft] = useState<Draft | null>(c ? makeDraft(c) : null),
     [dirty, setDirty] = useState(false),
     [adding, setAdding] = useState(false),
-    [error, setError] = useState(''),
     [link, setLink] = useState(true);
   const dialog = useRef<HTMLDialogElement>(null);
+
   useEffect(() => {
     setDraft(c ? makeDraft(c) : null);
     setDirty(false);
   }, [c]);
+
   useEffect(() => {
     if (adding) dialog.current?.showModal();
   }, [adding]);
+
   function change(next: Draft) {
     setDraft(next);
     setDirty(true);
   }
+
   function save() {
     if (!draft) return;
     try {
@@ -74,11 +80,11 @@ export function CharacterPanel({
         ),
       });
       setDirty(false);
-      setError('저장했습니다.');
     } catch (e) {
       notifyError(e);
     }
   }
+
   function add(next: Character) {
     if (characters.some((x) => x.name === next.name))
       throw Error('같은 이름의 캐릭터가 이미 있습니다.');
@@ -93,53 +99,81 @@ export function CharacterPanel({
     });
     setActive(next.id);
     setAdding(false);
-    setError('캐릭터를 추가했습니다.');
   }
+
+  const linkedCount = draft
+    ? p.blocks.filter((b) => b.characterId === draft.id).length
+    : 0;
+
   return (
     <section className="character-workspace">
       <div className="character-panel">
-        <nav>
-          <button
-            onClick={() => {
-              if (dirty && !confirm('저장하지 않은 변경을 버리고 추가할까요?')) return;
-              setError('');
-              setAdding(true);
-            }}
-          >
-            ＋ 캐릭터 추가
-          </button>
-          {characters.map((x) => (
+        <aside className="character-sidebar">
+          <div className="character-sidebar-head">
+            <span>캐릭터 {characters.length}</span>
             <button
-              key={x.id}
-              aria-pressed={c?.id === x.id}
+              type="button"
+              className="primary compact-btn"
               onClick={() => {
-                if (x.id === c?.id) return;
-                if (dirty && !confirm('저장하지 않은 변경을 버리고 이동할까요?')) return;
-                setActive(x.id);
-                setError('');
+                if (dirty && !confirm('저장하지 않은 변경을 버리고 추가할까요?')) return;
+                setAdding(true);
               }}
             >
-              <Avatar url={x.iconUrl || x.faces[0]?.iconUrl || ''} />
-              <strong style={{ color: x.color }}>{x.name}</strong>
+              ＋ 추가
             </button>
-          ))}
-        </nav>
+          </div>
+          <nav aria-label="캐릭터 목록">
+            {characters.map((x) => {
+              const count = p.blocks.filter((b) => b.characterId === x.id).length;
+              return (
+                <button
+                  type="button"
+                  key={x.id}
+                  aria-pressed={c?.id === x.id}
+                  onClick={() => {
+                    if (x.id === c?.id) return;
+                    if (dirty && !confirm('저장하지 않은 변경을 버리고 이동할까요?'))
+                      return;
+                    setActive(x.id);
+                  }}
+                >
+                  <span className="char-nav-main">
+                    <Avatar
+                      url={x.iconUrl || x.faces[0]?.iconUrl || ''}
+                      fallback={x.name}
+                      color={x.color}
+                    />
+                    <strong style={{ color: x.color }}>{x.name}</strong>
+                  </span>
+                  <span className="count-pill">{count}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
         <section className="character-editor">
           <div className="character-toolbar">
-            <strong>
-              {draft?.name || ''}
-              {dirty ? ' · 저장하지 않은 변경' : ''}
-            </strong>
-            <div>
+            <div className="character-toolbar-title">
+              {draft && (
+                <>
+                  <span
+                    className="color-dot"
+                    style={{ background: draft.color || '#888' }}
+                  />
+                  <strong>{draft.name || '이름 없음'}</strong>
+                  <span className="count-pill" title={`ID: ${draft.id}`}>
+                    메시지 {linkedCount}
+                  </span>
+                  {dirty && <span className="dirty-badge">미저장</span>}
+                </>
+              )}
+            </div>
+            <div className="character-toolbar-actions">
               <button
-                disabled={!draft || draft.id === SYSTEM_CHARACTER_ID}
-                onClick={save}
-              >
-                캐릭터 저장
-              </button>
-              <button
+                type="button"
                 disabled={!c || c.id === SYSTEM_CHARACTER_ID}
-                className="danger"
+                className="danger ghost"
                 onClick={() => {
                   if (
                     c &&
@@ -155,52 +189,69 @@ export function CharacterPanel({
                         b.characterId === c.id ? { ...b, characterId: null } : b,
                       ),
                     });
-                    setError('');
                   }
                 }}
               >
-                캐릭터 삭제
+                삭제
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={!draft || draft.id === SYSTEM_CHARACTER_ID}
+                onClick={save}
+              >
+                저장
               </button>
             </div>
           </div>
+
           <div className="character-detail">
             {draft?.id === SYSTEM_CHARACTER_ID ? (
-              <>
-                <h2>시스템</h2>
+              <div className="system-info-card">
+                <h2>시스템 캐릭터</h2>
                 <p>
-                  연결된 메시지{' '}
-                  {p.blocks.filter((b) => b.characterId === SYSTEM_CHARACTER_ID).length}개
+                  고정 시스템 캐릭터입니다. 화자 이름과 이미지 없이 시스템 전용 형식으로
+                  출력되며, 이름·색상·표정 편집 및 삭제가 제한됩니다.
                 </p>
-                <p>
-                  시스템 메시지는 화자 이름과 이미지 없이 표시됩니다. 이름·색상·표정은
-                  지정할 수 없으며 이 캐릭터는 삭제할 수 없습니다.
-                </p>
-              </>
+              </div>
             ) : draft ? (
-              <>
-                {/* <h2>{draft.name || ''}</h2> */}
-                <small>ID: {draft.id}</small>
-                <p>
-                  연결된 메시지{' '}
-                  {p.blocks.filter((b) => b.characterId === draft.id).length}개
-                </p>
-                <label>
-                  이름
-                  <input
-                    value={draft.name}
-                    onChange={(e) => change({ ...draft, name: e.target.value })}
-                  />
-                </label>
-                <label>
-                  색상 (#RRGGBB)
-                  <input
-                    value={draft.color}
-                    onChange={(e) => change({ ...draft, color: e.target.value })}
-                  />
-                </label>
+              <div className="character-detail-inner">
+                <div className="char-meta-grid">
+                  <div className="field-inline">
+                    <span className="field-label">이름</span>
+                    <input
+                      aria-label="캐릭터 이름"
+                      placeholder="캐릭터 이름"
+                      value={draft.name}
+                      onChange={(e) => change({ ...draft, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="field-inline">
+                    <span className="field-label">색상</span>
+                    <div className="color-input-group">
+                      <input
+                        type="color"
+                        aria-label="색상 선택"
+                        value={
+                          /^#[0-9a-fA-F]{6}$/.test(draft.color) ? draft.color : '#888888'
+                        }
+                        onChange={(e) => change({ ...draft, color: e.target.value })}
+                      />
+                      <input
+                        aria-label="색상 (#RRGGBB)"
+                        placeholder="#RRGGBB"
+                        value={draft.color}
+                        onChange={(e) => change({ ...draft, color: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="faces-heading">
-                  <h2>표정 {draft.faces.length}개</h2>
+                  <h2>표정 ({draft.faces.length})</h2>
                   <button
+                    type="button"
+                    className="compact-btn"
                     onClick={() =>
                       change({
                         ...draft,
@@ -214,80 +265,97 @@ export function CharacterPanel({
                     ＋ 표정 추가
                   </button>
                 </div>
-                <p>기본 표정을 선택하세요. 지정하지 않으면 첫 번째 표정을 사용합니다.</p>
-                {draft.faces.map((f, i) => {
-                  const isDefault = draft.iconUrl ? draft.iconUrl === f.iconUrl : i === 0;
-                  return (
-                    <div
-                      className={`expression-row ${isDefault ? 'default-face' : ''}`}
-                      key={i}
-                    >
-                      <Avatar url={f.iconUrl} />
-                      <div>
-                        <label>
-                          표정 이름
-                          <input
-                            value={f.name}
-                            onChange={(e) =>
-                              change({
-                                ...draft,
-                                faces: draft.faces.map((x, j) =>
-                                  i === j ? { ...x, name: e.target.value } : x,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
-                        <label>
-                          이미지 URL
-                          <input
-                            value={f.iconUrl}
-                            onChange={(e) =>
-                              change({
-                                ...draft,
-                                iconUrl: isDefault ? e.target.value : draft.iconUrl,
-                                faces: draft.faces.map((x, j) =>
-                                  i === j ? { ...x, iconUrl: e.target.value } : x,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
+
+                <div className="expression-list">
+                  {draft.faces.map((f, i) => {
+                    const isDefault = draft.iconUrl
+                      ? draft.iconUrl === f.iconUrl
+                      : i === 0;
+                    return (
+                      <div
+                        className={`expression-row ${isDefault ? 'default-face' : ''}`}
+                        key={i}
+                      >
+                        <Avatar url={f.iconUrl} fallback={f.name || String(i + 1)} />
+                        <input
+                          className="face-name-input"
+                          aria-label="표정 이름"
+                          placeholder="표정 이름"
+                          value={f.name}
+                          onChange={(e) =>
+                            change({
+                              ...draft,
+                              faces: draft.faces.map((x, j) =>
+                                i === j ? { ...x, name: e.target.value } : x,
+                              ),
+                            })
+                          }
+                        />
+                        <input
+                          className="face-url-input"
+                          aria-label="이미지 URL"
+                          placeholder="이미지 URL (https://…)"
+                          value={f.iconUrl}
+                          onChange={(e) =>
+                            change({
+                              ...draft,
+                              iconUrl: isDefault ? e.target.value : draft.iconUrl,
+                              faces: draft.faces.map((x, j) =>
+                                i === j ? { ...x, iconUrl: e.target.value } : x,
+                              ),
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="compact-btn"
+                          disabled={!f.iconUrl}
+                          aria-pressed={isDefault}
+                          title="기본 표정으로 지정"
+                          onClick={() => change({ ...draft, iconUrl: f.iconUrl })}
+                        >
+                          {isDefault ? '★ 기본' : '기본 지정'}
+                        </button>
+                        <button
+                          type="button"
+                          className="compact-btn danger ghost"
+                          title="표정 삭제 (기존 메시지 이미지는 유지)"
+                          onClick={() => {
+                            const faces = draft.faces.filter((_, j) => j !== i);
+                            change({
+                              ...draft,
+                              faces,
+                              iconUrl: isDefault
+                                ? faces[0]?.iconUrl || ''
+                                : draft.iconUrl,
+                            });
+                          }}
+                        >
+                          삭제
+                        </button>
                       </div>
-                      <button
-                        disabled={!f.iconUrl}
-                        aria-pressed={isDefault}
-                        onClick={() => change({ ...draft, iconUrl: f.iconUrl })}
-                      >
-                        {isDefault ? '✓ 기본 표정' : '기본으로 지정'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          const faces = draft.faces.filter((_, j) => j !== i);
-                          change({
-                            ...draft,
-                            faces,
-                            iconUrl: isDefault ? faces[0]?.iconUrl || '' : draft.iconUrl,
-                          });
-                        }}
-                      >
-                        삭제
-                      </button>
+                    );
+                  })}
+                  {!draft.faces.length && (
+                    <div className="empty-inline">
+                      등록된 표정이 없습니다. ‘＋ 표정 추가’로 추가하세요.
                     </div>
-                  );
-                })}
-                <p>표정 삭제는 목록에만 적용되며 기존 메시지의 이미지는 보존됩니다.</p>
-              </>
+                  )}
+                </div>
+              </div>
             ) : (
-              <p>캐릭터를 추가하거나 로그를 불러오세요.</p>
+              <div className="empty">
+                <p>캐릭터를 추가하거나 로그를 불러오세요.</p>
+              </div>
             )}
           </div>
         </section>
       </div>
+
       {adding && (
         <dialog
           ref={dialog}
-          className="character-add-dialog"
+          className="modal-dialog character-add-dialog"
           onCancel={() => setAdding(false)}
           onPaste={(e) => {
             const text = e.clipboardData.getData('text/plain');
@@ -300,7 +368,19 @@ export function CharacterPanel({
             }
           }}
         >
+          <div className="modal-header">
+            <h2>캐릭터 추가</h2>
+            <button
+              type="button"
+              className="ghost icon-btn"
+              aria-label="닫기"
+              onClick={() => setAdding(false)}
+            >
+              ×
+            </button>
+          </div>
           <form
+            className="modal-body"
             onSubmit={(e) => {
               e.preventDefault();
               const name = String(new FormData(e.currentTarget).get('name') ?? '').trim();
@@ -318,40 +398,58 @@ export function CharacterPanel({
               }
             }}
           >
-            <h2>캐릭터 추가</h2>
-            <p>코코포리아에서 복사한 캐릭터 JSON을 붙여넣으면 바로 추가됩니다.</p>
-            <label>
-              이름
-              <input name="name" autoFocus />
+            <div className="paste-hint">
+              코코포리아 캐릭터 JSON을 이 창에 붙여넣으면(Ctrl+V) 즉시 등록됩니다.
+            </div>
+            <label className="stack-field">
+              <span>이름</span>
+              <input name="name" placeholder="새 캐릭터 이름" autoFocus />
             </label>
-            <label>
+            <label className="check-field">
               <input
                 type="checkbox"
                 checked={link}
                 onChange={(e) => setLink(e.target.checked)}
-              />{' '}
-              같은 이름의 연결되지 않은 메시지 연결
+              />
+              <span>같은 이름의 미연결 메시지 자동 연결</span>
             </label>
-
-            <button>추가</button>
-            <button type="button" onClick={() => setAdding(false)}>
-              닫기
-            </button>
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setAdding(false)}>
+                취소
+              </button>
+              <button type="submit" className="primary">
+                추가
+              </button>
+            </div>
           </form>
         </dialog>
       )}
     </section>
   );
 }
-function Avatar({ url }: { url: string }) {
+
+function Avatar({
+  url,
+  fallback,
+  color,
+}: {
+  url: string;
+  fallback?: string;
+  color?: string;
+}) {
   return /^https?:\/\//.test(url) ? (
     <img
+      className="char-avatar-img"
       src={url}
       alt=""
-      width="48"
-      height="48"
+      width="44"
+      height="44"
       loading="lazy"
       referrerPolicy="no-referrer"
     />
-  ) : null;
+  ) : (
+    <span className="char-avatar-fallback" style={{ borderColor: color || undefined }}>
+      {(fallback || '?').slice(0, 1)}
+    </span>
+  );
 }

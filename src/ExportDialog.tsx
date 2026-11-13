@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Project } from './core';
 import { exportLog, type ExportFormat } from './export';
-const formats: { id: ExportFormat; description: string }[] = [
-  { id: 'html', description: '초상화와 색상이 있는 독립 HTML 로그' },
-  { id: 'txt', description: '화자·시간·본문이 담긴 일반 텍스트' },
-  { id: 'json', description: '메시지 데이터 JSON · 프로젝트 파일과 별개' },
-  { id: 'md', description: '제목·화자·시스템 인용문이 있는 마크다운' },
+
+const formats: { id: ExportFormat; label: string; description: string }[] = [
+  { id: 'html', label: 'HTML', description: '초상화·색상이 포함된 웹 문서' },
+  { id: 'txt', label: 'TXT', description: '화자·시각·본문 일반 텍스트' },
+  { id: 'json', label: 'JSON', description: '완성 로그 데이터 (프로젝트와 별개)' },
+  { id: 'md', label: 'Markdown', description: '제목·화자·시스템 인용문' },
 ];
+
 export function ExportDialog({
   project,
   onClose,
@@ -17,10 +19,12 @@ export function ExportDialog({
   const [format, setFormat] = useState<ExportFormat>('html');
   const dialog = useRef<HTMLDialogElement>(null);
   const content = useMemo(() => exportLog(project, format), [project, format]);
+
   useEffect(() => {
     dialog.current?.showModal();
     return () => dialog.current?.close();
   }, []);
+
   function download() {
     const mime = {
       html: 'text/html',
@@ -37,17 +41,29 @@ export function ExportDialog({
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+
+  const sizeKb = (new Blob([content]).size / 1024).toFixed(1);
+
   return (
     <dialog ref={dialog} className="export-dialog" onCancel={onClose}>
       <div className="export-heading">
-        <h2>로그 내보내기</h2>
-        <button aria-label="내보내기 닫기" onClick={onClose}>
+        <div className="export-heading-left">
+          <h2>로그 내보내기</h2>
+          <span className="count-pill">
+            {project.blocks.length.toLocaleString()}개 · {sizeKb} KB
+          </span>
+        </div>
+        <button
+          type="button"
+          className="ghost icon-btn"
+          aria-label="내보내기 닫기"
+          onClick={onClose}
+        >
           ×
         </button>
       </div>
       <div className="export-body">
         <section className="export-options">
-          <h3>내보내기 형식</h3>
           {formats.map((option) => (
             <label
               key={option.id}
@@ -60,19 +76,13 @@ export function ExportDialog({
                 onChange={() => setFormat(option.id)}
               />
               <span>
-                <strong>{option.id.toUpperCase()} 파일</strong>
+                <strong>{option.label}</strong>
                 <small>{option.description}</small>
               </span>
             </label>
           ))}
-          <p>
-            전체 편집본 {project.blocks.length.toLocaleString()}개 메시지
-            <br />
-            예상 크기 {(new Blob([content]).size / 1024).toFixed(1)} KB
-          </p>
-          <small>
-            검색·선택 상태와 관계없이 저장된 편집본 전체를 내보냅니다. HTML 초상화는 원본
-            이미지 URL을 사용합니다.
+          <small className="muted-note">
+            검색·선택과 무관하게 전체 편집본을 내보냅니다.
           </small>
         </section>
         <section className="export-preview" aria-label="내보내기 미리보기">
@@ -84,10 +94,15 @@ export function ExportDialog({
         </section>
       </div>
       <footer className="export-footer">
-        <span>{format.toUpperCase()} 미리보기</span>
-        <button onClick={download} disabled={!format}>
-          {format.toUpperCase()} 파일 내보내기
-        </button>
+        <span className="muted-note">{format.toUpperCase()} 미리보기</span>
+        <div className="export-footer-actions">
+          <button type="button" className="ghost" onClick={onClose}>
+            닫기
+          </button>
+          <button type="button" className="primary" onClick={download} disabled={!format}>
+            {format.toUpperCase()} 다운로드
+          </button>
+        </div>
       </footer>
     </dialog>
   );

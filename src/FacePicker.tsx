@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Character } from './core';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
+
 export function FacePicker({
   character,
   value,
@@ -15,6 +16,7 @@ export function FacePicker({
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const disabled = !character || character.id === SYSTEM_CHARACTER_ID;
+
   useEffect(() => {
     const close = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
@@ -22,6 +24,7 @@ export function FacePicker({
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
   }, []);
+
   return (
     <div
       ref={root}
@@ -36,7 +39,9 @@ export function FacePicker({
     >
       <button
         type="button"
+        className={imageButton ? 'face-btn-avatar' : 'face-btn-icon'}
         aria-label="표정 선택"
+        title={disabled ? '연결된 캐릭터의 표정 선택' : '표정 선택'}
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen(!open)}
@@ -54,6 +59,7 @@ export function FacePicker({
               <button
                 type="button"
                 key={i}
+                className={face.iconUrl === value ? 'active' : undefined}
                 onClick={() => {
                   onChange(face.iconUrl);
                   setOpen(false);
@@ -64,7 +70,7 @@ export function FacePicker({
               </button>
             ))
           ) : (
-            <p>등록된 표정이 없습니다.</p>
+            <p className="empty-faces">등록된 표정이 없습니다.</p>
           )}
         </div>
       )}
