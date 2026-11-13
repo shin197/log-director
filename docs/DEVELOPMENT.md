@@ -17,6 +17,7 @@
 | src/keyboardNavigation.ts                  | 키보드 커서 이동, 인접 교환                                      |
 | src/logOperations.ts                       | 페이지 크기와 연속 병합                                          |
 | src/bulkEdit.ts                            | 다중 선택 일괄 편집 상태, 대표 선정, 실시간 패치 및 단일 적용    |
+| src/BulkTextEditor.tsx                     | 일괄 편집 전용 대사 앞뒤 추가·원자적 블럭·치환 UI                |
 | src/textEdit.ts                            | 선택 텍스트 따옴표·괄호 자동 감싸기                              |
 | src/query.ts                               | 검색 문법, 드래그 순서 변경                                      |
 | src/ProjectPanels.tsx, src/presentation.ts | 설정 UI와 시각 표시                                              |

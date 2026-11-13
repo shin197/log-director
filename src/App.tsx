@@ -52,6 +52,7 @@ function App() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bulkEdit, setBulkEdit] = useState<BulkEditState | null>(null);
+  const [bulkReplaceOpen, setBulkReplaceOpen] = useState(false);
 
   const commit = (next: Project) => {
     setPast((x) => [...x, p].slice(-100));
@@ -112,6 +113,7 @@ function App() {
     setSelected(new Set());
     setEditingId(null);
     setBulkEdit(null);
+    setBulkReplaceOpen(false);
     pendingFocus.current = null;
   }
 
@@ -147,6 +149,7 @@ function App() {
     const repBlock = p.blocks.find((b) => b.id === repId);
     if (!repBlock) return;
     setEditingId(null);
+    setBulkReplaceOpen(false);
     setBulkEdit(createBulkEditState(repId, selected, repBlock));
     const visibleIdx = visible.findIndex((b) => b.id === repId);
     if (visibleIdx >= 0) setPage(Math.floor(visibleIdx / PAGE_SIZE));
@@ -158,6 +161,7 @@ function App() {
     const count = bulkEdit.selectedIds.size;
     commit(applyBulkEditToProject(p, bulkEdit));
     setBulkEdit(null);
+    setBulkReplaceOpen(false);
     setNotice(`${count}개 블록을 일괄 편집했습니다.`);
   }
 
@@ -191,10 +195,19 @@ function App() {
         if (!e.repeat) toggleSearch();
         return;
       }
+      if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        if (!e.repeat) {
+          if (bulkEdit) setBulkReplaceOpen((v) => !v);
+          else setReplaceOpen((v) => !v);
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         setHelpOpen(false);
         if (bulkEdit) {
           setBulkEdit(null);
+          setBulkReplaceOpen(false);
           return;
         }
         setSelected(new Set());
@@ -353,6 +366,13 @@ function App() {
       ).size > 1
     : false;
   const bulkHasAnyDice = bulkEdit ? bulkTargetBlocks.some((b) => !!b.diceResult) : false;
+  const bulkRepOriginalText = bulkEdit
+    ? (p.blocks.find((b) => b.id === bulkEdit.repId)?.text ?? '')
+    : '';
+  const bulkReplaceMatchCount =
+    bulkEdit && bulkEdit.replaceFind
+      ? bulkTargetBlocks.filter((b) => b.text.includes(bulkEdit.replaceFind)).length
+      : 0;
 
   return (
     <>
@@ -588,8 +608,8 @@ function App() {
                         <code>Del</code>
                       </li>
                       <li>
-                        <code>Ctrl+F</code> 검색 · <code>Ctrl+A</code> 전체 ·{' '}
-                        <code>Ctrl+Z/Y</code>
+                        <code>Ctrl+F</code> 검색 · <code>Ctrl+H</code> 치환 ·{' '}
+                        <code>Ctrl+A</code> 전체 · <code>Ctrl+Z/Y</code>
                       </li>
                     </ul>
                   </div>
@@ -663,10 +683,11 @@ function App() {
               <button
                 type="button"
                 className="compact-btn"
-                disabled={!!bulkEdit}
-                aria-pressed={replaceOpen}
-                onClick={() => setReplaceOpen(!replaceOpen)}
-                title="선택 블록 일괄 치환 열기/닫기"
+                aria-pressed={bulkEdit ? bulkReplaceOpen : replaceOpen}
+                onClick={() =>
+                  bulkEdit ? setBulkReplaceOpen((v) => !v) : setReplaceOpen((v) => !v)
+                }
+                title="일괄 치환 열기/닫기 (Ctrl+H)"
               >
                 일괄 치환
               </button>
@@ -786,7 +807,7 @@ function App() {
                 const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
                 const isBulkRep = bulkEdit?.repId === b.id;
                 const displayBlock =
-                  isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit, isBulkRep) : b;
+                  isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
 
                 return (
                   <MessageBlock
@@ -807,13 +828,21 @@ function App() {
                         ? {
                             count: bulkEdit.selectedIds.size,
                             state: bulkEdit,
+                            originalRepText: bulkRepOriginalText,
                             faceCharacter: bulkFaceCharacter,
                             mixedSpeakers: bulkMixedSpeakers,
                             hasAnyDice: bulkHasAnyDice,
+                            replaceOpen: bulkReplaceOpen,
+                            replaceMatchCount: bulkReplaceMatchCount,
+                            onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                            onCloseReplace: () => setBulkReplaceOpen(false),
                             onChangeState: (updater) =>
                               setBulkEdit((prev) => (prev ? updater(prev) : null)),
                             onSave: saveBulkEdit,
-                            onCancel: () => setBulkEdit(null),
+                            onCancel: () => {
+                              setBulkEdit(null);
+                              setBulkReplaceOpen(false);
+                            },
                             onDelete: deleteSelected,
                           }
                         : undefined

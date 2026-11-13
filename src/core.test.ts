@@ -622,17 +622,21 @@ test('일괄 편집 대표 선택, 표정 조건, 일괄 패치 및 단일 적�
     undefined,
   );
 
-  // 캐릭터를 일괄 지정하면 그 시점부터 표정 변경 가능 + 대표 대사만 변경 + 채널/표정 일괄 적용
+  // 캐릭터 일괄 지정 + 표정 + 대사 앞뒤 추가 및 기존 대사 내부 일괄 치환
   const edited = applyBulkEditToProject(baseProject, {
     ...mixedBulk,
     speakerAction: { type: 'character', character: charA },
     iconUrl: 'https://example.com/a2.png',
     channel: '정보',
-    repText: '수정된 첫 대사',
+    textPrefix: '"',
+    textSuffix: '"',
+    replaceFind: '대사',
+    replaceTo: '발언',
     diceMode: 'remove',
   });
-  assert.equal(edited.blocks[0].text, '수정된 첫 대사');
-  assert.equal(edited.blocks[1].text, '둘째 대사');
+  assert.equal(edited.blocks[0].text, '"첫 발언"');
+  assert.equal(edited.blocks[1].text, '"둘째 발언"');
+  assert.equal(edited.blocks[2].text, '셋째 대사');
   assert.equal(edited.blocks[0].characterId, 'c-a');
   assert.equal(edited.blocks[1].characterId, 'c-a');
   assert.equal(edited.blocks[1].iconUrl, 'https://example.com/a2.png');

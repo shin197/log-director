@@ -11,7 +11,10 @@ export type SpeakerAction =
 export type BulkEditState = {
   repId: string;
   selectedIds: Set<string>;
-  repText?: string;
+  textPrefix: string;
+  textSuffix: string;
+  replaceFind: string;
+  replaceTo: string;
   speakerAction: SpeakerAction;
   iconUrl?: string;
   channel?: string;
@@ -28,6 +31,10 @@ export function createBulkEditState(
   return {
     repId,
     selectedIds: new Set(selectedIds),
+    textPrefix: '',
+    textSuffix: '',
+    replaceFind: '',
+    replaceTo: '',
     speakerAction: null,
     diceMode: 'unchanged',
     diceResult: repBlock.diceResult,
@@ -78,7 +85,19 @@ export function getBulkFaceCharacter(
   return undefined;
 }
 
-export function applyBulkPatch(block: Block, bulk: BulkEditState, isRep: boolean): Block {
+/**
+ * Applies replace within the original text block and wraps it with prefix/suffix.
+ */
+export function applyBulkReplacedText(text: string, find: string, to: string): string {
+  return find ? text.split(find).join(to) : text;
+}
+
+export function applyBulkTextTransform(text: string, bulk: BulkEditState): string {
+  const inner = applyBulkReplacedText(text, bulk.replaceFind, bulk.replaceTo);
+  return bulk.textPrefix + inner + bulk.textSuffix;
+}
+
+export function applyBulkPatch(block: Block, bulk: BulkEditState): Block {
   let next: Block = block;
 
   if (bulk.speakerAction) {
@@ -117,8 +136,8 @@ export function applyBulkPatch(block: Block, bulk: BulkEditState, isRep: boolean
     next = { ...next, diceResult: bulk.diceResult };
   }
 
-  if (isRep && bulk.repText !== undefined) {
-    next = { ...next, text: bulk.repText };
+  if (bulk.textPrefix || bulk.textSuffix || bulk.replaceFind) {
+    next = { ...next, text: applyBulkTextTransform(next.text, bulk) };
   }
 
   return next;
@@ -128,7 +147,7 @@ export function applyBulkEditToProject(project: Project, bulk: BulkEditState): P
   return {
     ...project,
     blocks: project.blocks.map((b) =>
-      bulk.selectedIds.has(b.id) ? applyBulkPatch(b, bulk, b.id === bulk.repId) : b,
+      bulk.selectedIds.has(b.id) ? applyBulkPatch(b, bulk) : b,
     ),
   };
 }

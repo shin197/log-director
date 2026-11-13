@@ -679,6 +679,110 @@ code {
   border-left: 2px solid var(--accent-border);
 }
 
+.bulk-text-editor-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.bulk-replace-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.bulk-replace-bar input {
+  flex: 1 1 130px;
+}
+
+.bulk-replace-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.bulk-replace-summary > span {
+  margin-right: auto;
+}
+
+.bulk-text-editor {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.bulk-text-editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-border);
+}
+
+.bulk-part-input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 10px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.bulk-part-input:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.bulk-original-token {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 8px;
+  padding: 6px 9px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  user-select: none;
+  cursor: pointer;
+}
+
+.bulk-original-token:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.bulk-token-badge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-top: 2px;
+}
+
+.bulk-token-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
 .editor-actions {
   display: flex;
   align-items: center;

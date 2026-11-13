@@ -14,6 +14,10 @@ const WRAP_PAIRS: Record<string, readonly [string, string]> = {
   '〈': ['〈', '〉'],
 };
 
+export function getWrapPair(key: string): readonly [string, string] | undefined {
+  return WRAP_PAIRS[key];
+}
+
 /**
  * Wraps the selected range [start, end) with matching quote/bracket pairs.
  * Returns null if there is no selection or the key is not a supported wrapper.

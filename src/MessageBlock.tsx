@@ -4,15 +4,21 @@ import { defaultDisplay, displayTime, type DisplaySettings } from './presentatio
 import type { SelectionKeys } from './selection';
 import { useState, useEffect } from 'react';
 import type { Block, Character } from './core';
-import type { BulkEditState } from './bulkEdit';
+import { applyBulkReplacedText, type BulkEditState } from './bulkEdit';
+import { BulkTextEditor } from './BulkTextEditor';
 import { handleWrapKeyDown } from './textEdit';
 
 export type BulkEditContext = {
   count: number;
   state: BulkEditState;
+  originalRepText: string;
   faceCharacter?: Character;
   mixedSpeakers: boolean;
   hasAnyDice: boolean;
+  replaceOpen: boolean;
+  replaceMatchCount: number;
+  onToggleReplace: () => void;
+  onCloseReplace: () => void;
   onChangeState: (updater: (prev: BulkEditState) => BulkEditState) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -111,15 +117,6 @@ export function MessageBlock({
     ? bulkContext.faceCharacter
     : characters.find((c) => c.id === activeBlock.characterId);
   const canEditFace = isBulk ? !!bulkContext.faceCharacter : !isSystem;
-
-  const textValue = isBulk ? (bulkContext.state.repText ?? b.text) : draft.text;
-  const setTextValue = (nextText: string) => {
-    if (bulkContext) {
-      bulkContext.onChangeState((prev) => ({ ...prev, repText: nextText }));
-    } else {
-      setDraft({ ...draft, text: nextText });
-    }
-  };
 
   const diceValue = isBulk ? bulkContext.state.diceResult : draft.diceResult;
   const setDiceValue = (nextDice: string) => {
@@ -309,6 +306,17 @@ export function MessageBlock({
                   <button
                     type="button"
                     className="compact-btn"
+                    aria-pressed={
+                      bulkContext.replaceOpen || !!bulkContext.state.replaceFind
+                    }
+                    title="기존 대사 내부 일괄 치환 (Ctrl+H)"
+                    onClick={bulkContext.onToggleReplace}
+                  >
+                    치환
+                  </button>
+                  <button
+                    type="button"
+                    className="compact-btn"
                     aria-pressed={showDiceEditor}
                     title={
                       showDiceEditor
@@ -404,21 +412,64 @@ export function MessageBlock({
               />
             )}
 
-            <textarea
-              autoFocus
-              aria-label="메시지 본문"
-              placeholder="메시지 본문…"
-              rows={Math.max(2, Math.min(18, textValue.split('\n').length))}
-              value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (handleWrapKeyDown(e, textValue, setTextValue)) return;
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  finish();
+            {bulkContext ? (
+              <BulkTextEditor
+                previewText={applyBulkReplacedText(
+                  bulkContext.originalRepText,
+                  bulkContext.state.replaceFind,
+                  bulkContext.state.replaceTo,
+                )}
+                prefix={bulkContext.state.textPrefix}
+                suffix={bulkContext.state.textSuffix}
+                onChangePrefix={(textPrefix) =>
+                  bulkContext.onChangeState((prev) => ({ ...prev, textPrefix }))
                 }
-              }}
-            />
+                onChangeSuffix={(textSuffix) =>
+                  bulkContext.onChangeState((prev) => ({ ...prev, textSuffix }))
+                }
+                onSave={finish}
+                replaceOpen={bulkContext.replaceOpen}
+                replaceFind={bulkContext.state.replaceFind}
+                replaceTo={bulkContext.state.replaceTo}
+                replaceMatchCount={bulkContext.replaceMatchCount}
+                onToggleReplace={bulkContext.onToggleReplace}
+                onCloseReplace={bulkContext.onCloseReplace}
+                onChangeReplaceFind={(replaceFind) =>
+                  bulkContext.onChangeState((prev) => ({ ...prev, replaceFind }))
+                }
+                onChangeReplaceTo={(replaceTo) =>
+                  bulkContext.onChangeState((prev) => ({ ...prev, replaceTo }))
+                }
+                onClearReplace={() =>
+                  bulkContext.onChangeState((prev) => ({
+                    ...prev,
+                    replaceFind: '',
+                    replaceTo: '',
+                  }))
+                }
+              />
+            ) : (
+              <textarea
+                autoFocus
+                aria-label="메시지 본문"
+                placeholder="메시지 본문…"
+                rows={Math.max(2, Math.min(18, draft.text.split('\n').length))}
+                value={draft.text}
+                onChange={(e) => setDraft({ ...draft, text: e.target.value })}
+                onKeyDown={(e) => {
+                  if (
+                    handleWrapKeyDown(e, draft.text, (text) =>
+                      setDraft({ ...draft, text }),
+                    )
+                  )
+                    return;
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    finish();
+                  }
+                }}
+              />
+            )}
 
             {showDiceEditor && (
               <textarea
@@ -443,7 +494,7 @@ export function MessageBlock({
             <div className="editor-actions">
               <span className="editor-hint">
                 {bulkContext
-                  ? `Ctrl+Enter 저장 · Esc 취소 · 일괄 편집 (${bulkContext.count}개)`
+                  ? `Ctrl+Enter 저장 · Esc 취소 · Ctrl+H 치환 · 일괄 편집 (${bulkContext.count}개)`
                   : 'Ctrl+Enter 저장 · Esc 취소'}
               </span>
               <button type="button" className="danger ghost" onClick={removeAction}>
