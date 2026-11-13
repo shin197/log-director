@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
 import { FacePicker } from './FacePicker';
@@ -20,12 +20,14 @@ export function Composer({
   send,
   disabled = false,
   eyedrop = null,
+  focusRequest = 0,
 }: {
   characters: Character[];
   channels?: ChannelSummary[];
   send: (b: Block) => void;
   disabled?: boolean;
   eyedrop?: EyedropPayload | null;
+  focusRequest?: number;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
@@ -35,6 +37,15 @@ export function Composer({
     [open, setOpen] = useState(false),
     [index, setIndex] = useState(0),
     [collapsed, setCollapsed] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    setCollapsed(false);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [focusRequest]);
 
   useEffect(() => {
     if (!eyedrop) return;
@@ -101,11 +112,13 @@ export function Composer({
       <div className="composer-inner">
         <div className="composer-speaker-group">
           <div className="composer-avatar">
-            {character && /^https?:\/\//.test(icon) ? (
-              <img src={icon} alt="" />
-            ) : (
-              <span className="avatar-placeholder">{(name || '?').slice(0, 1)}</span>
-            )}
+            <FacePicker
+              character={character}
+              value={icon}
+              onChange={setIcon}
+              imageButton
+              fallbackText={(name || '?').slice(0, 1)}
+            />
           </div>
           <div className="composer-speaker">
             <input
@@ -154,7 +167,6 @@ export function Composer({
               </div>
             )}
           </div>
-          <FacePicker character={character} value={icon} onChange={setIcon} />
           <ChannelPicker
             value={channel}
             channels={channels}
@@ -164,6 +176,7 @@ export function Composer({
         </div>
 
         <textarea
+          ref={textareaRef}
           aria-label="전송 내용"
           disabled={disabled}
           placeholder={
@@ -176,6 +189,11 @@ export function Composer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (handleWrapKeyDown(e, text, setText)) return;
+            if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+              e.preventDefault();
+              e.currentTarget.blur();
+              return;
+            }
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();

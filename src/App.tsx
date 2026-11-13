@@ -65,6 +65,7 @@ function App() {
     null,
   );
   const [eyedrop, setEyedrop] = useState<EyedropPayload | null>(null);
+  const [composerFocusRequest, setComposerFocusRequest] = useState(0);
 
   const commit = (next: Project) => {
     setPast((x) => [...x, p].slice(-100));
@@ -300,6 +301,11 @@ function App() {
         e.isComposing
       )
         return;
+      if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && !cutIds) {
+        e.preventDefault();
+        setComposerFocusRequest((n) => n + 1);
+        return;
+      }
       if (e.ctrlKey && !e.altKey) {
         const key = e.key.toLowerCase();
         if (cutIds) {
@@ -1054,6 +1060,7 @@ function App() {
             send={addMessage}
             disabled={!!cutIds || !!bulkEdit}
             eyedrop={eyedrop}
+            focusRequest={composerFocusRequest}
           />
 
           <div className="status-bar">

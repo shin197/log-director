@@ -1201,7 +1201,8 @@ code {
   padding: 4px;
 }
 
-.composer-speaker-group .channel-options {
+.composer-speaker-group .channel-options,
+.composer-speaker-group .face-options {
   top: auto;
   bottom: calc(100% + 4px);
 }

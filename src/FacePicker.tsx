@@ -7,11 +7,13 @@ export function FacePicker({
   value,
   onChange,
   imageButton = false,
+  fallbackText,
 }: {
   character?: Character;
   value: string;
   onChange: (url: string) => void;
   imageButton?: boolean;
+  fallbackText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -49,7 +51,7 @@ export function FacePicker({
         {imageButton && /^https?:\/\//.test(value) ? (
           <img src={value} alt="현재 표정" />
         ) : (
-          '☺'
+          fallbackText || '☺'
         )}
       </button>
       {open && !disabled && (
