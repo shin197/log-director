@@ -904,3 +904,43 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
   clearAutosave();
   assert.equal(loadAutosave(), null);
 });
+
+import fs from 'node:fs';
+import { isSafeImageUrl } from './importFormats.ts';
+test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 project.json', () => {
+  // 1) base64 이미지 URL 안전성 검증
+  assert.equal(isSafeImageUrl('https://example.com/a.png'), true);
+  assert.equal(isSafeImageUrl('data:image/png;base64,iVBORw0KGgo='), true);
+  assert.equal(isSafeImageUrl('data:image/svg+xml;base64,PHN2Zz4='), false);
+  assert.equal(isSafeImageUrl('javascript:alert(1)'), false);
+
+  // 2) sample_log 5개 포맷 파일 검증
+  const jsonRaw = fs.readFileSync('sample_log/json_sample.json', 'utf8');
+  const jsonProj = parse(jsonRaw, 'json_sample.json');
+  assert.ok(jsonProj.blocks.length > 100);
+
+  const htmlRaw = fs.readFileSync('sample_log/html_sample.html', 'utf8');
+  const htmlProj = parse(htmlRaw, 'html_sample.html');
+  assert.ok(htmlProj.blocks.length > 100);
+  assert.ok(htmlProj.blocks.some((b) => b.diceResult.length > 0));
+  assert.ok(htmlProj.blocks.some((b) => b.sourceType === 'system' && !('speaker' in b)));
+
+  const htmlCcfRaw = fs.readFileSync('sample_log/html_ccf_sample.html', 'utf8');
+  const htmlCcfProj = parse(htmlCcfRaw, 'html_ccf_sample.html');
+  assert.ok(htmlCcfProj.blocks.length > 100);
+  assert.ok(htmlCcfProj.blocks.some((b) => (b.iconUrl ?? '').startsWith('data:image/')));
+
+  const htmlRawText = fs.readFileSync('sample_log/html_raw_sample.html', 'utf8');
+  const htmlRawProj = parse(htmlRawText, 'html_raw_sample.html');
+  assert.ok(htmlRawProj.blocks.length > 100);
+
+  const mdRaw = fs.readFileSync('sample_log/markdown_sample.md', 'utf8');
+  const mdProj = parse(mdRaw, 'markdown_sample.md');
+  assert.ok(mdProj.blocks.length > 100);
+  assert.ok(mdProj.blocks.some((b) => b.sourceType === 'system' && !('speaker' in b)));
+  assert.ok(mdProj.blocks.some((b) => b.diceResult.length > 0));
+
+  // 3) project.json 왕복
+  const roundtrip = parse(JSON.stringify(htmlCcfProj), 'test.project.json');
+  assert.equal(roundtrip.blocks.length, htmlCcfProj.blocks.length);
+});

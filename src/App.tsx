@@ -577,12 +577,12 @@ function App() {
         <div className="header-actions">
           <label
             className="button compact-btn"
-            title="코코포리아 JSON 또는 프로젝트 JSON 열기"
+            title="JSON, HTML, Markdown 로그 또는 프로젝트 JSON 열기"
           >
             열기
             <input
               type="file"
-              accept=".json"
+              accept=".json,.html,.htm,.md,.markdown"
               hidden
               onChange={async (e) => {
                 const f = e.target.files?.[0];

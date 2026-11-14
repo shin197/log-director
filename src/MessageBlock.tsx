@@ -9,6 +9,7 @@ import type { Block, Character } from './core';
 import { applyBulkReplacedText, type BulkEditState } from './bulkEdit';
 import { BulkTextEditor } from './BulkTextEditor';
 import { handleWrapKeyDown } from './textEdit';
+import { isSafeImageUrl } from './importFormats';
 
 export type BulkEditContext = {
   count: number;
@@ -258,7 +259,7 @@ export function MessageBlock({
               }}
               imageButton
             />
-          ) : activeBlock.iconUrl && /^https?:\/\//.test(activeBlock.iconUrl) ? (
+          ) : activeBlock.iconUrl && isSafeImageUrl(activeBlock.iconUrl) ? (
             <img
               draggable={false}
               src={activeBlock.iconUrl}

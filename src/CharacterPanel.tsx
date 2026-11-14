@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Project, Character } from './core';
 import { updateCharacter } from './characters';
 import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
+import { isSafeImageUrl } from './importFormats';
 
 type FaceDraft = { name: string; iconUrl: string; originalUrl: string };
 type Draft = Omit<Character, 'faces'> & { faces: FaceDraft[] };
@@ -437,7 +438,7 @@ function Avatar({
   fallback?: string;
   color?: string;
 }) {
-  return /^https?:\/\//.test(url) ? (
+  return isSafeImageUrl(url) ? (
     <img
       className="char-avatar-img"
       src={url}

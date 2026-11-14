@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Character } from './core';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
+import { isSafeImageUrl } from './importFormats';
 
 export function FacePicker({
   character,
@@ -48,7 +49,7 @@ export function FacePicker({
         disabled={disabled}
         onClick={() => setOpen(!open)}
       >
-        {imageButton && /^https?:\/\//.test(value) ? (
+        {imageButton && isSafeImageUrl(value) ? (
           <img src={value} alt="현재 표정" />
         ) : (
           fallbackText || '☺'

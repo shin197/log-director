@@ -1,5 +1,6 @@
 import { systemCharacter } from './systemCharacter.ts';
 import { migrateCharacters } from './characters.ts';
+import { parseHtmlLog, parseMarkdownLog } from './importFormats.ts';
 import type { DisplaySettings } from './presentation';
 export type Character = {
   id: string;
@@ -40,7 +41,42 @@ export const blank = (): Project => ({
   characters: [systemCharacter()],
 });
 export function parse(raw: string, name: string): Project {
-  const d = JSON.parse(raw.replace(/^\uFEFF/, ''));
+  const cleaned = raw.replace(/^\uFEFF/, '');
+  const trimmed = cleaned.trimStart();
+  const lowerName = name.toLowerCase();
+
+  if (
+    lowerName.endsWith('.html') ||
+    lowerName.endsWith('.htm') ||
+    trimmed.startsWith('<')
+  ) {
+    const { title, blocks } = parseHtmlLog(cleaned, name);
+    return migrateCharacters({
+      format: 'log-studio',
+      version: 1,
+      title,
+      original: { name, raw },
+      blocks,
+    });
+  }
+
+  if (
+    lowerName.endsWith('.md') ||
+    lowerName.endsWith('.markdown') ||
+    (!trimmed.startsWith('{') &&
+      (/^\s*#\s+/m.test(trimmed) || /^\*\*.+?\*\*.*:\s*$/m.test(trimmed)))
+  ) {
+    const { title, blocks } = parseMarkdownLog(cleaned, name);
+    return migrateCharacters({
+      format: 'log-studio',
+      version: 1,
+      title,
+      original: { name, raw },
+      blocks,
+    });
+  }
+
+  const d = JSON.parse(cleaned);
   if (d.format === 'log-studio') {
     if (
       d.version !== 1 ||
