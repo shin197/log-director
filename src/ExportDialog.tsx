@@ -69,12 +69,17 @@ export function ExportDialog({
   const filteredBlocks = useMemo(() => {
     if (!query.trim()) return project.blocks;
     try {
-      const predicate = compileQuery(sanitizeLiveQuery(query), project.characters ?? []);
+      const predicate = compileQuery(
+        sanitizeLiveQuery(query),
+        project.characters ?? [],
+        project.scenes ?? [],
+        project.blocks,
+      );
       return project.blocks.filter(predicate);
     } catch {
       return project.blocks;
     }
-  }, [project.blocks, project.characters, query]);
+  }, [project.blocks, project.characters, project.scenes, query]);
 
   useEffect(() => {
     if (!encodeBase64) {
@@ -189,6 +194,7 @@ export function ExportDialog({
           blocks={project.blocks}
           characters={project.characters ?? []}
           channels={channels}
+          scenes={project.scenes ?? []}
           onActivate={() => { }}
           onChangeQuery={setQuery}
         />

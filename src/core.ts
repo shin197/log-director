@@ -1,5 +1,6 @@
 import { systemCharacter } from './systemCharacter.ts';
 import { migrateCharacters } from './characters.ts';
+import { normalizeScenes } from './scenes.ts';
 import {
   isSafeImageUrl,
   parseHtmlLog,
@@ -27,6 +28,11 @@ export type Block = {
   channel?: string;
   sourceType?: string;
 };
+export type Scene = {
+  id: string;
+  name: string;
+  messageId: string;
+};
 export type Project = {
   format: 'log-studio';
   version: 1;
@@ -34,6 +40,7 @@ export type Project = {
   original: { name: string; raw: string } | null;
   blocks: Block[];
   characters?: Character[];
+  scenes?: Scene[];
   display?: DisplaySettings;
   expressions?: { speaker: string; iconUrl: string; name: string }[];
 };
@@ -116,7 +123,11 @@ export function parse(raw: string, name: string): Project {
       )
     )
       throw Error('프로젝트 구조를 확인해주세요.');
-    return migrateCharacters(d);
+    const migrated = migrateCharacters(d);
+    if (Array.isArray(d.scenes)) {
+      migrated.scenes = normalizeScenes(d.scenes, migrated.blocks);
+    }
+    return migrated;
   }
   if (!Array.isArray(d.messages)) throw Error('messages 배열을 가진 JSON이 필요합니다.');
   const imagesMap =

@@ -10,8 +10,16 @@ import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
-import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
+import { compileQuery, moveBlocks, quoteValueIfNeeded, sanitizeLiveQuery } from './query';
 import { collectChannels } from './channels';
+import {
+  addSceneForMessage,
+  findAdjacentScene,
+  normalizeScenes,
+  removeScene,
+  updateSceneName,
+} from './scenes';
+import { SceneSidebar } from './SceneSidebar';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { SearchBar } from './SearchBar';
 import { RestoreDialog } from './RestoreDialog';
@@ -32,7 +40,14 @@ import {
 } from './bulkEdit';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
-import { blank, parse, replaceBlocks, type Project, type Block } from './core';
+import {
+  blank,
+  parse,
+  replaceBlocks,
+  type Project,
+  type Block,
+  type Scene,
+} from './core';
 import './style.css';
 import './workspace-layout.css';
 
@@ -73,6 +88,8 @@ function App() {
   );
   const [eyedrop, setEyedrop] = useState<EyedropPayload | null>(null);
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
+  const [sceneBarOpen, setSceneBarOpen] = useState(true);
+  const [focusSceneId, setFocusSceneId] = useState<string | null>(null);
   const [pendingRestore, setPendingRestore] = useState<AutosavePayload | null>(() => {
     return loadAutosave();
   });
@@ -104,9 +121,12 @@ function App() {
   }
 
   const commit = (next: Project) => {
+    const normalized: Project = next.scenes
+      ? { ...next, scenes: normalizeScenes(next.scenes, next.blocks) }
+      : next;
     setPast((x) => [...x, p].slice(-100));
     setFuture([]);
-    setP(next);
+    setP(normalized);
   };
   const edit = (id: string, patch: Partial<Block>) =>
     commit({ ...p, blocks: p.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
@@ -117,6 +137,8 @@ function App() {
     predicate = compileQuery(
       searchActive ? sanitizeLiveQuery(query) : '',
       p.characters ?? [],
+      p.scenes ?? [],
+      p.blocks,
     );
   } catch (error) {
     queryError = String(error);
@@ -128,9 +150,12 @@ function App() {
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
     current = Math.min(page, pages - 1);
-  const pendingFocus = useRef<{ id: string; direction: number; center?: boolean } | null>(
-    null,
-  );
+  const pendingFocus = useRef<{
+    id: string;
+    direction: number;
+    center?: boolean;
+    top?: boolean;
+  } | null>(null);
 
   function disableSearch() {
     setQuery('');
@@ -163,6 +188,55 @@ function App() {
     if (cutIds) setPasteTarget({ id, after: true });
     pendingFocus.current = { id, direction: 1, center: true };
     setPage(Math.floor(index / PAGE_SIZE));
+  }
+
+  function jumpToScene(scene: Scene) {
+    let targetIndex = visible.findIndex((b) => b.id === scene.messageId);
+    if (targetIndex < 0) {
+      const fullIndex = p.blocks.findIndex((b) => b.id === scene.messageId);
+      if (fullIndex < 0) return;
+      disableSearch();
+      targetIndex = fullIndex;
+    }
+    setEditingId(null);
+    setBulkEdit(null);
+    setSelected(new Set([scene.messageId]));
+    if (cutIds) setPasteTarget({ id: scene.messageId, after: true });
+    pendingFocus.current = { id: scene.messageId, direction: 1, top: true };
+    setPage(Math.floor(targetIndex / PAGE_SIZE));
+    setNotice(`‘${scene.name || '장면'}’ 장면으로 이동했습니다.`);
+  }
+
+  function bookmarkMessage(messageId: string) {
+    if (cutIds || bulkEdit) return;
+    const {
+      scenes: nextScenes,
+      added,
+      existing,
+    } = addSceneForMessage(p.scenes, p.blocks, messageId);
+    setSceneBarOpen(true);
+    if (existing) {
+      setFocusSceneId(existing.id);
+      setNotice(
+        `이미 ‘${existing.name || '장면'}’ 장면이 등록된 메시지입니다. 우측 장면 바에서 이름을 수정하거나 삭제할 수 있습니다.`,
+      );
+      return;
+    }
+    if (added) {
+      commit({ ...p, scenes: nextScenes });
+      setFocusSceneId(added.id);
+      setNotice(
+        `‘${added.name}’ 장면을 등록했습니다. 우측 장면 바에서 이름을 수정하세요.`,
+      );
+    }
+  }
+
+  function filterByScene(scene: Scene) {
+    selectionAnchor.current = null;
+    setSearchActive(true);
+    setQuery(`scene:${quoteValueIfNeeded(scene.name || '장면')}`);
+    setPage(0);
+    setNotice(`‘${scene.name || '장면'}’ 장면 구간을 필터링합니다.`);
   }
 
   function resetInteraction() {
@@ -427,6 +501,27 @@ function App() {
         return;
       }
       if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        (e.key === 'PageUp' || e.key === 'PageDown')
+      ) {
+        e.preventDefault();
+        const anchorId = cursorId.current ?? [...selected].at(-1) ?? null;
+        const targetScene = findAdjacentScene(
+          p.scenes,
+          p.blocks,
+          anchorId,
+          e.key === 'PageDown' ? 1 : -1,
+        );
+        if (!targetScene) {
+          setNotice('등록된 장면이 없습니다.');
+          return;
+        }
+        jumpToScene(targetScene);
+        return;
+      }
+      if (
         e.altKey ||
         !['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)
       )
@@ -469,6 +564,8 @@ function App() {
     past,
     future,
     searchActive,
+    p.scenes,
+    p.blocks,
   ]);
 
   useEffect(() => {
@@ -490,6 +587,13 @@ function App() {
       );
       scroller.style.paddingTop = `${room}px`;
       scroller.style.paddingBottom = `${room}px`;
+    } else if (request.top) {
+      scroller.style.paddingTop = '';
+      const roomBottom = Math.max(
+        0,
+        scroller.clientHeight - node.getBoundingClientRect().height,
+      );
+      scroller.style.paddingBottom = `${roomBottom}px`;
     } else {
       scroller.style.paddingTop = '';
       scroller.style.paddingBottom = '';
@@ -500,6 +604,10 @@ function App() {
     if (request.center) {
       scroller.scrollTop +=
         rect.top - bounds.top - (scroller.clientHeight - rect.height) / 2;
+      return;
+    }
+    if (request.top) {
+      scroller.scrollTop += rect.top - bounds.top - 8;
       return;
     }
     const neighbors = [
@@ -529,6 +637,10 @@ function App() {
   }
 
   const channels = useMemo(() => collectChannels(p.blocks), [p.blocks]);
+  const sceneByMessageId = useMemo(
+    () => new Map(normalizeScenes(p.scenes, p.blocks).map((s) => [s.messageId, s])),
+    [p.scenes, p.blocks],
+  );
 
   const bulkTargetBlocks = bulkEdit
     ? p.blocks.filter((b) => bulkEdit.selectedIds.has(b.id))
@@ -749,6 +861,7 @@ function App() {
                 blocks={p.blocks}
                 characters={p.characters ?? []}
                 channels={channels}
+                scenes={p.scenes ?? []}
                 onActivate={() => setSearchActive(true)}
                 onChangeQuery={(nextQuery) => {
                   selectionAnchor.current = null;
@@ -1046,6 +1159,10 @@ function App() {
                         : undefined
                     }
                     onEyedrop={() => eyedropBlock(b)}
+                    scene={sceneByMessageId.get(b.id)}
+                    onBookmark={
+                      !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
+                    }
                     toggle={(keys: SelectionKeys) => {
                       if (bulkEdit) return;
                       const next = selectMessage(
@@ -1097,6 +1214,41 @@ function App() {
             </span>
           </div>
         </main>
+        <SceneSidebar
+          open={sceneBarOpen}
+          onToggleOpen={() => setSceneBarOpen((v) => !v)}
+          scenes={p.scenes ?? []}
+          blocks={p.blocks}
+          activeMessageId={cursorId.current ?? [...selected].at(-1) ?? null}
+          canAddFromSelection={
+            !cutIds && !bulkEdit && Boolean(cursorId.current || selected.size > 0)
+          }
+          focusSceneId={focusSceneId}
+          onClearFocusScene={() => setFocusSceneId(null)}
+          onAddFromSelection={() => {
+            const targetId = cursorId.current ?? [...selected].at(-1);
+            if (!targetId) {
+              setNotice('장면을 등록할 메시지를 먼저 선택하세요.');
+              return;
+            }
+            bookmarkMessage(targetId);
+          }}
+          onSelectScene={(scene) => jumpToScene(scene)}
+          onFilterScene={(scene) => filterByScene(scene)}
+          onRenameScene={(sceneId, name) =>
+            commit({
+              ...p,
+              scenes: updateSceneName(p.scenes, p.blocks, sceneId, name),
+            })
+          }
+          onRemoveScene={(sceneId) => {
+            commit({
+              ...p,
+              scenes: removeScene(p.scenes, p.blocks, sceneId),
+            });
+            setNotice('장면 북마크를 삭제했습니다.');
+          }}
+        />
       </div>
     </>
   );

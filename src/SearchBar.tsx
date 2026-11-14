@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { Block, Character } from './core';
+import type { Block, Character, Scene } from './core';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { fuzzyName } from './characters';
 import { formatChannelLabel, type ChannelSummary } from './channels';
 import { CharacterCard } from './CharacterCard';
+import { computeSceneRanges } from './scenes';
 import {
   formatChipDisplay,
   formatChipToken,
@@ -103,6 +104,7 @@ export function SearchBar({
   blocks,
   characters,
   channels,
+  scenes = [],
   onActivate,
   onChangeQuery,
 }: {
@@ -112,6 +114,7 @@ export function SearchBar({
   blocks: Block[];
   characters: Character[];
   channels: ChannelSummary[];
+  scenes?: Scene[];
   onActivate: () => void;
   onChangeQuery: (nextQuery: string) => void;
 }) {
@@ -240,6 +243,10 @@ export function SearchBar({
   }, [blocks, characters]);
 
   const { leading, activeToken } = splitTrailingToken(text);
+  const sceneRanges = useMemo(
+    () => computeSceneRanges(scenes, blocks),
+    [scenes, blocks],
+  );
 
   // 컨텍스트 드롭다운 항목 생성
   const suggestions = useMemo<SuggestionItem[]>(() => {
@@ -400,6 +407,54 @@ export function SearchBar({
       return items;
     }
 
+    // 4-2. scene: 또는 -scene: (장면 검색)
+    if (lowerToken.startsWith('scene:') || lowerToken.startsWith('-scene:')) {
+      const negative = lowerToken.startsWith('-');
+      const rawVal = activeToken.slice(negative ? 7 : 6).replace(/^"|"$/g, '');
+      const sub = rawVal.toLowerCase();
+      const section = negative ? '제외할 장면 (-scene:)' : '장면으로 검색 (scene:)';
+
+      const matched = sceneRanges.filter(
+        (r) =>
+          !sub ||
+          fuzzyName(r.scene.name, sub) ||
+          r.scene.name.toLowerCase().includes(sub),
+      );
+
+      for (const r of matched) {
+        items.push({
+          id: `scene-${negative ? 'neg' : 'pos'}-${r.scene.id}`,
+          section,
+          kind: 'chip',
+          chip: { key: 'scene', value: r.scene.name, negative },
+          icon: negative ? '-★' : '★',
+          label: r.scene.name,
+          syntax: `${negative ? '-' : ''}scene:${r.scene.name}`,
+          meta: `장면 · ${r.count}건`,
+        });
+      }
+
+      if (
+        rawVal.trim() &&
+        !matched.some(
+          (r) => r.scene.name.toLowerCase() === rawVal.trim().toLowerCase(),
+        )
+      ) {
+        const clean = rawVal.trim();
+        items.push({
+          id: `scene-custom-${clean}`,
+          section,
+          kind: 'chip',
+          chip: { key: 'scene', value: clean, negative },
+          icon: negative ? '-★' : '★',
+          label: `"${clean}" 장면 지정`,
+          syntax: `${negative ? '-' : ''}scene:${clean}`,
+          meta: '직접 지정',
+        });
+      }
+      return items;
+    }
+
     // 5. 제외 조건 (-)
     if (lowerToken.startsWith('-')) {
       const sub = activeToken.slice(1).replace(/^"|"$/g, '').trim();
@@ -446,6 +501,12 @@ export function SearchBar({
             icon: '-✨',
             label: '특정 상태 메시지 제외',
             description: '시스템·판정·미연결 등 제외',
+          },
+          {
+            prefix: '-scene:',
+            icon: '-★',
+            label: '특정 장면 제외',
+            description: '해당 장면 구간에 속하지 않는 메시지',
           },
         ];
 
@@ -503,6 +564,13 @@ export function SearchBar({
           keywords: ['is', 'system', 'normal', 'unlinked', '상태', '시스템', '미연결'],
         },
         {
+          prefix: 'scene:',
+          icon: '★',
+          label: '장면으로 검색',
+          description: '특정 장면부터 다음 장면까지의 메시지',
+          keywords: ['scene', 'bookmark', '장면', '북마크'],
+        },
+        {
           prefix: '-',
           icon: '🚫',
           label: '제외 조건',
@@ -520,7 +588,7 @@ export function SearchBar({
 
     // 사용자가 일반 단어를 입력 중일 때:
     // 키워드 프리픽스('from', 'in', 'dice', 'is')와 정확히 시작 일치하지 않으면 일반 텍스트 검색을 첫 항목으로 제공
-    const isTypingPrefixKeyword = ['from', 'in', 'dice', 'is'].some((k) =>
+    const isTypingPrefixKeyword = ['from', 'in', 'dice', 'is', 'scene'].some((k) =>
       k.startsWith(lowerToken),
     );
     if (activeToken && !isTypingPrefixKeyword) {
@@ -576,6 +644,23 @@ export function SearchBar({
             label: ch.name,
             syntax: `in:${ch.name}`,
             meta: `${ch.count}건`,
+          });
+        }
+      }
+      for (const r of sceneRanges) {
+        if (
+          fuzzyName(r.scene.name, lowerToken) ||
+          r.scene.name.toLowerCase().includes(lowerToken)
+        ) {
+          items.push({
+            id: `quick-scene-${r.scene.id}`,
+            section: '장면으로 검색',
+            kind: 'chip',
+            chip: { key: 'scene', value: r.scene.name, negative: false },
+            icon: '★',
+            label: r.scene.name,
+            syntax: `scene:${r.scene.name}`,
+            meta: `${r.count}건`,
           });
         }
       }

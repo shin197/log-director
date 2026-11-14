@@ -812,7 +812,7 @@ code {
   background: rgba(77, 184, 154, 0.04);
 }
 
-.log-message.is-cut> :not(.paste-indicator) {
+.log-message.is-cut > :not(.paste-indicator) {
   opacity: 0.42;
 }
 
@@ -971,17 +971,83 @@ code {
 
 .log-message:hover .message-hover-actions,
 .log-message:focus-within .message-hover-actions,
-.log-message.has-jump .message-hover-actions {
+.log-message.has-jump .message-hover-actions,
+.log-message.selected .message-hover-actions {
   opacity: 1;
   pointer-events: auto;
 }
 
 .message-edit-trigger,
-.message-jump {
+.message-jump,
+.message-bookmark-trigger {
   padding: 3px 8px;
   font-size: 11.5px;
   background: var(--bg-elevated);
   border-color: var(--border-default);
+}
+
+.message-bookmark-trigger {
+  color: #f5c542;
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 7px;
+}
+
+.message-bookmark-trigger:hover {
+  border-color: rgba(245, 197, 66, 0.55);
+  background: rgba(245, 197, 66, 0.12);
+}
+
+.message-bookmark-trigger.is-bookmarked {
+  border-color: rgba(245, 197, 66, 0.65);
+  background: rgba(245, 197, 66, 0.16);
+  color: #ffd452;
+}
+
+.log-message.has-scene {
+  box-shadow: inset 3px 0 0 #f5c542;
+  background: rgba(245, 197, 66, 0.025);
+}
+
+.log-message.has-scene.selected {
+  background: var(--bg-selected);
+  box-shadow:
+    inset 3px 0 0 #f5c542,
+    inset 6px 0 0 var(--accent);
+}
+
+.scene-bookmark-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  margin-bottom: -4px;
+}
+
+.log-message.system .scene-bookmark-row {
+  margin-bottom: 5px;
+}
+
+.scene-bookmark-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 197, 66, 0.14);
+  border: 1px solid rgba(245, 197, 66, 0.4);
+  color: #ffd452;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scene-bookmark-badge:hover {
+  background: rgba(245, 197, 66, 0.22);
+  border-color: rgba(245, 197, 66, 0.65);
+}
+
+.scene-star-icon {
+  color: #f5c542;
 }
 
 .message-jump {
@@ -1058,7 +1124,7 @@ code {
   color: var(--text-secondary);
 }
 
-.bulk-replace-summary>span {
+.bulk-replace-summary > span {
   margin-right: auto;
 }
 
@@ -1801,7 +1867,7 @@ code {
   gap: 8px;
 }
 
-.field-inline>input {
+.field-inline > input {
   flex: 1;
   min-width: 0;
 }
@@ -2042,7 +2108,7 @@ code {
   flex-wrap: wrap;
 }
 
-.settings-row>.stack-field {
+.settings-row > .stack-field {
   flex: 1 1 200px;
 }
 
@@ -2090,7 +2156,7 @@ code {
   flex-wrap: wrap;
 }
 
-.original-box-head>div:first-child {
+.original-box-head > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2430,7 +2496,7 @@ dialog::backdrop {
   animation: toast-fade 6.5s linear forwards;
 }
 
-.error-toast>div {
+.error-toast > div {
   flex: 1;
   min-width: 0;
 }
@@ -2456,7 +2522,6 @@ dialog::backdrop {
 }
 
 @keyframes toast-fade {
-
   0%,
   25% {
     opacity: 1;
@@ -2521,4 +2586,178 @@ dialog::backdrop {
     border-right: 0;
     border-bottom: 1px solid var(--border-subtle);
   }
+}
+
+/* Scene Sidebar */
+.scene-sidebar {
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.scene-sidebar-expand-btn {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12px 4px;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.scene-sidebar-expand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.scene-collapsed-label {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.scene-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.scene-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scene-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scene-sidebar-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scene-empty {
+  padding: 20px 10px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.scene-empty p {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.scene-empty small {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.scene-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition:
+    border-color 0.1s ease,
+    background-color 0.1s ease;
+}
+
+.scene-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.scene-card.is-active {
+  border-color: rgba(245, 197, 66, 0.65);
+  background: rgba(245, 197, 66, 0.08);
+}
+
+.scene-card-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.scene-index-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f5c542;
+  flex-shrink: 0;
+}
+
+.scene-name-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.scene-filter-btn,
+.scene-remove-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.scene-card-ref {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 2px;
+}
+
+.scene-ref-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.scene-ref-count {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.scene-ref-snippet {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scene-sidebar-foot {
+  padding: 7px 10px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  flex-shrink: 0;
 }

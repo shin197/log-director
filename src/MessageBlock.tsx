@@ -5,7 +5,7 @@ import type { ChannelSummary } from './channels';
 import { defaultDisplay, displayTime, type DisplaySettings } from './presentation';
 import type { SelectionKeys } from './selection';
 import { useState, useEffect } from 'react';
-import type { Block, Character } from './core';
+import type { Block, Character, Scene } from './core';
 import { applyBulkReplacedText, type BulkEditState } from './bulkEdit';
 import { BulkTextEditor } from './BulkTextEditor';
 import { handleWrapKeyDown } from './textEdit';
@@ -51,10 +51,14 @@ export function MessageBlock({
   drop,
   onJump,
   onEyedrop,
+  scene,
+  onBookmark,
 }: {
   block: Block;
   onJump?: () => void;
   onEyedrop?: () => void;
+  scene?: Scene;
+  onBookmark?: () => void;
   characters?: Character[];
   channels?: ChannelSummary[];
   display?: DisplaySettings;
@@ -171,7 +175,7 @@ export function MessageBlock({
   return (
     <article
       data-message-id={b.id}
-      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${dropClass}`}
+      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${dropClass}`}
       draggable={!isEditing && !bulkDisabled && !cutMode}
       onDragStart={(e) => {
         if (bulkDisabled || cutMode) return;
@@ -259,6 +263,22 @@ export function MessageBlock({
           >
             이 곳에 붙여넣기
           </button>
+        </div>
+      )}
+      {scene && (
+        <div
+          className="scene-bookmark-row"
+          onClick={(e) => {
+            if (onBookmark) {
+              e.stopPropagation();
+              onBookmark();
+            }
+          }}
+        >
+          <span className="scene-bookmark-badge" title="장면 바에서 이름 편집">
+            <span className="scene-star-icon">★</span>
+            <span>{scene.name || '이름 없는 장면'}</span>
+          </span>
         </div>
       )}
       {!isSystem && (
@@ -641,6 +661,25 @@ export function MessageBlock({
               }}
             >
               위치 이동 ↗
+            </button>
+          )}
+          {!cutMode && onBookmark && (
+            <button
+              type="button"
+              className={`message-bookmark-trigger ${scene ? 'is-bookmarked' : ''}`}
+              title={
+                scene
+                  ? `장면 북마크 편집 (${scene.name || '장면'})`
+                  : '이 메시지에 장면(북마크) 등록'
+              }
+              aria-label={scene ? '장면 북마크 편집' : '장면 북마크 등록'}
+              aria-pressed={!!scene}
+              onClick={(e) => {
+                e.stopPropagation();
+                onBookmark();
+              }}
+            >
+              ★
             </button>
           )}
           {!cutMode && (

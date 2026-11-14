@@ -1186,3 +1186,73 @@ test('moveCharacter는 드래그 순서 변경 시 원본 불변성과 객체 �
   assert.equal(moveCharacter(list, 1, 1, false), list);
   assert.equal(moveCharacter(list, 0, 1, false), list);
 });
+
+import {
+  addSceneForMessage,
+  computeSceneRanges,
+  findAdjacentScene,
+  removeScene,
+  updateSceneName,
+} from './scenes.ts';
+
+test('장면(북마크): 단일 메시지 중복 방지, 구간 계산, scene: 검색 필터, 이전/다음 전환', () => {
+  const blocks = [
+    { id: 'm1', speaker: 'GM', text: '오프닝 1', diceResult: '' },
+    { id: 'm2', speaker: 'A', text: '도입 시작', diceResult: '' },
+    { id: 'm3', speaker: 'B', text: '도입 대화', diceResult: '' },
+    { id: 'm4', speaker: 'GM', text: '클라이맥스 진입', diceResult: '' },
+    { id: 'm5', speaker: 'A', text: '마지막 결전', diceResult: '' },
+  ];
+
+  // m4에 먼저 등록 후 m2에 등록해도 블록 순서대로 정렬됨
+  const r1 = addSceneForMessage([], blocks, 'm4', '클라이맥스');
+  assert.ok(r1.added);
+  assert.equal(r1.existing, null);
+
+  // 같은 메시지에 중복 등록 불가
+  const dup = addSceneForMessage(r1.scenes, blocks, 'm4', '중복 장면');
+  assert.equal(dup.added, null);
+  assert.equal(dup.existing?.id, r1.added.id);
+  assert.equal(dup.scenes.length, 1);
+
+  const r2 = addSceneForMessage(r1.scenes, blocks, 'm2', '도입부');
+  assert.ok(r2.added);
+  const scenes = r2.scenes;
+  assert.deepEqual(
+    scenes.map((s) => s.name),
+    ['도입부', '클라이맥스'],
+  );
+
+  // 구간 계산: 도입부는 m2~m3 (2개), 클라이맥스는 m4~m5 (2개)
+  const ranges = computeSceneRanges(scenes, blocks);
+  assert.equal(ranges.length, 2);
+  assert.equal(ranges[0].count, 2);
+  assert.deepEqual([...ranges[0].blockIds], ['m2', 'm3']);
+  assert.equal(ranges[1].count, 2);
+  assert.deepEqual([...ranges[1].blockIds], ['m4', 'm5']);
+
+  // scene: 검색 필터 및 -scene: 제외 필터
+  const predIntro = compileQuery('scene:도입', [], scenes, blocks);
+  assert.deepEqual(
+    blocks.filter(predIntro).map((b) => b.id),
+    ['m2', 'm3'],
+  );
+  const predExcl = compileQuery('-scene:도입', [], scenes, blocks);
+  assert.deepEqual(
+    blocks.filter(predExcl).map((b) => b.id),
+    ['m1', 'm4', 'm5'],
+  );
+
+  // 이전/다음 장면 전환 (Ctrl+PgUp / PgDn)
+  assert.equal(findAdjacentScene(scenes, blocks, 'm1', 1)?.messageId, 'm2');
+  assert.equal(findAdjacentScene(scenes, blocks, 'm2', 1)?.messageId, 'm4');
+  assert.equal(findAdjacentScene(scenes, blocks, 'm5', -1)?.messageId, 'm4');
+  assert.equal(findAdjacentScene(scenes, blocks, 'm4', -1)?.messageId, 'm2');
+
+  // 이름 변경 및 삭제
+  const renamed = updateSceneName(scenes, blocks, r2.added.id, '1장 도입');
+  assert.equal(renamed[0].name, '1장 도입');
+  const afterRemove = removeScene(renamed, blocks, r2.added.id);
+  assert.equal(afterRemove.length, 1);
+  assert.equal(afterRemove[0].messageId, 'm4');
+});

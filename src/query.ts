@@ -1,7 +1,8 @@
-import type { Block, Character } from './core.ts';
+import type { Block, Character, Scene } from './core.ts';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter.ts';
+import { computeSceneRanges, type SceneRange } from './scenes.ts';
 
-export type SearchFieldKey = 'from' | 'in' | 'dice' | 'is' | 'text';
+export type SearchFieldKey = 'from' | 'in' | 'dice' | 'is' | 'scene' | 'text';
 export type IsFlag = 'dice' | 'system' | 'normal' | 'unlinked';
 
 export type SearchChip = {
@@ -17,31 +18,31 @@ export const IS_FLAGS: {
   description: string;
   icon: string;
 }[] = [
-    {
-      value: 'dice',
-      label: '판정 있음',
-      description: '주사위 판정이 있는 메시지',
-      icon: '🎲',
-    },
-    {
-      value: 'system',
-      label: '시스템',
-      description: '시스템 메시지만',
-      icon: '⚙',
-    },
-    {
-      value: 'normal',
-      label: '일반 대사',
-      description: '일반 대사만',
-      icon: '💬',
-    },
-    {
-      value: 'unlinked',
-      label: '미연결 캐릭터',
-      description: '캐릭터와 연결되지 않은 사용자 지정 캐릭터만',
-      icon: '⛓',
-    },
-  ];
+  {
+    value: 'dice',
+    label: '판정 있음',
+    description: '주사위 판정이 있는 메시지',
+    icon: '🎲',
+  },
+  {
+    value: 'system',
+    label: '시스템',
+    description: '시스템 메시지만',
+    icon: '⚙',
+  },
+  {
+    value: 'normal',
+    label: '일반 대사',
+    description: '일반 대사만',
+    icon: '💬',
+  },
+  {
+    value: 'unlinked',
+    label: '미연결 캐릭터',
+    description: '캐릭터와 연결되지 않은 사용자 지정 캐릭터만',
+    icon: '⛓',
+  },
+];
 
 function isSystemBlock(b: Block): boolean {
   return b.sourceType === 'system' || b.characterId === SYSTEM_CHARACTER_ID;
@@ -91,6 +92,8 @@ export function formatChipDisplay(chip: Omit<SearchChip, 'id'>): {
       };
     case 'dice':
       return { icon: `${neg}🎲`, label: chip.value };
+    case 'scene':
+      return { icon: `${neg}★`, label: chip.value };
     case 'is': {
       const found = IS_FLAGS.find((f) => f.value === chip.value.toLowerCase());
       return {
@@ -128,7 +131,7 @@ export function tryParseFilterToken(rawToken: string): Omit<SearchChip, 'id'> | 
     .trim();
   if (!value) return null;
 
-  if (key === 'from' || key === 'in' || key === 'dice') {
+  if (key === 'from' || key === 'in' || key === 'dice' || key === 'scene') {
     return { key, value, negative };
   }
   if (key === 'is') {
@@ -194,9 +197,13 @@ export function sanitizeLiveQuery(query: string): string {
 export function compileQuery(
   query: string,
   characters?: Character[],
+  scenes?: Scene[],
+  blocks?: Block[],
 ): (b: Block) => boolean {
   const tokens = query.match(/(?:[^\s"]|"[^"]*")+/g) ?? [];
   if ((query.match(/"/g)?.length ?? 0) % 2) throw Error('따옴표를 닫아주세요.');
+
+  let cachedSceneRanges: SceneRange[] | null = null;
 
   const checks = tokens.map((rawToken) => {
     let token = rawToken;
@@ -242,6 +249,19 @@ export function compileQuery(
       case 'dice':
         match = (b) => b.diceResult.toLowerCase().includes(value);
         break;
+      case 'scene': {
+        if (!cachedSceneRanges) {
+          cachedSceneRanges = computeSceneRanges(scenes, blocks ?? []);
+        }
+        const matchedIds = new Set<string>();
+        for (const r of cachedSceneRanges) {
+          if (r.scene.name.toLowerCase().includes(value)) {
+            for (const id of r.blockIds) matchedIds.add(id);
+          }
+        }
+        match = (b) => matchedIds.has(b.id);
+        break;
+      }
       case 'is':
         if (value === 'dice') {
           match = (b) => b.diceResult.trim().length > 0;

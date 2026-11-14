@@ -22,7 +22,10 @@ const CONTEXT_CONTENT: Record<
           { key: '클릭 / Ctrl / Shift', desc: '단일 · 다중 · 구간 메시지 선택' },
           { key: '더블클릭', desc: '메시지 편집 (선택 후 따옴표·괄호 자동 감싸기)' },
           { key: '드래그 / Alt+↑↓', desc: '선택 메시지 순서 이동' },
-          { key: 'Alt+클릭 / Ctrl+C', desc: '스포이트: 캐릭터·표정·채널을 입력창에 복사' },
+          {
+            key: 'Alt+클릭 / Ctrl+C',
+            desc: '스포이트: 캐릭터·표정·채널을 입력창에 복사',
+          },
           { key: 'Tab', desc: '하단 채팅창(Composer) 포커스 / 해제' },
         ],
       },
@@ -36,6 +39,7 @@ const CONTEXT_CONTENT: Record<
           },
           { key: '↑↓ / Ctrl+↑↓', desc: '커서 이동 / 선택 확장 유지 이동' },
           { key: 'PgUp/Dn · Home/End', desc: '10개 이동 · 필터 해제 후 처음/끝' },
+          { key: 'Ctrl+PgUp / PgDn', desc: '이전 / 다음 장면(북마크)으로 전환' },
           { key: 'Ctrl+Z / Ctrl+Y', desc: '실행 취소 / 다시 하기 · Del 선택 삭제' },
         ],
       },
@@ -44,6 +48,7 @@ const CONTEXT_CONTENT: Record<
         items: [
           { key: '일반 텍스트', desc: '캐릭터·대사·주사위 판정 통합 검색' },
           { key: 'from:이름 · in:채널', desc: '캐릭터 또는 채널 필터 (in:none 빈 채널)' },
+          { key: 'scene:장면이름', desc: '해당 장면 시작부터 다음 장면 직전까지 필터' },
           { key: 'dice:키워드', desc: '주사위 판정 결과 텍스트 필터' },
           { key: 'is:상태', desc: 'dice / system / normal / unlinked' },
           { key: '-조건 · Tab/Enter', desc: '조건 제외 · 자동완성 칩 확정' },
