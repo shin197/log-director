@@ -623,11 +623,11 @@ export function CharacterPanel({
                             faces: draft.faces.map((x, j) =>
                               j === editingFaceIndex
                                 ? {
-                                  ...x,
-                                  name:
-                                    x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
-                                  iconUrl: uploaded,
-                                }
+                                    ...x,
+                                    name:
+                                      x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
+                                    iconUrl: uploaded,
+                                  }
                                 : x,
                             ),
                           });

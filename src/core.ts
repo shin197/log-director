@@ -1,6 +1,11 @@
 import { systemCharacter } from './systemCharacter.ts';
 import { migrateCharacters } from './characters.ts';
-import { parseHtmlLog, parseMarkdownLog } from './importFormats.ts';
+import {
+  isSafeImageUrl,
+  parseHtmlLog,
+  parseMarkdownLog,
+  parseTxtLog,
+} from './importFormats.ts';
 import type { DisplaySettings } from './presentation';
 export type Character = {
   id: string;
@@ -76,6 +81,20 @@ export function parse(raw: string, name: string): Project {
     });
   }
 
+  if (
+    lowerName.endsWith('.txt') ||
+    (!lowerName.endsWith('.json') && !trimmed.startsWith('{') && !trimmed.startsWith('['))
+  ) {
+    const { title, blocks } = parseTxtLog(cleaned, name);
+    return migrateCharacters({
+      format: 'log-studio',
+      version: 1,
+      title,
+      original: { name, raw },
+      blocks,
+    });
+  }
+
   const d = JSON.parse(cleaned);
   if (d.format === 'log-studio') {
     if (
@@ -100,6 +119,10 @@ export function parse(raw: string, name: string): Project {
     return migrateCharacters(d);
   }
   if (!Array.isArray(d.messages)) throw Error('messages 배열을 가진 JSON이 필요합니다.');
+  const imagesMap =
+    d.images && typeof d.images === 'object'
+      ? (d.images as Record<string, unknown>)
+      : null;
   return migrateCharacters({
     format: 'log-studio',
     version: 1,
@@ -117,6 +140,19 @@ export function parse(raw: string, name: string): Project {
         throw Error(
           `${i + 1}번째 메시지 형식을 확인해주세요. 원본은 변경되지 않았습니다.`,
         );
+      let iconUrl = '';
+      if (typeof m.iconImage === 'string' && m.iconImage) {
+        if (isSafeImageUrl(m.iconImage)) {
+          iconUrl = m.iconImage;
+        } else {
+          const mapped = imagesMap?.[m.iconImage];
+          if (typeof mapped === 'string' && isSafeImageUrl(mapped)) {
+            iconUrl = mapped;
+          }
+        }
+      } else if (typeof m.iconUrl === 'string') {
+        iconUrl = m.iconUrl;
+      }
       return {
         id: crypto.randomUUID(),
         sourceIndex: i,
@@ -124,9 +160,9 @@ export function parse(raw: string, name: string): Project {
         text: m.text,
         diceResult: m.diceResult ?? '',
         color: typeof m.color === 'string' ? m.color : '',
-        iconUrl: typeof m.iconUrl === 'string' ? m.iconUrl : '',
+        iconUrl,
         timestamp: typeof m.timestamp === 'string' ? m.timestamp : '',
-        channel: typeof m.channelName === 'string' ? m.channelName : '',
+        channel: typeof m.channelName === 'string' ? m.channelName.trim() : '',
         sourceType: typeof m.type === 'string' ? m.type : '',
       };
     }),

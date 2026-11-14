@@ -74,11 +74,19 @@ export function parseHtmlLog(
       );
 
       // 본문 텍스트 수집 (한 메시지 내 여러 message-text div가 있을 수 있음)
+      // 시스템 메시지 등은 message-text 내부에 <span class="channel-name">[메인]</span>을 포함할 수 있으므로 제거
       const textParts = [
         ...inner.matchAll(
           /<div[^>]*class\s*=\s*(["'])[^"']*\bmessage-text\b[^"']*\1[^>]*>([\s\S]*?)<\/div>/gi,
         ),
-      ].map((m) => decodeHtml(m[2]).replace(/^\n+|\n+$/g, ''));
+      ].map((m) =>
+        decodeHtml(
+          m[2].replace(
+            /<span[^>]*class\s*=\s*(["'])[^"']*\bchannel-name\b[^"']*\1[^>]*>[\s\S]*?<\/span>/gi,
+            '',
+          ),
+        ).replace(/^\n+|\n+$/g, ''),
+      );
 
       // 주사위 판정 결과 수집 (span.roll-result 또는 div.roll-result)
       const diceParts = [
@@ -99,7 +107,7 @@ export function parseHtmlLog(
           color: '',
           iconUrl: '',
           timestamp: '',
-          channel: channel || '메인',
+          channel,
           sourceType: 'system',
         });
         continue;
@@ -230,6 +238,8 @@ export function parseMarkdownLog(
 
   const blocks: Block[] = [];
   let i = startIdx;
+  const mdHeaderRe =
+    /^\*\*(.+?)\*\*(?:\s+\*\((.+?)\)\*)?(?:\s+\*\[([^\]]*)\]\*)?\s*:\s*$/;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -238,39 +248,49 @@ export function parseMarkdownLog(
       continue;
     }
 
-    // 1) 시스템 인용 블록 (> ...)
+    // 1) 시스템 인용 블록 (> *[채널]* ... 또는 > ...)
     if (line.startsWith('>')) {
       const quoteLines: string[] = [];
       while (i < lines.length && lines[i].startsWith('>')) {
-        quoteLines.push(unescapeMarkdown(lines[i].replace(/^>\s?/, '')));
+        quoteLines.push(lines[i].replace(/^>\s?/, ''));
         i++;
+      }
+      let channel = '';
+      if (quoteLines.length > 0) {
+        const chPrefix = quoteLines[0].match(/^\*\[([^\]]*)\]\*\s*/);
+        if (chPrefix) {
+          channel = chPrefix[1].trim();
+          quoteLines[0] = quoteLines[0].slice(chPrefix[0].length);
+        }
       }
       blocks.push({
         id: crypto.randomUUID(),
         sourceIndex: blocks.length,
-        text: quoteLines.join('\n'),
+        text: quoteLines.map(unescapeMarkdown).join('\n'),
         diceResult: '',
         color: '',
         iconUrl: '',
         timestamp: '',
-        channel: '메인',
+        channel,
         sourceType: 'system',
       });
       continue;
     }
 
-    // 2) 일반 메시지 헤더: **화자** *(시각 [채널])* : 또는 **화자** :
-    const headerMatch = line.match(/^\*\*(.+?)\*\*(?:\s+\*\((.+?)\)\*)?\s*:\s*$/);
+    // 2) 일반 메시지 헤더: **화자** *(시각)* *[채널]* : 또는 **화자** *(시각 [채널])* : 또는 **화자** :
+    const headerMatch = line.match(mdHeaderRe);
     if (headerMatch) {
       const speaker = unescapeMarkdown(headerMatch[1].trim());
       const metaRaw = headerMatch[2] ? unescapeMarkdown(headerMatch[2].trim()) : '';
 
-      let channel = '메인';
+      let channel = headerMatch[3] ? unescapeMarkdown(headerMatch[3].trim()) : '';
       let timestamp = metaRaw;
-      const chMatch = metaRaw.match(/\[([^\]]+)\]/);
-      if (chMatch) {
-        channel = chMatch[1].trim();
-        timestamp = metaRaw.replace(chMatch[0], '').trim();
+      if (!channel && metaRaw) {
+        const chMatch = metaRaw.match(/\[([^\]]*)\]/);
+        if (chMatch) {
+          channel = chMatch[1].trim();
+          timestamp = metaRaw.replace(chMatch[0], '').trim();
+        }
       }
 
       i++;
@@ -280,10 +300,7 @@ export function parseMarkdownLog(
       while (i < lines.length) {
         const nextLine = lines[i];
         if (!nextLine.trim()) break;
-        if (
-          nextLine.startsWith('>') ||
-          /^\*\*(.+?)\*\*(?:\s+\*\((.+?)\)\*)?\s*:\s*$/.test(nextLine)
-        ) {
+        if (nextLine.startsWith('>') || mdHeaderRe.test(nextLine)) {
           break;
         }
         const diceMatch = nextLine.match(/^`(.+)`$/);
@@ -310,12 +327,105 @@ export function parseMarkdownLog(
       continue;
     }
 
-    // 예기치 않은 단독 텍스트 줄은 이전 블록이 없으면 일반 텍스트 블록으로 처리
+    // 예기치 않은 단독 텍스트 줄은 건너뜀
     i++;
   }
 
   if (!blocks.length) {
     throw Error('마크다운 로그에서 메시지를 찾을 수 없습니다.');
+  }
+
+  return { title, blocks };
+}
+
+const TXT_HEADER_RE = /^(.+?)(?:\s+\(([^)]+)\))?(?:\s+\[([^\]]*)\])?\s*:\s*$/;
+
+export function parseTxtLog(
+  raw: string,
+  filename: string,
+): { title: string; blocks: Block[] } {
+  const lines = raw.replace(/\r\n?/g, '\n').split('\n');
+  let title = filename;
+  let startIdx = 0;
+
+  // 상단 제목 + 구분선(====...) 파싱
+  for (let i = 0; i < Math.min(lines.length - 1, 5); i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    if (/^={5,}$/.test(lines[i + 1]?.trim() ?? '')) {
+      title = line || filename;
+      startIdx = i + 2;
+    }
+    break;
+  }
+
+  const isHeaderLine = (idx: number): RegExpMatchArray | null => {
+    const line = lines[idx];
+    const m = line.match(TXT_HEADER_RE);
+    if (!m) return null;
+    // 시각이나 채널이 명시되었거나, 이전 줄이 비어 있거나 시작 지점일 때만 헤더로 인정
+    const hasMeta = m[2] !== undefined || m[3] !== undefined;
+    const afterBlank = idx === startIdx || !lines[idx - 1]?.trim();
+    return hasMeta || afterBlank ? m : null;
+  };
+
+  const blocks: Block[] = [];
+  let i = startIdx;
+
+  while (i < lines.length) {
+    if (!lines[i].trim()) {
+      i++;
+      continue;
+    }
+
+    const header = isHeaderLine(i);
+    if (!header) {
+      i++;
+      continue;
+    }
+
+    const rawSpeaker = header[1].trim();
+    const timestamp = header[2]?.trim() ?? '';
+    const channel = header[3]?.trim() ?? '';
+    const isSystem = rawSpeaker === 'system';
+
+    i++;
+    const bodyLines: string[] = [];
+    while (i < lines.length) {
+      if (isHeaderLine(i)) break;
+      bodyLines.push(lines[i]);
+      i++;
+    }
+
+    while (bodyLines.length && !bodyLines[0].trim()) bodyLines.shift();
+    while (bodyLines.length && !bodyLines[bodyLines.length - 1].trim()) bodyLines.pop();
+
+    const textLines: string[] = [];
+    const diceLines: string[] = [];
+    for (const bodyLine of bodyLines) {
+      if (bodyLine.includes('＞') && /^\(.+\)\s*＞/.test(bodyLine.trim())) {
+        diceLines.push(bodyLine.trim());
+      } else {
+        textLines.push(bodyLine);
+      }
+    }
+
+    blocks.push({
+      id: crypto.randomUUID(),
+      sourceIndex: blocks.length,
+      ...(isSystem ? {} : { speaker: rawSpeaker }),
+      text: textLines.join('\n'),
+      diceResult: diceLines.join('\n'),
+      color: '',
+      iconUrl: '',
+      timestamp,
+      channel,
+      sourceType: isSystem ? 'system' : 'normal',
+    });
+  }
+
+  if (!blocks.length) {
+    throw Error('TXT 로그에서 메시지를 찾을 수 없습니다.');
   }
 
   return { title, blocks };

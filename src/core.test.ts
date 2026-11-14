@@ -914,16 +914,25 @@ test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 proj
   assert.equal(isSafeImageUrl('data:image/svg+xml;base64,PHN2Zz4='), false);
   assert.equal(isSafeImageUrl('javascript:alert(1)'), false);
 
-  // 2) sample_log 5개 포맷 파일 검증
+  // 2) sample_log 포맷 파일 검증
   const jsonRaw = fs.readFileSync('sample_log/json_sample.json', 'utf8');
   const jsonProj = parse(jsonRaw, 'json_sample.json');
   assert.ok(jsonProj.blocks.length > 100);
+
+  const jsonBase64Raw = fs.readFileSync('sample_log/json_sample_base64.json', 'utf8');
+  const jsonBase64Proj = parse(jsonBase64Raw, 'json_sample_base64.json');
+  assert.equal(jsonBase64Proj.blocks.length, jsonProj.blocks.length);
+  assert.ok(
+    jsonBase64Proj.blocks.some((b) => (b.iconUrl ?? '').startsWith('data:image/')),
+  );
 
   const htmlRaw = fs.readFileSync('sample_log/html_sample.html', 'utf8');
   const htmlProj = parse(htmlRaw, 'html_sample.html');
   assert.ok(htmlProj.blocks.length > 100);
   assert.ok(htmlProj.blocks.some((b) => b.diceResult.length > 0));
   assert.ok(htmlProj.blocks.some((b) => b.sourceType === 'system' && !('speaker' in b)));
+  assert.equal(htmlProj.blocks[0]?.channel, '메인');
+  assert.ok(!htmlProj.blocks[0]?.text.startsWith('[메인]'));
 
   const htmlCcfRaw = fs.readFileSync('sample_log/html_ccf_sample.html', 'utf8');
   const htmlCcfProj = parse(htmlCcfRaw, 'html_ccf_sample.html');
@@ -939,8 +948,41 @@ test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 proj
   assert.ok(mdProj.blocks.length > 100);
   assert.ok(mdProj.blocks.some((b) => b.sourceType === 'system' && !('speaker' in b)));
   assert.ok(mdProj.blocks.some((b) => b.diceResult.length > 0));
+  assert.equal(mdProj.blocks[0]?.channel, '메인');
+  assert.ok(!mdProj.blocks[0]?.text.startsWith('*[메인]*'));
+  assert.equal(mdProj.blocks[1]?.channel, '잡담');
 
-  // 3) project.json 왕복
+  const txtRaw = fs.readFileSync('sample_log/txt_sample.txt', 'utf8');
+  const txtProj = parse(txtRaw, 'txt_sample.txt');
+  assert.ok(txtProj.blocks.length > 100);
+  assert.ok(txtProj.blocks.some((b) => b.sourceType === 'system' && !('speaker' in b)));
+  assert.ok(txtProj.blocks.some((b) => b.diceResult.length > 0));
+  assert.equal(txtProj.blocks[0]?.channel, '메인');
+  assert.equal(txtProj.blocks[1]?.channel, '잡담');
+
+  // 3) 채널 미표기 시 빈 채널('') 처리 및 JSON channelName 우선 참조 검증
+  const emptyChJson = parse(
+    JSON.stringify({
+      title: 'Empty Channel JSON',
+      messages: [
+        { type: 'normal', speaker: 'A', channel: 'main', channelName: '', text: 'hello' },
+        { type: 'normal', speaker: 'A', channel: 'other', text: 'world' },
+      ],
+    }),
+    'empty.json',
+  );
+  assert.equal(emptyChJson.blocks[0]?.channel, '');
+  assert.equal(emptyChJson.blocks[1]?.channel, '');
+
+  const emptyChMd = parse('# Title\n\n---\n\n> 시스템 안내\n\n**A** :\n대사', 'empty.md');
+  assert.equal(emptyChMd.blocks[0]?.channel, '');
+  assert.equal(emptyChMd.blocks[1]?.channel, '');
+
+  const emptyChTxt = parse('Title\n=====\n\nsystem :\n안내\n\nA :\n대사', 'empty.txt');
+  assert.equal(emptyChTxt.blocks[0]?.channel, '');
+  assert.equal(emptyChTxt.blocks[1]?.channel, '');
+
+  // 4) project.json 왕복
   const roundtrip = parse(JSON.stringify(htmlCcfProj), 'test.project.json');
   assert.equal(roundtrip.blocks.length, htmlCcfProj.blocks.length);
 });
