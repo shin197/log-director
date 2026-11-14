@@ -10,6 +10,7 @@ export function mergeConsecutive(blocks: Block[], selectedIds?: Set<string>): Bl
     const same =
       previous &&
       inSelection &&
+      !previous.diceResult.trim() &&
       (previous.sourceType || 'normal') === (block.sourceType || 'normal') &&
       previous.speaker === block.speaker &&
       (previous.channel ?? '') === (block.channel ?? '');

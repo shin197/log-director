@@ -494,6 +494,29 @@ test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각
   assert.equal(partial[3].text, '공지2');
   assert.equal(JSON.stringify(p), before);
   assert.equal(PAGE_SIZE, 1000);
+
+  // 주사위 판정이 있는 메시지 직후의 메시지는 같은 화자·채널이어도 병합하지 않음
+  const withDice = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: 'GM', text: '선언', channelName: '메인' },
+        {
+          speaker: 'GM',
+          text: '판정 굴림',
+          diceResult: '(1D100<=50) ＞ 20 ＞ 성공',
+          channelName: '메인',
+        },
+        { speaker: 'GM', text: '판정 후 대사', channelName: '메인' },
+        { speaker: 'GM', text: '이어진 대사', channelName: '메인' },
+      ],
+    }),
+    'dice-merge.json',
+  );
+  const mergedDice = mergeConsecutive(withDice.blocks);
+  assert.equal(mergedDice.length, 2);
+  assert.equal(mergedDice[0].text, '선언\n판정 굴림');
+  assert.equal(mergedDice[0].diceResult, '(1D100<=50) ＞ 20 ＞ 성공');
+  assert.equal(mergedDice[1].text, '판정 후 대사\n이어진 대사');
 });
 
 import { navigateMessages, swapMessage } from './keyboardNavigation.ts';
