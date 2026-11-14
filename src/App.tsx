@@ -8,6 +8,8 @@ import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
+import { ImportDialog } from './ImportDialog';
+import { createImportedLogItem, type ImportedLogItem } from './importManager';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
@@ -69,7 +71,10 @@ function App() {
     '로그를 열거나 하단 입력창에서 메시지를 추가하세요.',
   );
   const [page, setPage] = useState(0);
-  const [original, setOriginal] = useState(false);
+  const [openOriginals, setOpenOriginals] = useState<Set<number>>(new Set());
+  const [importOpen, setImportOpen] = useState(false);
+  const [initialImportItems, setInitialImportItems] = useState<ImportedLogItem[]>([]);
+  const multiImportInputRef = useRef<HTMLInputElement>(null);
   const cursorId = useRef<string | null>(null);
   const selectionAnchor = useRef<SelectionAnchor>(null);
 
@@ -754,6 +759,49 @@ function App() {
           <button
             type="button"
             className="compact-btn"
+            title="여러 로그 파일을 불러오거나 이어붙이기"
+            onClick={() => {
+              if (!isMeaningfulProject(p)) {
+                multiImportInputRef.current?.click();
+              } else {
+                setInitialImportItems([]);
+                setImportOpen(true);
+              }
+            }}
+          >
+            불러오기
+          </button>
+          <input
+            ref={multiImportInputRef}
+            type="file"
+            multiple
+            accept=".json,.html,.htm,.md,.markdown,.txt"
+            hidden
+            onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = '';
+              if (files.length === 0) return;
+              const loaded: ImportedLogItem[] = [];
+              for (const f of files) {
+                try {
+                  loaded.push(createImportedLogItem(f.name, await f.text()));
+                } catch (err) {
+                  notifyError(
+                    err instanceof Error
+                      ? `'${f.name}': ${err.message}`
+                      : `'${f.name}' 파일을 읽거나 해석하지 못했습니다.`,
+                  );
+                }
+              }
+              if (loaded.length > 0) {
+                setInitialImportItems(loaded);
+                setImportOpen(true);
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="compact-btn"
             title="프로젝트 저장 (.project.json)"
             onClick={() => save(JSON.stringify(p, null, 2), p.title + '.project.json')}
           >
@@ -777,6 +825,18 @@ function App() {
         />
       )}
       {exportOpen && <ExportDialog project={p} onClose={() => setExportOpen(false)} />}
+      <ImportDialog
+        open={importOpen}
+        project={p}
+        initialItems={initialImportItems}
+        onClose={() => setImportOpen(false)}
+        onApply={(nextProject, summaryText) => {
+          commit(nextProject);
+          resetInteraction();
+          setNotice(summaryText);
+        }}
+        onError={(msg) => notifyError(msg)}
+      />
       {helpOpen && <HelpSheet context={helpContext} onClose={() => setHelpOpen(false)} />}
       {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
       {tab === '설정' && (
@@ -805,35 +865,76 @@ function App() {
               <div className="original-box">
                 <div className="original-box-head">
                   <div>
-                    <strong>보관된 원본</strong>
+                    <strong>보관된 원본 ({p.original.length}개)</strong>
                     <span className="muted-note">
-                      {p.original?.name ?? '원본 파일 없음 (새로 작성)'}
+                      {p.original.length > 0
+                        ? p.original.map((o) => o.name).join(', ')
+                        : '원본 파일 없음 (새로 작성)'}
                     </span>
-                  </div>
-                  <div className="original-box-actions">
-                    <button
-                      type="button"
-                      className="compact-btn"
-                      disabled={!p.original}
-                      onClick={() => setOriginal(!original)}
-                    >
-                      {original ? '원본 닫기' : '원본 보기'}
-                    </button>
-                    <button
-                      type="button"
-                      className="compact-btn"
-                      disabled={!p.original}
-                      onClick={() => p.original && save(p.original.raw, p.original.name)}
-                    >
-                      원문 내려받기
-                    </button>
                   </div>
                 </div>
                 <small className="muted-note">
-                  원본 문자열과 모든 원본 필드는 프로젝트 안에 별도 보존되며 편집 시
+                  원본 문자열과 모든 원본 필드는 프로젝트 안에 각각 별도 보존되며 편집 시
                   훼손되지 않습니다.
                 </small>
-                {original && <pre className="original">{p.original?.raw}</pre>}
+                {p.original.length > 0 && (
+                  <div className="original-accordion-list">
+                    {p.original.map((orig, idx) => {
+                      const isOpen = openOriginals.has(idx);
+                      const toggleOpen = () => {
+                        setOpenOriginals((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(idx)) next.delete(idx);
+                          else next.add(idx);
+                          return next;
+                        });
+                      };
+                      return (
+                        <div
+                          key={`${orig.name}-${idx}`}
+                          className={`original-accordion-item ${isOpen ? 'open' : ''}`}
+                        >
+                          <div className="original-accordion-head">
+                            <button
+                              type="button"
+                              className="original-accordion-toggle"
+                              onClick={toggleOpen}
+                              aria-expanded={isOpen}
+                            >
+                              <span className="original-accordion-caret">
+                                {isOpen ? '▾' : '▸'}
+                              </span>
+                              <span className="original-accordion-badge">#{idx + 1}</span>
+                              <strong className="original-accordion-name">
+                                {orig.name}
+                              </strong>
+                              <span className="muted-note">
+                                ({orig.raw.length.toLocaleString()}자)
+                              </span>
+                            </button>
+                            <div className="original-box-actions">
+                              <button
+                                type="button"
+                                className="compact-btn"
+                                onClick={toggleOpen}
+                              >
+                                {isOpen ? '원본 닫기' : '원본 보기'}
+                              </button>
+                              <button
+                                type="button"
+                                className="compact-btn"
+                                onClick={() => save(orig.raw, orig.name)}
+                              >
+                                원문 내려받기
+                              </button>
+                            </div>
+                          </div>
+                          {isOpen && <pre className="original">{orig.raw}</pre>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
           </div>

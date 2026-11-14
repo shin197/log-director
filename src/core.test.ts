@@ -113,7 +113,7 @@ test('원본과 빈 본문 판정 및 알 수 없는 필드 보존', () => {
     });
   const p = parse(raw, 'sample.json');
   const next = replaceBlocks(p, new Set([p.blocks[1].id]), '안녕', '안녕하세요');
-  assert.equal(next.original?.raw, raw);
+  assert.equal(next.original[0]?.raw, raw);
   assert.equal(next.blocks[0].diceResult, '두 판정\n결과');
   assert.equal(next.blocks[1].text, '안녕하세요 안녕하세요');
   assert.equal(p.blocks[1].text, '안녕 안녕');
@@ -316,7 +316,7 @@ test('캐릭터 ID 마이그레이션과 이름 변경 격리 및 저장', () =>
   assert.equal(changed.blocks[0].speaker, '진행자');
   assert.equal(changed.blocks[2].speaker, '메튜');
   assert.equal(changed.blocks[0].characterId, gm.id);
-  assert.equal(changed.original?.raw, raw);
+  assert.equal(changed.original[0]?.raw, raw);
   assert.deepEqual(parse(JSON.stringify(changed), 'project.json'), changed);
   const custom = { ...p, blocks: p.blocks.map((b) => ({ ...b, characterId: null })) };
   assert.equal(
@@ -631,7 +631,7 @@ test('일괄 편집 대표 선택, 표정 조건, 일괄 패치 및 단일 적�
     format: 'log-studio' as const,
     version: 1 as const,
     title: '테스트',
-    original: null,
+    original: [],
     characters: [charA, charB, sys],
     blocks: [
       {
@@ -868,7 +868,7 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
       format: 'log-studio',
       version: 1,
       title: '새 로그',
-      original: null,
+      original: [],
       blocks: [],
     }),
     false,
@@ -878,7 +878,7 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
       format: 'log-studio',
       version: 1,
       title: '제목 있는 로그',
-      original: null,
+      original: [],
       blocks: [],
     }),
     true,
@@ -888,7 +888,7 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
       format: 'log-studio',
       version: 1,
       title: '새 로그',
-      original: { name: 'sample.json', raw: '{}' },
+      original: [{ name: 'sample.json', raw: '{}' }],
       blocks: [],
     }),
     true,
@@ -906,7 +906,7 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
     format: 'log-studio' as const,
     version: 1 as const,
     title: '테스트 세션',
-    original: null,
+    original: [],
     blocks: [
       {
         id: 'b1',
@@ -1255,4 +1255,160 @@ test('장면(북마크): 단일 메시지 중복 방지, 구간 계산, scene: �
   const afterRemove = removeScene(renamed, blocks, r2.added.id);
   assert.equal(afterRemove.length, 1);
   assert.equal(afterRemove[0].messageId, 'm4');
+});
+
+import { blank } from './core.ts';
+import {
+  createImportedLogItem,
+  mergeImportedLogs,
+  moveImportedItem,
+  parseLogTimestamp,
+} from './importManager.ts';
+
+test('불러오기 매니저: 파일 순서 이동, 이어붙이기(Append/Insert/Interleave), 경계 중복 제거, 캐릭터·표정 병합, 장면 등록, 다중 원본 보존', () => {
+  const raw1 = JSON.stringify({
+    title: '1부',
+    messages: [
+      {
+        type: 'normal',
+        speaker: '몰토',
+        color: '#b8342c',
+        iconUrl: 'https://example.com/molto-1.png',
+        timestamp: '2026. 10. 20. 오후 08:00:00',
+        text: '1부 첫 대사',
+      },
+      {
+        type: 'normal',
+        speaker: '몰토',
+        color: '#b8342c',
+        iconUrl: 'https://example.com/molto-1.png',
+        timestamp: '2026. 10. 20. 오후 08:05:00',
+        text: '경계 중복 대사',
+      },
+    ],
+  });
+
+  const raw2 = JSON.stringify({
+    title: '2부',
+    messages: [
+      {
+        type: 'normal',
+        speaker: '몰토',
+        color: '#b8342c',
+        iconUrl: 'https://example.com/molto-1.png',
+        timestamp: '2026. 10. 20. 오후 08:05:00',
+        text: '경계 중복 대사',
+      },
+      {
+        type: 'normal',
+        speaker: '몰토',
+        color: '#b8342c',
+        iconUrl: 'https://example.com/molto-2.png',
+        timestamp: '2026. 10. 20. 오후 08:10:00',
+        text: '2부 새 표정 대사',
+      },
+    ],
+  });
+
+  const item1 = createImportedLogItem('part1.json', raw1);
+  const item2 = createImportedLogItem('part2.json', raw2);
+
+  // 파일 순서 변경
+  const moved = moveImportedItem([item1, item2], 0, 1);
+  assert.deepEqual(
+    moved.map((i) => i.name),
+    ['part2.json', 'part1.json'],
+  );
+
+  // 빈 프로젝트에 다중 파일 Append + 경계 중복 제거 + 캐릭터·표정 병합 + 파일 시작점 장면 등록
+  const mergedResult = mergeImportedLogs(blank(), [item1, item2], {
+    mode: 'append',
+    registerScenes: true,
+    mergeCharacters: true,
+    skipBoundaryDuplicates: true,
+  });
+
+  assert.equal(mergedResult.skippedDuplicateCount, 1);
+  assert.equal(mergedResult.addedBlockCount, 3);
+  assert.equal(mergedResult.project.blocks.length, 3);
+  assert.deepEqual(
+    mergedResult.project.blocks.map((b) => b.text),
+    ['1부 첫 대사', '경계 중복 대사', '2부 새 표정 대사'],
+  );
+
+  // 다중 원본 보존 확인
+  assert.equal(mergedResult.project.original.length, 2);
+  assert.equal(mergedResult.project.original[0].name, 'part1.json');
+  assert.equal(mergedResult.project.original[1].name, 'part2.json');
+
+  // 동일 캐릭터 병합 및 표정(faces) 추가 확인
+  const moltoChars = mergedResult.project.characters.filter((c) => c.name === '몰토');
+  assert.equal(moltoChars.length, 1);
+  assert.equal(moltoChars[0].faces.length, 2);
+
+  // 파일 시작점 장면 북마크 등록 확인
+  assert.deepEqual(
+    mergedResult.project.scenes.map((s) => s.name),
+    ['part1', 'part2'],
+  );
+  assert.equal(
+    mergedResult.project.scenes[0].messageId,
+    mergedResult.project.blocks[0].id,
+  );
+  assert.equal(
+    mergedResult.project.scenes[1].messageId,
+    mergedResult.project.blocks[2].id,
+  );
+
+  // 장면에 삽입 (Insert) 모드 확인: part2 장면 바로 앞에 삽입
+  const rawInsert = JSON.stringify({
+    messages: [{ type: 'normal', speaker: 'GM', text: '중간 삽입 나레이션' }],
+  });
+  const insertItem = createImportedLogItem('mid.json', rawInsert);
+  const part2SceneId = mergedResult.project.scenes[1].id;
+  const insertedResult = mergeImportedLogs(mergedResult.project, [insertItem], {
+    mode: 'insert-scene',
+    targetSceneId: part2SceneId,
+    registerScenes: false,
+    mergeCharacters: true,
+    skipBoundaryDuplicates: false,
+  });
+  assert.deepEqual(
+    insertedResult.project.blocks.map((b) => b.text),
+    ['1부 첫 대사', '경계 중복 대사', '중간 삽입 나레이션', '2부 새 표정 대사'],
+  );
+  assert.equal(insertedResult.project.original.length, 3);
+
+  // 시간순 정렬 (Interleave) 모드 및 타임스탬프 미기재 메시지 순서 보존 확인
+  assert.ok(
+    (parseLogTimestamp('2026. 10. 20. 오후 08:03:00') ?? 0) >
+      (parseLogTimestamp('2026. 10. 20. 오후 08:00:00') ?? 0),
+  );
+  const rawSide = JSON.stringify({
+    messages: [
+      {
+        type: 'normal',
+        speaker: '서브',
+        timestamp: '2026. 10. 20. 오후 08:02:00',
+        text: '8시 2분 귓속말',
+      },
+      {
+        type: 'normal',
+        speaker: '서브',
+        timestamp: '',
+        text: '타임스탬프 없는 연속 귓속말',
+      },
+    ],
+  });
+  const sideItem = createImportedLogItem('side.json', rawSide);
+  const interleaved = mergeImportedLogs(blank(), [item1, sideItem], {
+    mode: 'interleave',
+    registerScenes: false,
+    mergeCharacters: true,
+    skipBoundaryDuplicates: false,
+  });
+  assert.deepEqual(
+    interleaved.project.blocks.map((b) => b.text),
+    ['1부 첫 대사', '8시 2분 귓속말', '타임스탬프 없는 연속 귓속말', '경계 중복 대사'],
+  );
 });

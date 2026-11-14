@@ -10,7 +10,7 @@ export type AutosavePayload = {
 
 export function isMeaningfulProject(p: Project): boolean {
   if (p.blocks.length > 0) return true;
-  if (p.original !== null) return true;
+  if (p.original.length > 0) return true;
   if (p.title.trim() && p.title.trim() !== '새 로그') return true;
   return false;
 }

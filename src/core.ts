@@ -19,6 +19,7 @@ export type Block = {
   characterId?: string | null;
   id: string;
   sourceIndex?: number;
+  sourceFileIndex?: number;
   speaker?: string;
   text: string;
   diceResult: string;
@@ -33,11 +34,15 @@ export type Scene = {
   name: string;
   messageId: string;
 };
+export type OriginalFile = {
+  name: string;
+  raw: string;
+};
 export type Project = {
   format: 'log-studio';
   version: 1;
   title: string;
-  original: { name: string; raw: string } | null;
+  original: OriginalFile[];
   blocks: Block[];
   characters?: Character[];
   scenes?: Scene[];
@@ -48,7 +53,7 @@ export const blank = (): Project => ({
   format: 'log-studio',
   version: 1,
   title: '새 로그',
-  original: null,
+  original: [],
   blocks: [],
   characters: [systemCharacter()],
 });
@@ -67,7 +72,7 @@ export function parse(raw: string, name: string): Project {
       format: 'log-studio',
       version: 1,
       title,
-      original: { name, raw },
+      original: [{ name, raw }],
       blocks,
     });
   }
@@ -83,7 +88,7 @@ export function parse(raw: string, name: string): Project {
       format: 'log-studio',
       version: 1,
       title,
-      original: { name, raw },
+      original: [{ name, raw }],
       blocks,
     });
   }
@@ -97,7 +102,7 @@ export function parse(raw: string, name: string): Project {
       format: 'log-studio',
       version: 1,
       title,
-      original: { name, raw },
+      original: [{ name, raw }],
       blocks,
     });
   }
@@ -117,9 +122,9 @@ export function parse(raw: string, name: string): Project {
           typeof b.diceResult === 'string',
       ) ||
       new Set(d.blocks.map((b: any) => b.id)).size !== d.blocks.length ||
-      !(
-        d.original === null ||
-        (typeof d.original?.raw === 'string' && typeof d.original?.name === 'string')
+      !Array.isArray(d.original) ||
+      !d.original.every(
+        (o: any) => o && typeof o.raw === 'string' && typeof o.name === 'string',
       )
     )
       throw Error('프로젝트 구조를 확인해주세요.');
@@ -138,7 +143,7 @@ export function parse(raw: string, name: string): Project {
     format: 'log-studio',
     version: 1,
     title: typeof d.title === 'string' ? d.title : name,
-    original: { name, raw },
+    original: [{ name, raw }],
     blocks: d.messages.map((m: any, i: number) => {
       if (
         !m ||

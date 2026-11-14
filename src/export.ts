@@ -67,11 +67,15 @@ export function exportLog(
   };
 
   if (format === 'json') {
-    let originals: Record<string, unknown>[] = [];
-    try {
-      originals =
-        JSON.parse(p.original?.raw.replace(/^\uFEFF/, '') ?? '{}').messages ?? [];
-    } catch {}
+    const parsedOriginals: Record<string, unknown>[][] = (p.original ?? []).map(
+      (orig) => {
+        try {
+          return JSON.parse(orig.raw.replace(/^\uFEFF/, '')).messages ?? [];
+        } catch {
+          return [];
+        }
+      },
+    );
 
     const images: Record<string, string> = {};
     const dataUriToKey = new Map<string, string>();
@@ -91,7 +95,9 @@ export function exportLog(
     };
 
     const messages = targetBlocks.map((b) => {
-      const source = b.sourceIndex === undefined ? {} : (originals[b.sourceIndex] ?? {});
+      const fileOriginals = parsedOriginals[b.sourceFileIndex ?? 0] ?? [];
+      const source =
+        b.sourceIndex === undefined ? {} : (fileOriginals[b.sourceIndex] ?? {});
       const m: Record<string, unknown> = {
         ...source,
         type: b.sourceType || 'normal',
