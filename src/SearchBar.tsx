@@ -3,6 +3,7 @@ import type { Block, Character } from './core';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { fuzzyName } from './characters';
 import { formatChannelLabel, type ChannelSummary } from './channels';
+import { CharacterCard } from './CharacterCard';
 import {
   formatChipDisplay,
   formatChipToken,
@@ -35,6 +36,7 @@ type SuggestionItem =
     label: string;
     syntax: string;
     meta?: string;
+    characterCard?: { name: string; iconUrl: string; color: string };
   }
   | {
     id: string;
@@ -197,10 +199,19 @@ export function SearchBar({
 
   // 캐릭터 및 미연결 화자 목록 집계
   const speakerCandidates = useMemo(() => {
-    const counts = new Map<string, { name: string; count: number; isLinked: boolean }>();
+    const counts = new Map<
+      string,
+      { name: string; count: number; isLinked: boolean; iconUrl: string; color: string }
+    >();
     for (const c of characters) {
       if (c.id === SYSTEM_CHARACTER_ID) continue;
-      counts.set(c.name, { name: c.name, count: 0, isLinked: true });
+      counts.set(c.name, {
+        name: c.name,
+        count: 0,
+        isLinked: true,
+        iconUrl: c.iconUrl || c.faces[0]?.iconUrl || '',
+        color: c.color || '',
+      });
     }
     for (const b of blocks) {
       if (b.sourceType === 'system' || b.characterId === SYSTEM_CHARACTER_ID) continue;
@@ -212,11 +223,16 @@ export function SearchBar({
       const existing = counts.get(speakerName);
       if (existing) {
         existing.count += 1;
+        if (!existing.iconUrl && b.iconUrl) existing.iconUrl = b.iconUrl;
+        if (!existing.color && b.color) existing.color = b.color;
       } else {
         counts.set(speakerName, {
           name: speakerName,
           count: 1,
           isLinked: !!linkedChar,
+          iconUrl:
+            linkedChar?.iconUrl || linkedChar?.faces[0]?.iconUrl || b.iconUrl || '',
+          color: linkedChar?.color || b.color || '',
         });
       }
     }
@@ -251,6 +267,7 @@ export function SearchBar({
           label: s.name,
           syntax: `${negative ? '-' : ''}from:${s.name}`,
           meta: `${s.isLinked ? '캐릭터' : '화자'} · ${s.count}`,
+          characterCard: { name: s.name, iconUrl: s.iconUrl, color: s.color },
         });
       }
 
@@ -543,6 +560,7 @@ export function SearchBar({
             label: s.name,
             syntax: `from:${s.name}`,
             meta: `${s.count}건`,
+            characterCard: { name: s.name, iconUrl: s.iconUrl, color: s.color },
           });
         }
       }
@@ -900,15 +918,27 @@ export function SearchBar({
                     applySuggestion(item);
                   }}
                 >
-                  <span className="search-suggest-icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <div className="search-suggest-body">
-                    <span className="search-suggest-label">{item.label}</span>
-                    {item.kind === 'prefix' && (
-                      <span className="search-suggest-desc">{item.description}</span>
-                    )}
-                  </div>
+                  {item.kind === 'chip' && item.characterCard ? (
+                    <div className="search-suggest-body">
+                      <CharacterCard
+                        name={item.characterCard.name}
+                        iconUrl={item.characterCard.iconUrl}
+                        color={item.characterCard.color}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <span className="search-suggest-icon" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      <div className="search-suggest-body">
+                        <span className="search-suggest-label">{item.label}</span>
+                        {item.kind === 'prefix' && (
+                          <span className="search-suggest-desc">{item.description}</span>
+                        )}
+                      </div>
+                    </>
+                  )}
                   {item.kind === 'history' ? (
                     <button
                       type="button"

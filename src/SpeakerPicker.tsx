@@ -2,6 +2,7 @@ import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { useState, useId } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
+import { CharacterCard } from './CharacterCard';
 
 export function SpeakerPicker({
   draft,
@@ -121,19 +122,34 @@ export function SpeakerPicker({
       </div>
       {open && (
         <div id={id} role="listbox" className="speaker-options">
-          {[...matches.map((c) => c.name), '사용자 지정...'].map((name, i) => (
+          {matches.map((c, i) => (
             <button
               type="button"
               role="option"
               aria-selected={current === i}
               id={`${id}-${i}`}
-              key={i}
+              key={c.id}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(i)}
             >
-              {name}
+              <CharacterCard
+                name={c.name}
+                iconUrl={c.iconUrl || c.faces[0]?.iconUrl || ''}
+                color={c.color}
+              />
             </button>
           ))}
+          <button
+            type="button"
+            role="option"
+            aria-selected={current === matches.length}
+            id={`${id}-${matches.length}`}
+            className="speaker-option-custom"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick(matches.length)}
+          >
+            사용자 지정...
+          </button>
         </div>
       )}
     </div>

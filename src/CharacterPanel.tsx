@@ -5,6 +5,7 @@ import type { Project, Character } from './core';
 import { moveCharacter, updateCharacter } from './characters';
 import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
 import { isSafeImageUrl } from './importFormats';
+import { CharacterCard } from './CharacterCard';
 
 type FaceDraft = { name: string; iconUrl: string; originalUrl: string };
 type Draft = Omit<Character, 'faces'> & { faces: FaceDraft[] };
@@ -199,14 +200,11 @@ export function CharacterPanel({
                     setActive(x.id);
                   }}
                 >
-                  <span className="char-nav-main">
-                    <Avatar
-                      url={x.iconUrl || x.faces[0]?.iconUrl || ''}
-                      fallback={x.name}
-                      color={x.color}
-                    />
-                    <strong style={{ color: x.color }}>{x.name}</strong>
-                  </span>
+                  <CharacterCard
+                    name={x.name}
+                    iconUrl={x.iconUrl || x.faces[0]?.iconUrl || ''}
+                    color={x.color}
+                  />
                   <span className="count-pill">{count}</span>
                 </button>
               );
@@ -668,11 +666,11 @@ export function CharacterPanel({
                             faces: draft.faces.map((x, j) =>
                               j === editingFaceIndex
                                 ? {
-                                  ...x,
-                                  name:
-                                    x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
-                                  iconUrl: uploaded,
-                                }
+                                    ...x,
+                                    name:
+                                      x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
+                                    iconUrl: uploaded,
+                                  }
                                 : x,
                             ),
                           });
@@ -734,31 +732,5 @@ function UploadIcon() {
       <polyline points="17 8 12 3 7 8" />
       <line x1="12" y1="3" x2="12" y2="15" />
     </svg>
-  );
-}
-
-function Avatar({
-  url,
-  fallback,
-  color,
-}: {
-  url: string;
-  fallback?: string;
-  color?: string;
-}) {
-  return isSafeImageUrl(url) ? (
-    <img
-      className="char-avatar-img"
-      src={url}
-      alt=""
-      width="44"
-      height="44"
-      loading="lazy"
-      referrerPolicy="no-referrer"
-    />
-  ) : (
-    <span className="char-avatar-fallback" style={{ borderColor: color || undefined }}>
-      {(fallback || '?').slice(0, 1)}
-    </span>
   );
 }

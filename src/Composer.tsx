@@ -6,6 +6,7 @@ import { ChannelPicker } from './ChannelPicker';
 import type { ChannelSummary } from './channels';
 import { handleWrapKeyDown } from './textEdit';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
+import { CharacterCard } from './CharacterCard';
 
 export type EyedropPayload = {
   speaker: string;
@@ -150,7 +151,7 @@ export function Composer({
                     setOpen(true);
                     setIndex(
                       (selected + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) %
-                      Math.max(1, matches.length),
+                        Math.max(1, matches.length),
                     );
                   }
                   if (e.key === 'Enter' && open && matches.length) {
@@ -169,7 +170,11 @@ export function Composer({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pick(c)}
                     >
-                      {c.name}
+                      <CharacterCard
+                        name={c.name}
+                        iconUrl={c.iconUrl || c.faces[0]?.iconUrl || ''}
+                        color={c.color}
+                      />
                     </button>
                   ))}
                   {!matches.length && <small>사용자 지정 화자</small>}
