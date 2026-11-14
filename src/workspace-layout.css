@@ -26,7 +26,7 @@ body,
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -47,6 +47,23 @@ body,
   flex-shrink: 0;
 }
 
+.log-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.log-main-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .log-scroll {
   flex: 1;
   min-height: 0;
@@ -55,6 +72,7 @@ body,
   padding: 14px 16px 24px;
 }
 
+.log-main-content > .composer,
 .log-editor > .composer {
   flex-shrink: 0;
 }

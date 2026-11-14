@@ -1059,140 +1059,191 @@ function App() {
             </div>
           )}
 
-          <div className="log-scroll">
-            <div className="log-list">
-              {!visible.length && (
-                <div className="empty">
-                  <h2>
-                    {p.blocks.length
-                      ? '검색 조건과 일치하는 메시지가 없습니다.'
-                      : '로그가 비어있습니다.'}
-                  </h2>
-                  <p>
-                    {p.blocks.length
-                      ? '검색어를 수정하거나 필터를 꺼보세요.'
-                      : '상단에서 JSON 파일을 열거나 아래 입력창에서 메시지를 작성하세요.'}
-                  </p>
-                </div>
-              )}
-              {visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((b) => {
-                const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
-                const isBulkRep = bulkEdit?.repId === b.id;
-                const displayBlock =
-                  isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
+          <div className="log-editor-body">
+            <div className="log-main-content">
+              <div className="log-scroll">
+                <div className="log-list">
+                  {!visible.length && (
+                    <div className="empty">
+                      <h2>
+                        {p.blocks.length
+                          ? '검색 조건과 일치하는 메시지가 없습니다.'
+                          : '로그가 비어있습니다.'}
+                      </h2>
+                      <p>
+                        {p.blocks.length
+                          ? '검색어를 수정하거나 필터를 꺼보세요.'
+                          : '상단에서 JSON 파일을 열거나 아래 입력창에서 메시지를 작성하세요.'}
+                      </p>
+                    </div>
+                  )}
+                  {visible
+                    .slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
+                    .map((b) => {
+                      const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
+                      const isBulkRep = bulkEdit?.repId === b.id;
+                      const displayBlock =
+                        isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
 
-                return (
-                  <MessageBlock
-                    key={b.id}
-                    block={displayBlock}
-                    characters={p.characters}
-                    channels={channels}
-                    display={p.display}
-                    editing={!bulkEdit && !cutIds && editingId === b.id}
-                    setEditing={(value) => {
-                      if (bulkEdit || cutIds) return;
-                      setEditingId(value ? b.id : null);
-                    }}
-                    selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
-                    cut={!!cutIds?.has(b.id)}
-                    cutMode={!!cutIds}
-                    pasteIndicator={
-                      cutIds && pasteTarget?.id === b.id
-                        ? pasteTarget.after
-                          ? 'after'
-                          : 'before'
-                        : undefined
-                    }
-                    onPasteHover={
-                      cutIds
-                        ? (after) =>
-                            setPasteTarget((prev) =>
-                              prev?.id === b.id && prev.after === after
-                                ? prev
-                                : { id: b.id, after },
-                            )
-                        : undefined
-                    }
-                    onPasteHere={
-                      cutIds ? (after) => executePaste(b.id, after) : undefined
-                    }
-                    bulkTarget={isBulkTarget && !isBulkRep}
-                    bulkDisabled={!!bulkEdit && !isBulkRep}
-                    bulkContext={
-                      isBulkRep && bulkEdit
-                        ? {
-                            count: bulkEdit.selectedIds.size,
-                            state: bulkEdit,
-                            originalRepText: bulkRepOriginalText,
-                            faceCharacter: bulkFaceCharacter,
-                            mixedSpeakers: bulkMixedSpeakers,
-                            mixedChannels: bulkMixedChannels,
-                            hasAnyDice: bulkHasAnyDice,
-                            replaceOpen: bulkReplaceOpen,
-                            replaceMatchCount: bulkReplaceMatchCount,
-                            onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                            onCloseReplace: () => setBulkReplaceOpen(false),
-                            onChangeState: (updater) =>
-                              setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                            onSave: saveBulkEdit,
-                            onCancel: () => {
-                              setBulkEdit(null);
-                              setBulkReplaceOpen(false);
-                            },
-                            onDelete: deleteSelected,
+                      return (
+                        <MessageBlock
+                          key={b.id}
+                          block={displayBlock}
+                          characters={p.characters}
+                          channels={channels}
+                          display={p.display}
+                          editing={!bulkEdit && !cutIds && editingId === b.id}
+                          setEditing={(value) => {
+                            if (bulkEdit || cutIds) return;
+                            setEditingId(value ? b.id : null);
+                          }}
+                          selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
+                          cut={!!cutIds?.has(b.id)}
+                          cutMode={!!cutIds}
+                          pasteIndicator={
+                            cutIds && pasteTarget?.id === b.id
+                              ? pasteTarget.after
+                                ? 'after'
+                                : 'before'
+                              : undefined
                           }
-                        : undefined
-                    }
-                    onJump={
-                      !bulkEdit && searchActive && query.trim() && selected.has(b.id)
-                        ? () => jumpToMessage(b.id)
-                        : undefined
-                    }
-                    onEyedrop={() => eyedropBlock(b)}
-                    scene={sceneByMessageId.get(b.id)}
-                    onBookmark={
-                      !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
-                    }
-                    toggle={(keys: SelectionKeys) => {
-                      if (bulkEdit) return;
-                      const next = selectMessage(
-                        selected,
-                        selectionAnchor.current,
-                        visible.map((item) => item.id),
-                        b.id,
-                        keys,
+                          onPasteHover={
+                            cutIds
+                              ? (after) =>
+                                  setPasteTarget((prev) =>
+                                    prev?.id === b.id && prev.after === after
+                                      ? prev
+                                      : { id: b.id, after },
+                                  )
+                              : undefined
+                          }
+                          onPasteHere={
+                            cutIds ? (after) => executePaste(b.id, after) : undefined
+                          }
+                          bulkTarget={isBulkTarget && !isBulkRep}
+                          bulkDisabled={!!bulkEdit && !isBulkRep}
+                          bulkContext={
+                            isBulkRep && bulkEdit
+                              ? {
+                                  count: bulkEdit.selectedIds.size,
+                                  state: bulkEdit,
+                                  originalRepText: bulkRepOriginalText,
+                                  faceCharacter: bulkFaceCharacter,
+                                  mixedSpeakers: bulkMixedSpeakers,
+                                  mixedChannels: bulkMixedChannels,
+                                  hasAnyDice: bulkHasAnyDice,
+                                  replaceOpen: bulkReplaceOpen,
+                                  replaceMatchCount: bulkReplaceMatchCount,
+                                  onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                                  onCloseReplace: () => setBulkReplaceOpen(false),
+                                  onChangeState: (updater) =>
+                                    setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                                  onSave: saveBulkEdit,
+                                  onCancel: () => {
+                                    setBulkEdit(null);
+                                    setBulkReplaceOpen(false);
+                                  },
+                                  onDelete: deleteSelected,
+                                }
+                              : undefined
+                          }
+                          onJump={
+                            !bulkEdit &&
+                            searchActive &&
+                            query.trim() &&
+                            selected.has(b.id)
+                              ? () => jumpToMessage(b.id)
+                              : undefined
+                          }
+                          onEyedrop={() => eyedropBlock(b)}
+                          scene={sceneByMessageId.get(b.id)}
+                          onBookmark={
+                            !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
+                          }
+                          toggle={(keys: SelectionKeys) => {
+                            if (bulkEdit) return;
+                            const next = selectMessage(
+                              selected,
+                              selectionAnchor.current,
+                              visible.map((item) => item.id),
+                              b.id,
+                              keys,
+                            );
+                            cursorId.current = b.id;
+                            selectionAnchor.current = next.anchor;
+                            setSelectedRaw(next.selected);
+                            if (cutIds) setPasteTarget({ id: b.id, after: true });
+                          }}
+                          save={(next) => edit(b.id, next)}
+                          remove={() => {
+                            commit({
+                              ...p,
+                              blocks: p.blocks.filter((x) => x.id !== b.id),
+                            });
+                            setSelected(
+                              new Set([...selected].filter((id) => id !== b.id)),
+                            );
+                          }}
+                          drop={(id, after) => {
+                            if (bulkEdit || cutIds) return;
+                            const movingIds =
+                              selected.has(id) && selected.size > 1
+                                ? selected
+                                : new Set([id]);
+                            const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
+                            if (blocks !== p.blocks) commit({ ...p, blocks });
+                          }}
+                        />
                       );
-                      cursorId.current = b.id;
-                      selectionAnchor.current = next.anchor;
-                      setSelectedRaw(next.selected);
-                      if (cutIds) setPasteTarget({ id: b.id, after: true });
-                    }}
-                    save={(next) => edit(b.id, next)}
-                    remove={() => {
-                      commit({ ...p, blocks: p.blocks.filter((x) => x.id !== b.id) });
-                      setSelected(new Set([...selected].filter((id) => id !== b.id)));
-                    }}
-                    drop={(id, after) => {
-                      if (bulkEdit || cutIds) return;
-                      const movingIds =
-                        selected.has(id) && selected.size > 1 ? selected : new Set([id]);
-                      const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
-                      if (blocks !== p.blocks) commit({ ...p, blocks });
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
+                    })}
+                </div>
+              </div>
 
-          <Composer
-            characters={p.characters ?? []}
-            channels={channels}
-            send={addMessage}
-            disabled={!!cutIds || !!bulkEdit}
-            eyedrop={eyedrop}
-            focusRequest={composerFocusRequest}
-          />
+              <Composer
+                characters={p.characters ?? []}
+                channels={channels}
+                send={addMessage}
+                disabled={!!cutIds || !!bulkEdit}
+                eyedrop={eyedrop}
+                focusRequest={composerFocusRequest}
+              />
+            </div>
+
+            <SceneSidebar
+              open={sceneBarOpen}
+              onToggleOpen={() => setSceneBarOpen((v) => !v)}
+              scenes={p.scenes ?? []}
+              blocks={p.blocks}
+              activeMessageId={cursorId.current ?? [...selected].at(-1) ?? null}
+              canAddFromSelection={
+                !cutIds && !bulkEdit && Boolean(cursorId.current || selected.size > 0)
+              }
+              focusSceneId={focusSceneId}
+              onClearFocusScene={() => setFocusSceneId(null)}
+              onAddFromSelection={() => {
+                const targetId = cursorId.current ?? [...selected].at(-1);
+                if (!targetId) {
+                  setNotice('장면을 등록할 메시지를 먼저 선택하세요.');
+                  return;
+                }
+                bookmarkMessage(targetId);
+              }}
+              onSelectScene={(scene) => jumpToScene(scene)}
+              onRenameScene={(sceneId, name) =>
+                commit({
+                  ...p,
+                  scenes: updateSceneName(p.scenes, p.blocks, sceneId, name),
+                })
+              }
+              onRemoveScene={(sceneId) => {
+                commit({
+                  ...p,
+                  scenes: removeScene(p.scenes, p.blocks, sceneId),
+                });
+                setNotice('장면 북마크를 삭제했습니다.');
+              }}
+            />
+          </div>
 
           <div className="status-bar">
             <span role="status" className="status-notice">
@@ -1204,40 +1255,6 @@ function App() {
             </span>
           </div>
         </main>
-        <SceneSidebar
-          open={sceneBarOpen}
-          onToggleOpen={() => setSceneBarOpen((v) => !v)}
-          scenes={p.scenes ?? []}
-          blocks={p.blocks}
-          activeMessageId={cursorId.current ?? [...selected].at(-1) ?? null}
-          canAddFromSelection={
-            !cutIds && !bulkEdit && Boolean(cursorId.current || selected.size > 0)
-          }
-          focusSceneId={focusSceneId}
-          onClearFocusScene={() => setFocusSceneId(null)}
-          onAddFromSelection={() => {
-            const targetId = cursorId.current ?? [...selected].at(-1);
-            if (!targetId) {
-              setNotice('장면을 등록할 메시지를 먼저 선택하세요.');
-              return;
-            }
-            bookmarkMessage(targetId);
-          }}
-          onSelectScene={(scene) => jumpToScene(scene)}
-          onRenameScene={(sceneId, name) =>
-            commit({
-              ...p,
-              scenes: updateSceneName(p.scenes, p.blocks, sceneId, name),
-            })
-          }
-          onRemoveScene={(sceneId) => {
-            commit({
-              ...p,
-              scenes: removeScene(p.scenes, p.blocks, sceneId),
-            });
-            setNotice('장면 북마크를 삭제했습니다.');
-          }}
-        />
       </div>
     </>
   );
