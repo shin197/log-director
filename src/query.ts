@@ -17,31 +17,31 @@ export const IS_FLAGS: {
   description: string;
   icon: string;
 }[] = [
-  {
-    value: 'dice',
-    label: '판정 있음',
-    description: '주사위 판정이 있는 메시지',
-    icon: '🎲',
-  },
-  {
-    value: 'system',
-    label: '시스템',
-    description: '시스템 메시지만',
-    icon: '⚙',
-  },
-  {
-    value: 'normal',
-    label: '일반 대사',
-    description: '일반 대사만',
-    icon: '💬',
-  },
-  {
-    value: 'unlinked',
-    label: '미연결 화자',
-    description: '캐릭터와 연결되지 않은 사용자 지정 화자만',
-    icon: '⛓',
-  },
-];
+    {
+      value: 'dice',
+      label: '판정 있음',
+      description: '주사위 판정이 있는 메시지',
+      icon: '🎲',
+    },
+    {
+      value: 'system',
+      label: '시스템',
+      description: '시스템 메시지만',
+      icon: '⚙',
+    },
+    {
+      value: 'normal',
+      label: '일반 대사',
+      description: '일반 대사만',
+      icon: '💬',
+    },
+    {
+      value: 'unlinked',
+      label: '미연결 캐릭터',
+      description: '캐릭터와 연결되지 않은 사용자 지정 캐릭터만',
+      icon: '⛓',
+    },
+  ];
 
 function isSystemBlock(b: Block): boolean {
   return b.sourceType === 'system' || b.characterId === SYSTEM_CHARACTER_ID;

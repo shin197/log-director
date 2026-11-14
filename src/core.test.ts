@@ -291,7 +291,12 @@ test('표시 옵션을 모든 출력에 적용하고 프로젝트 설정과 표�
   assert.deepEqual(parse(JSON.stringify(p), 'project.json'), p);
 });
 
-import { updateCharacter, inheritCharacter, fuzzyName } from './characters.ts';
+import {
+  updateCharacter,
+  inheritCharacter,
+  fuzzyName,
+  moveCharacter,
+} from './characters.ts';
 test('캐릭터 ID 마이그레이션과 이름 변경 격리 및 저장', () => {
   const raw = JSON.stringify({
     messages: [
@@ -1153,4 +1158,31 @@ test('내보내기 옵션(검색 필터, 시스템 채널 표시, Base64 인코�
   const reJsonB64 = parse(jsonB64, 'b64.json');
   assert.equal(reJsonB64.blocks[1]?.iconUrl, dataUri);
   assert.equal(reJsonB64.blocks[2]?.iconUrl, dataUri);
+});
+
+test('moveCharacter는 드래그 순서 변경 시 원본 불변성과 객체 참조를 유지한다', () => {
+  const c1 = { id: 'c1', name: 'A', color: '#111111', iconUrl: '', faces: [] };
+  const c2 = { id: 'c2', name: 'B', color: '#222222', iconUrl: '', faces: [] };
+  const c3 = { id: 'c3', name: 'C', color: '#333333', iconUrl: '', faces: [] };
+  const list = [c1, c2, c3];
+
+  const forward = moveCharacter(list, 0, 2, true);
+  assert.deepEqual(
+    forward.map((x) => x.id),
+    ['c2', 'c3', 'c1'],
+  );
+  assert.equal(forward[2], c1);
+  assert.deepEqual(
+    list.map((x) => x.id),
+    ['c1', 'c2', 'c3'],
+  );
+
+  const backward = moveCharacter(list, 2, 0, false);
+  assert.deepEqual(
+    backward.map((x) => x.id),
+    ['c3', 'c1', 'c2'],
+  );
+
+  assert.equal(moveCharacter(list, 1, 1, false), list);
+  assert.equal(moveCharacter(list, 0, 1, false), list);
 });

@@ -274,6 +274,14 @@ code {
   font-weight: 600;
 }
 
+.top-tabs .top-tab-help {
+  margin-left: 2px;
+  border-left: 1px solid var(--border-subtle);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 12px;
+}
+
 .header-title-input {
   flex: 0 1 260px;
   min-width: 110px;
@@ -583,36 +591,120 @@ code {
   text-align: center;
 }
 
-/* Help Popover */
-.help-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 60;
-  width: min(560px, 92vw);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  padding: 14px 16px;
+/* Floating Context Help Sheet */
+.help-sheet {
+  position: fixed;
+  top: 58px;
+  right: 18px;
+  z-index: 80;
+  width: min(370px, calc(100vw - 24px));
+  max-height: calc(100vh - 84px);
+  display: flex;
+  flex-direction: column;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
   font-size: 12.5px;
 }
 
-.help-popover strong {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--accent);
-  font-size: 12px;
+.help-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: move;
+  user-select: none;
+  flex-shrink: 0;
 }
 
-.help-popover ul {
+.help-sheet-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.help-sheet-title strong {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.help-sheet-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+}
+
+.help-sheet-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.help-sheet-section h3 {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.help-sheet-section ul {
+  list-style: none;
   margin: 0;
-  padding-left: 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.help-sheet-section li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   color: var(--text-secondary);
-  line-height: 1.65;
+  line-height: 1.45;
+}
+
+.help-sheet-section li span {
+  text-align: right;
+}
+
+.help-sheet-section kbd {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.help-sheet-footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 /* Collapsible Find & Replace Bar */
@@ -1031,13 +1123,17 @@ code {
 }
 
 .bulk-token-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
-  max-height: 120px;
-  overflow-y: auto;
+  max-height: calc(1.5em * 4);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .editor-actions {
@@ -1535,6 +1631,16 @@ code {
   border-color: var(--accent-border);
 }
 
+.character-sidebar nav button.drop-before {
+  border-top-color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.character-sidebar nav button.drop-after {
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .char-nav-main {
   display: flex;
   align-items: center;
@@ -1724,20 +1830,6 @@ code {
 .expression-row.drop-after {
   border-bottom-color: var(--accent);
   box-shadow: inset 0 -2px 0 var(--accent);
-}
-
-.face-drag-handle {
-  cursor: grab;
-  color: var(--text-muted);
-  user-select: none;
-  padding: 0 2px;
-  font-size: 14px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.face-drag-handle:active {
-  cursor: grabbing;
 }
 
 .face-image-btn {
@@ -2362,10 +2454,6 @@ dialog::backdrop {
 }
 
 @media (max-width: 640px) {
-  .help-popover {
-    grid-template-columns: 1fr;
-  }
-
   .export-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);

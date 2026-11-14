@@ -2,7 +2,7 @@ import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { notifyError } from './Toast';
 import { useState, useRef, useEffect } from 'react';
 import type { Project, Character } from './core';
-import { updateCharacter } from './characters';
+import { moveCharacter, updateCharacter } from './characters';
 import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
 import { isSafeImageUrl } from './importFormats';
 
@@ -34,6 +34,11 @@ export function CharacterPanel({
   const [faceImageDraft, setFaceImageDraft] = useState('');
   const [dragFaceIndex, setDragFaceIndex] = useState<number | null>(null);
   const [dragOverFace, setDragOverFace] = useState<{
+    index: number;
+    after: boolean;
+  } | null>(null);
+  const [dragCharIndex, setDragCharIndex] = useState<number | null>(null);
+  const [dragOverChar, setDragOverChar] = useState<{
     index: number;
     after: boolean;
   } | null>(null);
@@ -137,13 +142,56 @@ export function CharacterPanel({
             </button>
           </div>
           <nav aria-label="캐릭터 목록">
-            {characters.map((x) => {
+            {characters.map((x, i) => {
               const count = p.blocks.filter((b) => b.characterId === x.id).length;
+              const dropClass =
+                dragOverChar?.index === i
+                  ? dragOverChar.after
+                    ? 'drop-after'
+                    : 'drop-before'
+                  : '';
               return (
                 <button
                   type="button"
                   key={x.id}
+                  className={dropClass || undefined}
                   aria-pressed={c?.id === x.id}
+                  draggable
+                  onDragStart={(e) => {
+                    setDragCharIndex(i);
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', x.id);
+                  }}
+                  onDragOver={(e) => {
+                    if (dragCharIndex === null || dragCharIndex === i) return;
+                    e.preventDefault();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const after = e.clientY >= rect.top + rect.height / 2;
+                    setDragOverChar({ index: i, after });
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverChar?.index === i) setDragOverChar(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragCharIndex !== null && dragCharIndex !== i) {
+                      const nextCharacters = moveCharacter(
+                        characters,
+                        dragCharIndex,
+                        i,
+                        !!dragOverChar?.after,
+                      );
+                      if (nextCharacters !== characters) {
+                        commit({ ...p, characters: nextCharacters });
+                      }
+                    }
+                    setDragCharIndex(null);
+                    setDragOverChar(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragCharIndex(null);
+                    setDragOverChar(null);
+                  }}
                   onClick={() => {
                     if (x.id === c?.id) return;
                     if (dirty && !confirm('저장하지 않은 변경을 버리고 이동할까요?'))
@@ -224,7 +272,7 @@ export function CharacterPanel({
               <div className="system-info-card">
                 <h2>시스템 캐릭터</h2>
                 <p>
-                  고정 시스템 캐릭터입니다. 화자 이름과 이미지 없이 시스템 전용 형식으로
+                  고정 시스템 캐릭터입니다. 캐릭터 이름과 이미지 없이 시스템 전용 형식으로
                   출력되며, 이름·색상·표정 편집 및 삭제가 제한됩니다.
                 </p>
               </div>
@@ -386,9 +434,6 @@ export function CharacterPanel({
                           setDragOverFace(null);
                         }}
                       >
-                        <span className="face-drag-handle" title="드래그하여 순서 변경">
-                          ⋮⋮
-                        </span>
                         <button
                           type="button"
                           className="face-image-btn"
@@ -623,11 +668,11 @@ export function CharacterPanel({
                             faces: draft.faces.map((x, j) =>
                               j === editingFaceIndex
                                 ? {
-                                    ...x,
-                                    name:
-                                      x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
-                                    iconUrl: uploaded,
-                                  }
+                                  ...x,
+                                  name:
+                                    x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
+                                  iconUrl: uploaded,
+                                }
                                 : x,
                             ),
                           });

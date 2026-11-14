@@ -84,3 +84,25 @@ export function fuzzyName(name: string, query: string) {
   for (const c of name.toLowerCase()) if (c === query.toLowerCase()[i]) i++;
   return i === query.length;
 }
+export function moveCharacter(
+  characters: Character[],
+  fromIndex: number,
+  targetIndex: number,
+  after: boolean,
+): Character[] {
+  if (
+    fromIndex === targetIndex ||
+    fromIndex < 0 ||
+    targetIndex < 0 ||
+    fromIndex >= characters.length ||
+    targetIndex >= characters.length
+  )
+    return characters;
+  const next = [...characters];
+  const [moved] = next.splice(fromIndex, 1);
+  let insertAt = after ? targetIndex + 1 : targetIndex;
+  if (fromIndex < insertAt) insertAt -= 1;
+  if (insertAt === fromIndex) return characters;
+  next.splice(insertAt, 0, moved);
+  return next;
+}

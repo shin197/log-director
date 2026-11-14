@@ -15,6 +15,7 @@ import { collectChannels } from './channels';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { SearchBar } from './SearchBar';
 import { RestoreDialog } from './RestoreDialog';
+import { HelpSheet, type HelpContext } from './HelpSheet';
 import {
   isMeaningfulProject,
   loadAutosave,
@@ -47,7 +48,6 @@ function App() {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
-  const helpRef = useRef<HTMLDivElement>(null);
   const [find, setFind] = useState('');
   const [to, setTo] = useState('');
   const [notice, setNotice] = useState(
@@ -191,7 +191,7 @@ function App() {
       channel,
       key: Date.now() + Math.random(),
     });
-    setNotice(`‘${speaker || '화자 없음'}’ 캐릭터 정보를 입력창에 가져왔습니다.`);
+    setNotice(`‘${speaker || '캐릭터 없음'}’ 캐릭터 정보를 입력창에 가져왔습니다.`);
   }
 
   function startCutMode() {
@@ -289,12 +289,22 @@ function App() {
   }
 
   useEffect(() => {
-    if (!helpOpen) return;
-    const close = (e: PointerEvent) => {
-      if (!helpRef.current?.contains(e.target as Node)) setHelpOpen(false);
+    const onHelpKey = (e: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]') || e.isComposing) return;
+      if (e.key === 'Escape' && helpOpen) {
+        e.preventDefault();
+        setHelpOpen(false);
+        return;
+      }
+      const target = e.target as HTMLElement;
+      if (target.closest('input,textarea,select,[contenteditable=true]')) return;
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
+      }
     };
-    document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
+    window.addEventListener('keydown', onHelpKey);
+    return () => window.removeEventListener('keydown', onHelpKey);
   }, [helpOpen]);
 
   useEffect(() => {
@@ -315,7 +325,6 @@ function App() {
         return;
       }
       if (e.key === 'Escape') {
-        setHelpOpen(false);
         if (cutIds) {
           cancelCutMode();
           return;
@@ -527,12 +536,12 @@ function App() {
     : undefined;
   const bulkMixedSpeakers = bulkEdit
     ? new Set(
-        bulkTargetBlocks.map((b) =>
-          b.sourceType === 'system'
-            ? 'system'
-            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
-        ),
-      ).size > 1
+      bulkTargetBlocks.map((b) =>
+        b.sourceType === 'system'
+          ? 'system'
+          : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+      ),
+    ).size > 1
     : false;
   const bulkMixedChannels = bulkEdit
     ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
@@ -545,6 +554,19 @@ function App() {
     bulkEdit && bulkEdit.replaceFind
       ? bulkTargetBlocks.filter((b) => b.text.includes(bulkEdit.replaceFind)).length
       : 0;
+
+  const helpContext: HelpContext =
+    tab === '캐릭터'
+      ? 'characters'
+      : tab === '설정'
+        ? 'settings'
+        : cutIds
+          ? 'log-cut'
+          : bulkEdit
+            ? 'log-bulk'
+            : editingId
+              ? 'log-editing'
+              : 'log';
 
   return (
     <>
@@ -563,6 +585,17 @@ function App() {
                 {name}
               </button>
             ))}
+            <button
+              type="button"
+              className="top-tab-help"
+              aria-label="단축키 및 컨텍스트 도움말 (?)"
+              aria-expanded={helpOpen}
+              aria-pressed={helpOpen}
+              title="단축키 및 컨텍스트 도움말 (?)"
+              onClick={() => setHelpOpen((v) => !v)}
+            >
+              도움말
+            </button>
           </nav>
           <input
             className="header-title-input"
@@ -640,6 +673,7 @@ function App() {
         />
       )}
       {exportOpen && <ExportDialog project={p} onClose={() => setExportOpen(false)} />}
+      {helpOpen && <HelpSheet context={helpContext} onClose={() => setHelpOpen(false)} />}
       {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
       {tab === '설정' && (
         <div className="settings-scroll">
@@ -705,7 +739,7 @@ function App() {
       <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
         <main className="log-editor">
           <div className="toolbar">
-            <div className="toolbar-search" ref={helpRef}>
+            <div className="toolbar-search">
               <SearchBar
                 inputRef={searchInput}
                 query={query}
@@ -730,61 +764,6 @@ function App() {
               >
                 {searchActive ? '필터 ON' : '필터 OFF'}
               </button>
-              <button
-                type="button"
-                className="compact-btn icon-btn"
-                aria-label="검색 문법 및 단축키 도움말"
-                aria-expanded={helpOpen}
-                title="검색 문법 및 단축키"
-                onClick={() => setHelpOpen(!helpOpen)}
-              >
-                ?
-              </button>
-              {helpOpen && (
-                <div className="help-popover" role="region" aria-label="도움말">
-                  <div>
-                    <strong>검색 문법</strong>
-                    <ul>
-                      <li>일반 텍스트: 캐릭터·대사·판정 통합 검색</li>
-                      <li>
-                        <code>from:제타</code> (캐릭터) · <code>in:메인</code> (채널)
-                      </li>
-                      <li>
-                        <code>dice:성공</code> (주사위 판정 텍스트)
-                      </li>
-                      <li>
-                        <code>is:dice</code> · <code>is:system</code> ·{' '}
-                        <code>is:normal</code> · <code>is:unlinked</code>
-                      </li>
-                      <li>
-                        <code>-from:제타</code> (제외) · <code>Tab/Enter</code> 자동완성
-                      </li>
-                    </ul>
-                  </div>
-                  <div>
-                    <strong>조작 및 단축키</strong>
-                    <ul>
-                      <li>더블클릭: 편집 · 선택 후 따옴표/괄호 자동 감싸기</li>
-                      <li>클릭 / Ctrl+클릭 / Shift+클릭 · 드래그 이동</li>
-                      <li>
-                        <code>Ctrl+Shift+Enter</code>: 일괄 편집 · <code>Ctrl+X/V</code>:
-                        오려붙이기
-                      </li>
-                      <li>
-                        <code>↑↓</code> / <code>Ctrl+↑↓</code> / <code>Alt+↑↓</code>
-                      </li>
-                      <li>
-                        <code>PgUp/Dn</code> 10개 · <code>Home/End</code> ·{' '}
-                        <code>Del</code>
-                      </li>
-                      <li>
-                        <code>Ctrl+F</code> 검색 · <code>Ctrl+H</code> 치환 ·{' '}
-                        <code>Ctrl+A</code> 전체 · <code>Ctrl+Z/Y</code>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="toolbar-divider" />
@@ -851,7 +830,7 @@ function App() {
                 type="button"
                 className="compact-btn"
                 disabled={selected.size < 2 || !!bulkEdit || !!cutIds}
-                title="선택한 메시지 중 화자·채널·유형이 같은 연속 메시지 병합"
+                title="선택한 메시지 중 캐릭터·채널·유형이 같은 연속 메시지 병합"
                 onClick={() => {
                   const blocks = mergeConsecutive(p.blocks, selected);
                   const mergedCount = p.blocks.length - blocks.length;
@@ -1022,11 +1001,11 @@ function App() {
                     onPasteHover={
                       cutIds
                         ? (after) =>
-                            setPasteTarget((prev) =>
-                              prev?.id === b.id && prev.after === after
-                                ? prev
-                                : { id: b.id, after },
-                            )
+                          setPasteTarget((prev) =>
+                            prev?.id === b.id && prev.after === after
+                              ? prev
+                              : { id: b.id, after },
+                          )
                         : undefined
                     }
                     onPasteHere={
@@ -1037,26 +1016,26 @@ function App() {
                     bulkContext={
                       isBulkRep && bulkEdit
                         ? {
-                            count: bulkEdit.selectedIds.size,
-                            state: bulkEdit,
-                            originalRepText: bulkRepOriginalText,
-                            faceCharacter: bulkFaceCharacter,
-                            mixedSpeakers: bulkMixedSpeakers,
-                            mixedChannels: bulkMixedChannels,
-                            hasAnyDice: bulkHasAnyDice,
-                            replaceOpen: bulkReplaceOpen,
-                            replaceMatchCount: bulkReplaceMatchCount,
-                            onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                            onCloseReplace: () => setBulkReplaceOpen(false),
-                            onChangeState: (updater) =>
-                              setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                            onSave: saveBulkEdit,
-                            onCancel: () => {
-                              setBulkEdit(null);
-                              setBulkReplaceOpen(false);
-                            },
-                            onDelete: deleteSelected,
-                          }
+                          count: bulkEdit.selectedIds.size,
+                          state: bulkEdit,
+                          originalRepText: bulkRepOriginalText,
+                          faceCharacter: bulkFaceCharacter,
+                          mixedSpeakers: bulkMixedSpeakers,
+                          mixedChannels: bulkMixedChannels,
+                          hasAnyDice: bulkHasAnyDice,
+                          replaceOpen: bulkReplaceOpen,
+                          replaceMatchCount: bulkReplaceMatchCount,
+                          onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                          onCloseReplace: () => setBulkReplaceOpen(false),
+                          onChangeState: (updater) =>
+                            setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                          onSave: saveBulkEdit,
+                          onCancel: () => {
+                            setBulkEdit(null);
+                            setBulkReplaceOpen(false);
+                          },
+                          onDelete: deleteSelected,
+                        }
                         : undefined
                     }
                     onJump={

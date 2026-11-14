@@ -11,31 +11,31 @@ const formats: {
   description: string;
   btnClass: string;
 }[] = [
-  {
-    id: 'html',
-    label: 'HTML',
-    description: '초상화·색상이 포함된 웹 문서',
-    btnClass: 'mb-led-btn-primary',
-  },
-  {
-    id: 'txt',
-    label: 'TXT',
-    description: '화자·시각·본문 일반 텍스트',
-    btnClass: 'mb-led-btn-txt',
-  },
-  {
-    id: 'json',
-    label: 'JSON',
-    description: '완성 로그 데이터 (프로젝트와 별개)',
-    btnClass: 'mb-led-btn-json',
-  },
-  {
-    id: 'md',
-    label: 'Markdown',
-    description: '제목·화자·시스템 인용문',
-    btnClass: 'mb-led-btn-md',
-  },
-];
+    {
+      id: 'html',
+      label: 'HTML',
+      description: '초상화·색상이 포함된 웹 문서',
+      btnClass: 'mb-led-btn-primary',
+    },
+    {
+      id: 'txt',
+      label: 'TXT',
+      description: '캐릭터·시각·본문 일반 텍스트',
+      btnClass: 'mb-led-btn-txt',
+    },
+    {
+      id: 'json',
+      label: 'JSON',
+      description: '완성 로그 데이터 (프로젝트와 별개)',
+      btnClass: 'mb-led-btn-json',
+    },
+    {
+      id: 'md',
+      label: 'Markdown',
+      description: '제목·캐릭터·시스템 인용문',
+      btnClass: 'mb-led-btn-md',
+    },
+  ];
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -189,7 +189,7 @@ export function ExportDialog({
           blocks={project.blocks}
           characters={project.characters ?? []}
           channels={channels}
-          onActivate={() => {}}
+          onActivate={() => { }}
           onChangeQuery={setQuery}
         />
       </div>
