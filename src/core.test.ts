@@ -944,3 +944,59 @@ test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 proj
   const roundtrip = parse(JSON.stringify(htmlCcfProj), 'test.project.json');
   assert.equal(roundtrip.blocks.length, htmlCcfProj.blocks.length);
 });
+
+test('imageUrl allows safe data:image base64 and HTML export deduplicates identical avatars', async () => {
+  const { imageUrl } = await import('./clipboardCharacter.ts');
+  const dataUri =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  assert.equal(imageUrl(dataUri), dataUri);
+  assert.throws(() => imageUrl('javascript:alert(1)'));
+
+  const proj: Project = {
+    version: 1,
+    title: 'Base64 Dedupe Test',
+    characters: [
+      {
+        id: 'c1',
+        name: 'A',
+        color: '#888888',
+        iconUrl: dataUri,
+        aliases: [],
+        faces: [{ name: '기본', imageUrl: dataUri }],
+        defaultFace: '기본',
+      },
+    ],
+    blocks: [
+      {
+        id: 'b1',
+        sourceIndex: 0,
+        channel: 'main',
+        speaker: 'A',
+        characterId: 'c1',
+        iconUrl: dataUri,
+        text: '첫 번째',
+      },
+      {
+        id: 'b2',
+        sourceIndex: 1,
+        channel: 'main',
+        speaker: 'A',
+        characterId: 'c1',
+        iconUrl: dataUri,
+        text: '두 번째',
+      },
+    ],
+  };
+
+  const html = exportLog(proj, 'html');
+  assert.equal(html.split(dataUri).length - 1, 1);
+  assert.ok(html.includes('.avatar-image-0{background-image:url("'));
+  assert.ok(
+    html.includes('<span class="avatar avatar-image-0" aria-hidden="true"></span>'),
+  );
+
+  const reparsed = parse(html, 'dedupe.html');
+  assert.equal(reparsed.blocks.length, 2);
+  assert.equal(reparsed.blocks[0]?.iconUrl, dataUri);
+  assert.equal(reparsed.blocks[1]?.iconUrl, dataUri);
+});

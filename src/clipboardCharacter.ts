@@ -1,4 +1,5 @@
 import type { Character } from './core.ts';
+import { isSafeImageUrl } from './importFormats.ts';
 export function imageUrl(value: unknown): string {
   if (value === undefined || value === '') return '';
   if (typeof value !== 'string') throw Error('이미지 URL이 문자열이 아닙니다.');
@@ -6,11 +7,18 @@ export function imageUrl(value: unknown): string {
   const markdown = raw.match(/^\[[^\]]*\]\((https?:\/\/[^\s]+)\)$/);
   const url = markdown?.[1] ?? raw;
   if (!url) return '';
+  if (/^data:image\//i.test(url)) {
+    const compact = url.replace(/\s+/g, '');
+    if (!isSafeImageUrl(compact)) {
+      throw Error('지원하는 base64 이미지(png/jpg/gif/webp) 형식이 아닙니다.');
+    }
+    return compact;
+  }
   try {
     const parsed = new URL(url);
     if (!['http:', 'https:'].includes(parsed.protocol)) throw Error();
   } catch {
-    throw Error('이미지는 http 또는 https URL이어야 합니다.');
+    throw Error('이미지는 http/https URL 또는 base64 이미지 데이터여야 합니다.');
   }
   return url;
 }

@@ -30,16 +30,29 @@ export function CharacterPanel({
     [dirty, setDirty] = useState(false),
     [adding, setAdding] = useState(false),
     [link, setLink] = useState(true);
+  const [editingFaceIndex, setEditingFaceIndex] = useState<number | null>(null);
+  const [faceImageDraft, setFaceImageDraft] = useState('');
+  const [dragFaceIndex, setDragFaceIndex] = useState<number | null>(null);
+  const [dragOverFace, setDragOverFace] = useState<{
+    index: number;
+    after: boolean;
+  } | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
+  const faceDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     setDraft(c ? makeDraft(c) : null);
     setDirty(false);
+    setEditingFaceIndex(null);
   }, [c]);
 
   useEffect(() => {
     if (adding) dialog.current?.showModal();
   }, [adding]);
+
+  useEffect(() => {
+    if (editingFaceIndex !== null) faceDialogRef.current?.showModal();
+  }, [editingFaceIndex]);
 
   function change(next: Draft) {
     setDraft(next);
@@ -250,21 +263,71 @@ export function CharacterPanel({
 
                 <div className="faces-heading">
                   <h2>표정 ({draft.faces.length})</h2>
-                  <button
-                    type="button"
-                    className="compact-btn"
-                    onClick={() =>
-                      change({
-                        ...draft,
-                        faces: [
-                          ...draft.faces,
-                          { name: '', iconUrl: '', originalUrl: '' },
-                        ],
-                      })
-                    }
-                  >
-                    ＋ 표정 추가
-                  </button>
+                  <div className="faces-heading-actions">
+                    {/* <label
+                      className="button compact-btn"
+                      title="사진 파일을 선택해 새 표정으로 바로 등록"
+                    >
+                      ＋ 업로드
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon"
+                        multiple
+                        hidden
+                        onChange={(e) => {
+                          const files = e.target.files ? Array.from(e.target.files) : [];
+                          if (!files.length) return;
+                          Promise.all(
+                            files.map(
+                              (file) =>
+                                new Promise<FaceDraft>((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onload = () => {
+                                    const baseName = file.name
+                                      .replace(/\.[^/.]+$/, '')
+                                      .trim();
+                                    resolve({
+                                      name: baseName,
+                                      iconUrl:
+                                        typeof reader.result === 'string'
+                                          ? reader.result
+                                          : '',
+                                      originalUrl: '',
+                                    });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }),
+                            ),
+                          ).then((newFaces) => {
+                            const valid = newFaces.filter((x) => x.iconUrl);
+                            if (!valid.length) return;
+                            const nextFaces = [...draft.faces, ...valid];
+                            change({
+                              ...draft,
+                              faces: nextFaces,
+                              iconUrl: draft.iconUrl || valid[0]?.iconUrl || '',
+                            });
+                          });
+                          e.target.value = '';
+                        }}
+                      />
+                    </label> */}
+                    <button
+                      type="button"
+                      className="compact-btn"
+                      onClick={() =>
+                        change({
+                          ...draft,
+                          faces: [
+                            ...draft.faces,
+                            { name: '', iconUrl: '', originalUrl: '' },
+                          ],
+                        })
+                      }
+                    >
+                      ＋ 표정 추가
+                    </button>
+                  </div>
                 </div>
 
                 <div className="expression-list">
@@ -272,12 +335,86 @@ export function CharacterPanel({
                     const isDefault = draft.iconUrl
                       ? draft.iconUrl === f.iconUrl
                       : i === 0;
+                    const dropClass =
+                      dragOverFace?.index === i
+                        ? dragOverFace.after
+                          ? 'drop-after'
+                          : 'drop-before'
+                        : '';
                     return (
                       <div
-                        className={`expression-row ${isDefault ? 'default-face' : ''}`}
+                        className={`expression-row ${isDefault ? 'default-face' : ''} ${dropClass}`.trim()}
                         key={i}
+                        draggable
+                        onDragStart={(e) => {
+                          if ((e.target as HTMLElement).closest('input,button')) {
+                            e.preventDefault();
+                            return;
+                          }
+                          setDragFaceIndex(i);
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', String(i));
+                        }}
+                        onDragOver={(e) => {
+                          if (dragFaceIndex === null || dragFaceIndex === i) return;
+                          e.preventDefault();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const after = e.clientY >= rect.top + rect.height / 2;
+                          setDragOverFace({ index: i, after });
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverFace?.index === i) setDragOverFace(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (dragFaceIndex === null || dragFaceIndex === i) {
+                            setDragFaceIndex(null);
+                            setDragOverFace(null);
+                            return;
+                          }
+                          const nextFaces = [...draft.faces];
+                          const [moved] = nextFaces.splice(dragFaceIndex, 1);
+                          let insertAt = dragOverFace?.after ? i + 1 : i;
+                          if (dragFaceIndex < insertAt) insertAt -= 1;
+                          nextFaces.splice(insertAt, 0, moved);
+                          change({ ...draft, faces: nextFaces });
+                          setDragFaceIndex(null);
+                          setDragOverFace(null);
+                        }}
+                        onDragEnd={() => {
+                          setDragFaceIndex(null);
+                          setDragOverFace(null);
+                        }}
                       >
-                        <Avatar url={f.iconUrl} fallback={f.name || String(i + 1)} />
+                        <span className="face-drag-handle" title="드래그하여 순서 변경">
+                          ⋮⋮
+                        </span>
+                        <button
+                          type="button"
+                          className="face-image-btn"
+                          title="표정 이미지 업로드 또는 URL/base64 입력"
+                          aria-label={`${f.name || `표정 ${i + 1}`} 이미지 설정`}
+                          onClick={() => {
+                            setFaceImageDraft(f.iconUrl);
+                            setEditingFaceIndex(i);
+                          }}
+                        >
+                          {isSafeImageUrl(f.iconUrl) ? (
+                            <img
+                              className="char-avatar-img"
+                              src={f.iconUrl}
+                              alt=""
+                              width="44"
+                              height="44"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className="face-upload-placeholder">
+                              <UploadIcon />
+                            </span>
+                          )}
+                        </button>
                         <input
                           className="face-name-input"
                           aria-label="표정 이름"
@@ -292,48 +429,35 @@ export function CharacterPanel({
                             })
                           }
                         />
-                        <input
-                          className="face-url-input"
-                          aria-label="이미지 URL"
-                          placeholder="이미지 URL (https://…)"
-                          value={f.iconUrl}
-                          onChange={(e) =>
-                            change({
-                              ...draft,
-                              iconUrl: isDefault ? e.target.value : draft.iconUrl,
-                              faces: draft.faces.map((x, j) =>
-                                i === j ? { ...x, iconUrl: e.target.value } : x,
-                              ),
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="compact-btn"
-                          disabled={!f.iconUrl}
-                          aria-pressed={isDefault}
-                          title="기본 표정으로 지정"
-                          onClick={() => change({ ...draft, iconUrl: f.iconUrl })}
-                        >
-                          {isDefault ? '★ 기본' : '기본 지정'}
-                        </button>
-                        <button
-                          type="button"
-                          className="compact-btn danger ghost"
-                          title="표정 삭제 (기존 메시지 이미지는 유지)"
-                          onClick={() => {
-                            const faces = draft.faces.filter((_, j) => j !== i);
-                            change({
-                              ...draft,
-                              faces,
-                              iconUrl: isDefault
-                                ? faces[0]?.iconUrl || ''
-                                : draft.iconUrl,
-                            });
-                          }}
-                        >
-                          삭제
-                        </button>
+                        <div className="expression-row-actions">
+                          <button
+                            type="button"
+                            className="compact-btn"
+                            disabled={!f.iconUrl}
+                            aria-pressed={isDefault}
+                            title="기본 표정으로 지정"
+                            onClick={() => change({ ...draft, iconUrl: f.iconUrl })}
+                          >
+                            {isDefault ? '★ 기본' : '기본 지정'}
+                          </button>
+                          <button
+                            type="button"
+                            className="compact-btn danger ghost"
+                            title="표정 삭제 (기존 메시지 이미지는 유지)"
+                            onClick={() => {
+                              const faces = draft.faces.filter((_, j) => j !== i);
+                              change({
+                                ...draft,
+                                faces,
+                                iconUrl: isDefault
+                                  ? faces[0]?.iconUrl || ''
+                                  : draft.iconUrl,
+                              });
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -425,7 +549,146 @@ export function CharacterPanel({
           </form>
         </dialog>
       )}
+      {editingFaceIndex !== null && draft && (
+        <dialog
+          ref={faceDialogRef}
+          className="modal-dialog face-image-dialog"
+          onCancel={() => setEditingFaceIndex(null)}
+        >
+          <div className="modal-header">
+            <h2>표정 이미지 설정</h2>
+            <button
+              type="button"
+              className="ghost icon-btn"
+              aria-label="닫기"
+              onClick={() => setEditingFaceIndex(null)}
+            >
+              ×
+            </button>
+          </div>
+          <form
+            className="modal-body"
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                const validated = imageUrl(faceImageDraft);
+                if (!validated)
+                  throw Error('이미지를 업로드하거나 URL/base64를 입력해주세요.');
+                const target = draft.faces[editingFaceIndex];
+                const wasDefault = draft.iconUrl
+                  ? draft.iconUrl === target?.iconUrl
+                  : editingFaceIndex === 0;
+                change({
+                  ...draft,
+                  iconUrl: wasDefault ? validated : draft.iconUrl,
+                  faces: draft.faces.map((x, j) =>
+                    j === editingFaceIndex ? { ...x, iconUrl: validated } : x,
+                  ),
+                });
+                setEditingFaceIndex(null);
+              } catch (err) {
+                notifyError(err);
+              }
+            }}
+          >
+            <div className="face-image-preview-row">
+              <div className="face-image-preview-box">
+                {isSafeImageUrl(faceImageDraft) ? (
+                  <img src={faceImageDraft.trim()} alt="표정 미리보기" />
+                ) : (
+                  <UploadIcon />
+                )}
+              </div>
+              <div className="face-upload-controls">
+                <label className="button compact-btn">
+                  사진 파일 업로드
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon"
+                    hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        if (typeof reader.result === 'string') {
+                          const uploaded = reader.result;
+                          const target = draft.faces[editingFaceIndex];
+                          const wasDefault = draft.iconUrl
+                            ? draft.iconUrl === target?.iconUrl
+                            : editingFaceIndex === 0;
+                          change({
+                            ...draft,
+                            iconUrl: wasDefault ? uploaded : draft.iconUrl,
+                            faces: draft.faces.map((x, j) =>
+                              j === editingFaceIndex
+                                ? {
+                                  ...x,
+                                  name:
+                                    x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
+                                  iconUrl: uploaded,
+                                }
+                                : x,
+                            ),
+                          });
+                          setEditingFaceIndex(null);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <small className="muted-note">
+                  업로드한 사진은 base64 이미지로 저장됩니다.
+                </small>
+              </div>
+            </div>
+            <label className="stack-field">
+              <span>이미지 URL 또는 base64</span>
+              <textarea
+                rows={3}
+                placeholder="https://... 또는 data:image/png;base64,..."
+                value={faceImageDraft}
+                onChange={(e) => setFaceImageDraft(e.target.value)}
+              />
+            </label>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setEditingFaceIndex(null)}
+              >
+                취소
+              </button>
+              <button type="submit" className="primary">
+                적용
+              </button>
+            </div>
+          </form>
+        </dialog>
+      )}
     </section>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
   );
 }
 

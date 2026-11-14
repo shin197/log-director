@@ -1684,6 +1684,12 @@ code {
   margin-bottom: 10px;
 }
 
+.faces-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .faces-heading h2 {
   margin: 0;
   font-size: 13.5px;
@@ -1710,14 +1716,114 @@ code {
   border-color: var(--accent-border);
 }
 
-.face-name-input {
-  width: 140px;
+.expression-row.drop-before {
+  border-top-color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.expression-row.drop-after {
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.face-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  user-select: none;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
   flex-shrink: 0;
 }
 
-.face-url-input {
+.face-drag-handle:active {
+  cursor: grabbing;
+}
+
+.face-image-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  color: var(--text-muted);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.face-image-btn:hover {
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+}
+
+.face-image-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.face-upload-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.face-name-input {
   flex: 1;
-  min-width: 140px;
+  min-width: 120px;
+}
+
+.expression-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.face-image-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.face-image-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.face-image-preview-box {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.face-image-preview-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.face-upload-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .empty-inline {
