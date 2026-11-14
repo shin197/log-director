@@ -14,9 +14,10 @@ npm run dev
 터미널에 표시되는 로컬 주소를 브라우저에서 엽니다. 기본 주소는 `http://127.0.0.1:5173`입니다. 포트가 사용 중이면 실제 출력 주소를 확인하세요.
 
 ```sh
-npm run build       # 타입 검사 및 dist 생성
-npm test            # Node 내장 테스트 실행
-npm run format      # 기존 설정 범위 포맷
+npm run build          # 일반 빌드 (dist/ 에 assets 분리)
+npm run build:single   # 단일 HTML 빌드 (dist/index.html 1개 파일로 인라인 통합)
+npm test               # Node 내장 테스트 실행
+npm run format         # 기존 설정 범위 포맷
 npm run format:check
 ```
 
@@ -46,6 +47,7 @@ npm run format:check
 - [사용 기능과 단축키](docs/FEATURES.md)
 - [데이터 모델과 변경 규칙](docs/DATA_MODEL.md)
 - [개발 인수인계와 검증](docs/DEVELOPMENT.md)
+- [배포 및 빌드 가이드](docs/DEPLOYMENT.md)
 - [향후 개발 목록](docs/ROADMAP.md)
 - [에이전트 작업 지침](AGENTS.md)
 
