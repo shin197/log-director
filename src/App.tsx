@@ -10,7 +10,7 @@ import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
-import { compileQuery, moveBlocks, quoteValueIfNeeded, sanitizeLiveQuery } from './query';
+import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
 import { collectChannels } from './channels';
 import {
   addSceneForMessage,
@@ -217,9 +217,7 @@ function App() {
     setSceneBarOpen(true);
     if (existing) {
       setFocusSceneId(existing.id);
-      setNotice(
-        `이미 ‘${existing.name || '장면'}’ 장면이 등록된 메시지입니다. 우측 장면 바에서 이름을 수정하거나 삭제할 수 있습니다.`,
-      );
+      setNotice(`‘${existing.name || '장면'}’ 장면 이름을 편집합니다.`);
       return;
     }
     if (added) {
@@ -229,14 +227,6 @@ function App() {
         `‘${added.name}’ 장면을 등록했습니다. 우측 장면 바에서 이름을 수정하세요.`,
       );
     }
-  }
-
-  function filterByScene(scene: Scene) {
-    selectionAnchor.current = null;
-    setSearchActive(true);
-    setQuery(`scene:${quoteValueIfNeeded(scene.name || '장면')}`);
-    setPage(0);
-    setNotice(`‘${scene.name || '장면'}’ 장면 구간을 필터링합니다.`);
   }
 
   function resetInteraction() {
@@ -1234,7 +1224,6 @@ function App() {
             bookmarkMessage(targetId);
           }}
           onSelectScene={(scene) => jumpToScene(scene)}
-          onFilterScene={(scene) => filterByScene(scene)}
           onRenameScene={(sceneId, name) =>
             commit({
               ...p,

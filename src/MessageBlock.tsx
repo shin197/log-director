@@ -10,6 +10,7 @@ import { applyBulkReplacedText, type BulkEditState } from './bulkEdit';
 import { BulkTextEditor } from './BulkTextEditor';
 import { handleWrapKeyDown } from './textEdit';
 import { isSafeImageUrl } from './importFormats';
+import { BookmarkRibbon } from './BookmarkRibbon';
 
 export type BulkEditContext = {
   count: number;
@@ -263,22 +264,6 @@ export function MessageBlock({
           >
             이 곳에 붙여넣기
           </button>
-        </div>
-      )}
-      {scene && (
-        <div
-          className="scene-bookmark-row"
-          onClick={(e) => {
-            if (onBookmark) {
-              e.stopPropagation();
-              onBookmark();
-            }
-          }}
-        >
-          <span className="scene-bookmark-badge" title="장면 바에서 이름 편집">
-            <span className="scene-star-icon">★</span>
-            <span>{scene.name || '이름 없는 장면'}</span>
-          </span>
         </div>
       )}
       {!isSystem && (
@@ -660,7 +645,21 @@ export function MessageBlock({
                 onJump();
               }}
             >
-              위치 이동 ↗
+              이동↗
+            </button>
+          )}
+          {!cutMode && (
+            <button
+              type="button"
+              className="message-edit-trigger"
+              title="메시지 편집 (더블클릭)"
+              aria-label="메시지 편집"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+              }}
+            >
+              편집
             </button>
           )}
           {!cutMode && onBookmark && (
@@ -679,21 +678,11 @@ export function MessageBlock({
                 onBookmark();
               }}
             >
-              ★
-            </button>
-          )}
-          {!cutMode && (
-            <button
-              type="button"
-              className="message-edit-trigger"
-              title="메시지 편집 (더블클릭)"
-              aria-label="메시지 편집"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditing(true);
-              }}
-            >
-              편집
+              {scene ? (
+                <BookmarkRibbon className="message-bookmark-ribbon">★</BookmarkRibbon>
+              ) : (
+                '★'
+              )}
             </button>
           )}
         </div>

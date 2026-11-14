@@ -812,7 +812,7 @@ code {
   background: rgba(77, 184, 154, 0.04);
 }
 
-.log-message.is-cut > :not(.paste-indicator) {
+.log-message.is-cut> :not(.paste-indicator) {
   opacity: 0.42;
 }
 
@@ -962,24 +962,37 @@ code {
   right: 10px;
   top: 7px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
+  pointer-events: none;
+}
+
+.message-edit-trigger,
+.message-jump,
+.message-bookmark-trigger:not(.is-bookmarked) {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
 }
 
-.log-message:hover .message-hover-actions,
-.log-message:focus-within .message-hover-actions,
-.log-message.has-jump .message-hover-actions,
-.log-message.selected .message-hover-actions {
+.log-message:hover .message-edit-trigger,
+.log-message:hover .message-jump,
+.log-message:hover .message-bookmark-trigger,
+.log-message:focus-within .message-edit-trigger,
+.log-message:focus-within .message-jump,
+.log-message:focus-within .message-bookmark-trigger,
+.log-message.has-jump .message-edit-trigger,
+.log-message.has-jump .message-jump,
+.log-message.has-jump .message-bookmark-trigger,
+.log-message.selected .message-edit-trigger,
+.log-message.selected .message-jump,
+.log-message.selected .message-bookmark-trigger {
   opacity: 1;
   pointer-events: auto;
 }
 
 .message-edit-trigger,
-.message-jump,
-.message-bookmark-trigger {
+.message-jump {
   padding: 3px 8px;
   font-size: 11.5px;
   background: var(--bg-elevated);
@@ -987,63 +1000,81 @@ code {
 }
 
 .message-bookmark-trigger {
+  width: 22px;
+  height: 22px;
+  padding-top: 3px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #f5c542;
   font-size: 13px;
   line-height: 1;
-  padding: 3px 7px;
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
 }
 
-.message-bookmark-trigger:hover {
+.message-bookmark-trigger:not(.is-bookmarked):hover {
   border-color: rgba(245, 197, 66, 0.55);
-  background: rgba(245, 197, 66, 0.12);
+  /* background: rgba(245, 197, 66, 0.12); */
 }
 
 .message-bookmark-trigger.is-bookmarked {
-  border-color: rgba(245, 197, 66, 0.65);
-  background: rgba(245, 197, 66, 0.16);
-  color: #ffd452;
+  width: 22px;
+  height: 34px;
+  margin-top: -10px;
+  margin-left: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.log-message.has-scene {
-  box-shadow: inset 3px 0 0 #f5c542;
-  background: rgba(245, 197, 66, 0.025);
+.message-bookmark-trigger.is-bookmarked:hover {
+  background: transparent;
+  border-color: transparent;
 }
 
-.log-message.has-scene.selected {
-  background: var(--bg-selected);
-  box-shadow:
-    inset 3px 0 0 #f5c542,
-    inset 6px 0 0 var(--accent);
-}
-
-.scene-bookmark-row {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  margin-bottom: -4px;
-}
-
-.log-message.system .scene-bookmark-row {
-  margin-bottom: 5px;
-}
-
-.scene-bookmark-badge {
+.bookmark-ribbon {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  background: rgba(245, 197, 66, 0.14);
-  border: 1px solid rgba(245, 197, 66, 0.4);
-  color: #ffd452;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
+  justify-content: center;
+  box-sizing: border-box;
+  color: #f5ba00;
+  line-height: 1;
+  user-select: none;
 }
 
-.scene-bookmark-badge:hover {
-  background: rgba(245, 197, 66, 0.22);
-  border-color: rgba(245, 197, 66, 0.65);
+.bookmark-ribbon-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+.bookmark-ribbon-content {
+  position: relative;
+  z-index: 1;
+  color: #6b4c00;
+  font-weight: 700;
+}
+
+.message-bookmark-ribbon {
+  width: 100%;
+  height: 100%;
+  padding-bottom: 5px;
+  font-size: 13px;
+}
+
+.message-bookmark-trigger.is-bookmarked:hover .bookmark-ribbon {
+  color: #ffd454;
 }
 
 .scene-star-icon {
@@ -1124,7 +1155,7 @@ code {
   color: var(--text-secondary);
 }
 
-.bulk-replace-summary > span {
+.bulk-replace-summary>span {
   margin-right: auto;
 }
 
@@ -1867,7 +1898,7 @@ code {
   gap: 8px;
 }
 
-.field-inline > input {
+.field-inline>input {
   flex: 1;
   min-width: 0;
 }
@@ -2108,7 +2139,7 @@ code {
   flex-wrap: wrap;
 }
 
-.settings-row > .stack-field {
+.settings-row>.stack-field {
   flex: 1 1 200px;
 }
 
@@ -2156,7 +2187,7 @@ code {
   flex-wrap: wrap;
 }
 
-.original-box-head > div:first-child {
+.original-box-head>div:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2496,7 +2527,7 @@ dialog::backdrop {
   animation: toast-fade 6.5s linear forwards;
 }
 
-.error-toast > div {
+.error-toast>div {
   flex: 1;
   min-width: 0;
 }
@@ -2522,6 +2553,7 @@ dialog::backdrop {
 }
 
 @keyframes toast-fade {
+
   0%,
   25% {
     opacity: 1;
@@ -2697,14 +2729,47 @@ dialog::backdrop {
 .scene-card-top {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  min-height: 26px;
 }
 
-.scene-index-badge {
-  font-size: 11px;
-  font-weight: 700;
-  color: #f5c542;
+.scene-index-ribbon-btn {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: -10px;
+  cursor: pointer;
+}
+
+.scene-index-ribbon-btn:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.scene-index-ribbon-btn:hover .bookmark-ribbon {
+  color: #ffca28;
+}
+
+.scene-index-ribbon {
+  min-width: 26px;
+  height: 34px;
+  padding: 0 5px 6px;
+  font-size: 11.5px;
+}
+
+.scene-name-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 4px;
 }
 
 .scene-name-input {
@@ -2714,6 +2779,13 @@ dialog::backdrop {
   padding: 2px 6px;
   font-size: 12.5px;
   font-weight: 600;
+}
+
+.scene-save-btn {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  flex-shrink: 0;
 }
 
 .scene-filter-btn,
