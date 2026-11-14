@@ -1913,6 +1913,61 @@ dialog::backdrop {
   margin-top: 4px;
 }
 
+/* Restore Dialog */
+.restore-dialog {
+  width: min(390px, 92vw);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px 18px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.7);
+}
+
+.restore-dialog-body {
+  margin-bottom: 20px;
+}
+
+.restore-dialog-title {
+  margin: 0 0 6px 0;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.restore-dialog-desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.restore-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.restore-cancel-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.restore-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+}
+
+.restore-confirm-btn {
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .export-dialog {
   width: 94vw;
   max-width: 1400px;

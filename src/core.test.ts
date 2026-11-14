@@ -819,3 +819,88 @@ test('채널 집계: 기본 채널 유지, 메시지 수 카운트, 빈 커스�
     { name: '메인', count: 0, isDefault: true },
   ]);
 });
+
+import {
+  formatRelativeTime,
+  isMeaningfulProject,
+  saveAutosave,
+  loadAutosave,
+  clearAutosave,
+} from './storage.ts';
+test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, 스토리지 저장 및 복원', () => {
+  const baseTime = 1700000000000;
+  assert.equal(formatRelativeTime(baseTime, baseTime + 20_000), '방금 전');
+  assert.equal(formatRelativeTime(baseTime, baseTime + 5 * 60_000), '5분 전');
+  assert.equal(formatRelativeTime(baseTime, baseTime + 2 * 3600_000), '2시간 전');
+  assert.equal(formatRelativeTime(baseTime, baseTime + 3 * 86400_000), '3일 전');
+
+  // 유의미한 프로젝트 판별: 빈 프로젝트는 저장하지 않음
+  assert.equal(
+    isMeaningfulProject({
+      format: 'log-studio',
+      version: 1,
+      title: '새 로그',
+      original: null,
+      blocks: [],
+    }),
+    false,
+  );
+  assert.equal(
+    isMeaningfulProject({
+      format: 'log-studio',
+      version: 1,
+      title: '제목 있는 로그',
+      original: null,
+      blocks: [],
+    }),
+    true,
+  );
+  assert.equal(
+    isMeaningfulProject({
+      format: 'log-studio',
+      version: 1,
+      title: '새 로그',
+      original: { name: 'sample.json', raw: '{}' },
+      blocks: [],
+    }),
+    true,
+  );
+
+  // mock localStorage 설정 후 저장 및 복원 검증
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => store.set(k, v),
+    removeItem: (k: string) => store.delete(k),
+  };
+
+  const sampleProject = {
+    format: 'log-studio' as const,
+    version: 1 as const,
+    title: '테스트 세션',
+    original: null,
+    blocks: [
+      {
+        id: 'b1',
+        speaker: 'GM',
+        text: '세션 시작',
+        diceResult: '',
+        sourceType: 'normal',
+      },
+    ],
+  };
+
+  clearAutosave();
+  assert.equal(loadAutosave(), null);
+
+  assert.equal(saveAutosave(sampleProject, baseTime), true);
+  const loaded = loadAutosave();
+  assert.ok(loaded);
+  assert.equal(loaded.savedAt, baseTime);
+  assert.equal(loaded.project.title, '테스트 세션');
+  assert.equal(loaded.project.blocks.length, 1);
+  assert.equal(loaded.project.blocks[0].text, '세션 시작');
+
+  clearAutosave();
+  assert.equal(loadAutosave(), null);
+});

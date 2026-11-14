@@ -14,6 +14,13 @@ import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
 import { collectChannels } from './channels';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { SearchBar } from './SearchBar';
+import { RestoreDialog } from './RestoreDialog';
+import {
+  isMeaningfulProject,
+  loadAutosave,
+  saveAutosave,
+  type AutosavePayload,
+} from './storage';
 import {
   applyBulkEditToProject,
   applyBulkPatch,
@@ -66,6 +73,35 @@ function App() {
   );
   const [eyedrop, setEyedrop] = useState<EyedropPayload | null>(null);
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
+  const [pendingRestore, setPendingRestore] = useState<AutosavePayload | null>(() => {
+    return loadAutosave();
+  });
+
+  // 프로젝트 변경 시 디바운스 자동 보관
+  useEffect(() => {
+    if (!isMeaningfulProject(p)) return;
+    const timer = setTimeout(() => {
+      saveAutosave(p);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [p]);
+
+  function handleConfirmRestore() {
+    if (!pendingRestore) return;
+    setP(pendingRestore.project);
+    setPast([]);
+    setFuture([]);
+    resetInteraction();
+    setQuery('');
+    setSearchActive(false);
+    setPage(0);
+    setNotice('이전 작업을 복원했습니다.');
+    setPendingRestore(null);
+  }
+
+  function handleCancelRestore() {
+    setPendingRestore(null);
+  }
 
   const commit = (next: Project) => {
     setPast((x) => [...x, p].slice(-100));
@@ -596,6 +632,13 @@ function App() {
         </div>
       </header>
 
+      {pendingRestore && (
+        <RestoreDialog
+          autosave={pendingRestore}
+          onConfirm={handleConfirmRestore}
+          onCancel={handleCancelRestore}
+        />
+      )}
       {exportOpen && <ExportDialog project={p} onClose={() => setExportOpen(false)} />}
       {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
       {tab === '설정' && (
