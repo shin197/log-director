@@ -39,7 +39,7 @@ export type ImportManagerOptions = {
 export const DEFAULT_IMPORT_OPTIONS: ImportManagerOptions = {
   mode: 'append',
   targetSceneId: '',
-  registerScenes: false,
+  registerScenes: true,
   mergeCharacters: true,
   skipBoundaryDuplicates: true,
 };
@@ -257,9 +257,9 @@ export const mergeImportedLogs = (
   // Clone base characters
   const nextCharacters: Character[] = baseIsMeaningful
     ? (baseProject.characters ?? []).map((c) => ({
-        ...c,
-        faces: (c.faces ?? []).map((f) => ({ ...f })),
-      }))
+      ...c,
+      faces: (c.faces ?? []).map((f) => ({ ...f })),
+    }))
     : [systemCharacter()];
 
   const charByName = new Map<string, Character>();

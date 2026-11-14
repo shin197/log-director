@@ -119,12 +119,12 @@ export function ImportDialog({
   const totalMessages = items.reduce((sum, item) => sum + item.project.blocks.length, 0);
   const modeSummary =
     options.mode === 'insert-scene'
-      ? '선택한 장면 앞에 삽입'
+      ? '선택한 장면 앞에 삽입합니다.'
       : options.mode === 'interleave'
-        ? '타임스탬프 기준 시간순 교차 정렬'
+        ? '타임스탬프 기준 시간순 교차 정렬합니다.'
         : hasExistingProject
-          ? '현재 타임라인 맨 뒤에 추가'
-          : '목록 순서대로 새 로그 생성';
+          ? '현재 타임라인 맨 뒤에 추가합니다.'
+          : '목록 순서대로 새 로그 생성합니다.';
 
   return (
     <dialog
@@ -226,9 +226,8 @@ export function ImportDialog({
                         key={item.id}
                         role="listitem"
                         draggable
-                        className={`import-file-card ${isDragging ? 'dragging' : ''} ${
-                          isDragOver ? 'drag-over' : ''
-                        }`}
+                        className={`import-file-card ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''
+                          }`}
                         onDragStart={(e) => {
                           setDragIndex(idx);
                           e.dataTransfer.effectAllowed = 'move';
@@ -334,9 +333,8 @@ export function ImportDialog({
               </label>
 
               <label
-                className={`format-option ${
-                  options.mode === 'insert-scene' ? 'active' : ''
-                } ${scenes.length === 0 ? 'disabled' : ''}`}
+                className={`format-option ${options.mode === 'insert-scene' ? 'active' : ''
+                  } ${scenes.length === 0 ? 'disabled' : ''}`}
               >
                 <input
                   type="radio"
@@ -411,9 +409,9 @@ export function ImportDialog({
                 }
               />
               <span>
-                <strong>각 파일 시작점에 장면(북마크) 등록하기</strong>
+                <strong>파일 시작점에 장면 등록</strong>
                 <small>
-                  각 파일 첫 메시지에 파일 이름으로 장면 북마크를 자동 등록합니다.
+                  각 파일 첫 메시지에 장면 북마크를 등록합니다.
                 </small>
               </span>
             </label>
@@ -426,7 +424,7 @@ export function ImportDialog({
                 }
               />
               <span>
-                <strong>동일 캐릭터 및 표정 목록 병합하기</strong>
+                <strong>동일 캐릭터 병합</strong>
                 <small>
                   이름이 같은 캐릭터를 하나로 통합하고 새 표정을 표정 목록에 자동
                   추가합니다.
@@ -447,7 +445,7 @@ export function ImportDialog({
               <span>
                 <strong>파일 경계선의 중복 메시지 건너뛰기</strong>
                 <small>
-                  연속된 두 파일의 경계에서 화자와 본문이 일치하는 중복 메시지를
+                  연속된 두 파일의 경계에서 겹치는 메시지를
                   걸러냅니다.
                 </small>
               </span>
@@ -457,9 +455,6 @@ export function ImportDialog({
       </div>
 
       <footer className="export-footer">
-        <span className="muted-note">
-          {modeSummary} · 적용 후 Ctrl+Z로 한 번에 되돌릴 수 있습니다.
-        </span>
         <div className="export-footer-actions">
           <button type="button" className="ghost" onClick={onClose}>
             취소
