@@ -2100,6 +2100,66 @@ dialog::backdrop {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.export-filter-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.export-extra-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 2px 4px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+}
+
+.mb-led-btn-primary {
+  background: #2196f3;
+  border-color: #2196f3;
+  color: #fff;
+}
+
+.mb-led-btn-primary:hover {
+  background: #1976d2;
+  border-color: #1976d2;
+}
+
+.mb-led-btn-txt {
+  background: #2e7d32;
+  border-color: #2e7d32;
+  color: #fff;
+}
+
+.mb-led-btn-txt:hover {
+  background: #1b5e20;
+  border-color: #1b5e20;
+}
+
+.mb-led-btn-json {
+  background: #ef6c00;
+  border-color: #ef6c00;
+  color: #fff;
+}
+
+.mb-led-btn-json:hover {
+  background: #e65100;
+  border-color: #e65100;
+}
+
+.mb-led-btn-md {
+  background: #7b1fa2;
+  border-color: #7b1fa2;
+  color: #fff;
+}
+
+.mb-led-btn-md:hover {
+  background: #6a1b9a;
+  border-color: #6a1b9a;
+}
+
 .export-heading-left {
   display: flex;
   align-items: center;

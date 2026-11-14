@@ -1042,3 +1042,92 @@ test('imageUrl allows safe data:image base64 and HTML export deduplicates identi
   assert.equal(reparsed.blocks[0]?.iconUrl, dataUri);
   assert.equal(reparsed.blocks[1]?.iconUrl, dataUri);
 });
+
+test('내보내기 옵션(검색 필터, 시스템 채널 표시, Base64 인코딩) 및 4종 포맷 왕복 파싱', () => {
+  const dataUri =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const extUrl = 'https://example.com/avatar.png';
+
+  const proj = parse(
+    JSON.stringify({
+      title: '왕복 테스트 세션',
+      messages: [
+        {
+          type: 'system',
+          channelName: '메인',
+          timestamp: '2026. 10. 20. 오후 08:00:00',
+          text: '세션 시작 안내',
+        },
+        {
+          type: 'normal',
+          speaker: '몰토',
+          color: '#b8342c',
+          iconUrl: extUrl,
+          channelName: '잡담',
+          timestamp: '2026. 10. 20. 오후 08:01:00',
+          text: '안녕하세요',
+          diceResult: '(1B8) ＞ 8 ＞ 🎲S=8 강성공',
+        },
+        {
+          type: 'normal',
+          speaker: '몰토',
+          color: '#b8342c',
+          iconUrl: extUrl,
+          channelName: '메인',
+          timestamp: '2026. 10. 20. 오후 08:02:00',
+          text: '메인 대사입니다',
+        },
+      ],
+    }),
+    'roundtrip.json',
+  );
+
+  // 1) 4개 포맷(html, txt, json, md) 모두 내보내기 후 다시 parse() 왕복 검증
+  for (const fmt of ['html', 'txt', 'json', 'md'] as const) {
+    const out = exportLog(proj, fmt);
+    const re = parse(out, `out.${fmt}`);
+    assert.equal(re.title, '왕복 테스트 세션');
+    assert.equal(re.blocks.length, 3);
+    assert.equal(re.blocks[0]?.sourceType, 'system');
+    assert.equal(re.blocks[0]?.channel, '메인');
+    assert.equal(re.blocks[0]?.text, '세션 시작 안내');
+    assert.equal(re.blocks[1]?.speaker, '몰토');
+    assert.equal(re.blocks[1]?.channel, '잡담');
+    assert.equal(re.blocks[1]?.timestamp, '2026. 10. 20. 오후 08:01:00');
+    assert.equal(re.blocks[1]?.text, '안녕하세요');
+    assert.equal(re.blocks[1]?.diceResult, '(1B8) ＞ 8 ＞ 🎲S=8 강성공');
+  }
+
+  // 2) 검색 필터(query) 적용 내보내기
+  const filteredMd = exportLog(proj, 'md', { query: 'in:잡담' });
+  const parsedFiltered = parse(filteredMd, 'filtered.md');
+  assert.equal(parsedFiltered.blocks.length, 1);
+  assert.equal(parsedFiltered.blocks[0]?.channel, '잡담');
+
+  // 3) 시스템 메시지 채널 비표시(showSystemChannel: false)
+  for (const fmt of ['html', 'txt', 'json', 'md'] as const) {
+    const outNoSysCh = exportLog(proj, fmt, { showSystemChannel: false });
+    const reNoSysCh = parse(outNoSysCh, `nosys.${fmt}`);
+    assert.equal(reNoSysCh.blocks[0]?.channel, '');
+    assert.equal(reNoSysCh.blocks[1]?.channel, '잡담');
+  }
+
+  // 4) URL 이미지 Base64 인코딩(encodeBase64: true) 시 HTML CSS 및 JSON images 맵 중복 제거
+  const urlMap = { [extUrl]: dataUri };
+  const htmlB64 = exportLog(proj, 'html', { encodeBase64: true, urlToBase64: urlMap });
+  assert.equal(htmlB64.split(dataUri).length - 1, 1);
+  assert.ok(!htmlB64.includes(extUrl));
+  const reHtmlB64 = parse(htmlB64, 'b64.html');
+  assert.equal(reHtmlB64.blocks[1]?.iconUrl, dataUri);
+  assert.equal(reHtmlB64.blocks[2]?.iconUrl, dataUri);
+
+  const jsonB64 = exportLog(proj, 'json', { encodeBase64: true, urlToBase64: urlMap });
+  assert.equal(jsonB64.split(dataUri).length - 1, 1);
+  const parsedJsonObj = JSON.parse(jsonB64);
+  assert.ok(parsedJsonObj.images && Object.keys(parsedJsonObj.images).length === 1);
+  assert.equal(parsedJsonObj.messages[1].iconUrl, undefined);
+  assert.ok(typeof parsedJsonObj.messages[1].iconImage === 'string');
+  const reJsonB64 = parse(jsonB64, 'b64.json');
+  assert.equal(reJsonB64.blocks[1]?.iconUrl, dataUri);
+  assert.equal(reJsonB64.blocks[2]?.iconUrl, dataUri);
+});

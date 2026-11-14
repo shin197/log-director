@@ -263,11 +263,21 @@ export function parseMarkdownLog(
           quoteLines[0] = quoteLines[0].slice(chPrefix[0].length);
         }
       }
+      const textLines: string[] = [];
+      const diceLines: string[] = [];
+      for (const qLine of quoteLines) {
+        const diceMatch = qLine.match(/^`(.+)`$/);
+        if (diceMatch && qLine.includes('＞')) {
+          diceLines.push(unescapeMarkdown(diceMatch[1]));
+        } else {
+          textLines.push(unescapeMarkdown(qLine));
+        }
+      }
       blocks.push({
         id: crypto.randomUUID(),
         sourceIndex: blocks.length,
-        text: quoteLines.map(unescapeMarkdown).join('\n'),
-        diceResult: '',
+        text: textLines.join('\n'),
+        diceResult: diceLines.join('\n'),
         color: '',
         iconUrl: '',
         timestamp: '',
@@ -294,22 +304,28 @@ export function parseMarkdownLog(
       }
 
       i++;
-      const textLines: string[] = [];
-      const diceLines: string[] = [];
-
+      const bodyLines: string[] = [];
       while (i < lines.length) {
         const nextLine = lines[i];
-        if (!nextLine.trim()) break;
         if (nextLine.startsWith('>') || mdHeaderRe.test(nextLine)) {
           break;
         }
+        bodyLines.push(nextLine);
+        i++;
+      }
+
+      while (bodyLines.length && !bodyLines[0].trim()) bodyLines.shift();
+      while (bodyLines.length && !bodyLines[bodyLines.length - 1].trim()) bodyLines.pop();
+
+      const textLines: string[] = [];
+      const diceLines: string[] = [];
+      for (const nextLine of bodyLines) {
         const diceMatch = nextLine.match(/^`(.+)`$/);
-        if (diceMatch && nextLine.includes('＞')) {
+        if (diceMatch) {
           diceLines.push(unescapeMarkdown(diceMatch[1]));
         } else {
           textLines.push(unescapeMarkdown(nextLine));
         }
-        i++;
       }
 
       blocks.push({
@@ -403,7 +419,7 @@ export function parseTxtLog(
     const textLines: string[] = [];
     const diceLines: string[] = [];
     for (const bodyLine of bodyLines) {
-      if (bodyLine.includes('＞') && /^\(.+\)\s*＞/.test(bodyLine.trim())) {
+      if (bodyLine.includes('＞')) {
         diceLines.push(bodyLine.trim());
       } else {
         textLines.push(bodyLine);
