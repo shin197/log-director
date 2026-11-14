@@ -63,6 +63,40 @@ export const blank = (): Project => ({
   blocks: [],
   characters: [systemCharacter()],
 });
+export function validateLogStudioProject(d: any): Project {
+  if (
+    !d ||
+    d.format !== 'log-studio' ||
+    d.version !== 1 ||
+    typeof d.title !== 'string' ||
+    !Array.isArray(d.blocks) ||
+    !d.blocks.every(
+      (b: any) =>
+        typeof b.id === 'string' &&
+        typeof b.text === 'string' &&
+        (typeof b.speaker === 'string' ||
+          (b.speaker == null && b.sourceType === 'system')) &&
+        typeof b.diceResult === 'string',
+    ) ||
+    new Set(d.blocks.map((b: any) => b.id)).size !== d.blocks.length ||
+    !Array.isArray(d.original) ||
+    !d.original.every(
+      (o: any) => o && typeof o.raw === 'string' && typeof o.name === 'string',
+    ) ||
+    (d.images !== undefined &&
+      (!d.images ||
+        typeof d.images !== 'object' ||
+        Array.isArray(d.images) ||
+        !Object.values(d.images).every((v: unknown) => typeof v === 'string')))
+  )
+    throw Error('프로젝트 구조를 확인해주세요.');
+  const migrated = migrateCharacters(d);
+  if (Array.isArray(d.scenes)) {
+    migrated.scenes = normalizeScenes(d.scenes, migrated.blocks);
+  }
+  return normalizeProjectImagePool(migrated);
+}
+
 export function parse(raw: string, name: string): Project {
   const cleaned = raw.replace(/^\uFEFF/, '');
   const trimmed = cleaned.trimStart();
@@ -121,35 +155,7 @@ export function parse(raw: string, name: string): Project {
 
   const d = JSON.parse(cleaned);
   if (d.format === 'log-studio') {
-    if (
-      d.version !== 1 ||
-      typeof d.title !== 'string' ||
-      !Array.isArray(d.blocks) ||
-      !d.blocks.every(
-        (b: any) =>
-          typeof b.id === 'string' &&
-          typeof b.text === 'string' &&
-          (typeof b.speaker === 'string' ||
-            (b.speaker == null && b.sourceType === 'system')) &&
-          typeof b.diceResult === 'string',
-      ) ||
-      new Set(d.blocks.map((b: any) => b.id)).size !== d.blocks.length ||
-      !Array.isArray(d.original) ||
-      !d.original.every(
-        (o: any) => o && typeof o.raw === 'string' && typeof o.name === 'string',
-      ) ||
-      (d.images !== undefined &&
-        (!d.images ||
-          typeof d.images !== 'object' ||
-          Array.isArray(d.images) ||
-          !Object.values(d.images).every((v: unknown) => typeof v === 'string')))
-    )
-      throw Error('프로젝트 구조를 확인해주세요.');
-    const migrated = migrateCharacters(d);
-    if (Array.isArray(d.scenes)) {
-      migrated.scenes = normalizeScenes(d.scenes, migrated.blocks);
-    }
-    return normalizeProjectImagePool(migrated);
+    return validateLogStudioProject(d);
   }
   if (!Array.isArray(d.messages)) throw Error('messages 배열을 가진 JSON이 필요합니다.');
   const imagesMap =

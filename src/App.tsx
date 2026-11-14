@@ -97,15 +97,27 @@ function App() {
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
   const [sceneBarOpen, setSceneBarOpen] = useState(true);
   const [focusSceneId, setFocusSceneId] = useState<string | null>(null);
-  const [pendingRestore, setPendingRestore] = useState<AutosavePayload | null>(() => {
-    return loadAutosave();
-  });
+  const [pendingRestore, setPendingRestore] = useState<AutosavePayload | null>(null);
+  const pRef = useRef(p);
+  pRef.current = p;
 
-  // 프로젝트 변경 시 디바운스 자동 보관
+  useEffect(() => {
+    let cancelled = false;
+    void loadAutosave().then((loaded) => {
+      if (cancelled || !loaded) return;
+      if (isMeaningfulProject(pRef.current)) return;
+      setPendingRestore(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 프로젝트 변경 시 디바운스 자동 보관 (IndexedDB)
   useEffect(() => {
     if (!isMeaningfulProject(p)) return;
     const timer = setTimeout(() => {
-      saveAutosave(p);
+      void saveAutosave(p);
     }, 800);
     return () => clearTimeout(timer);
   }, [p]);

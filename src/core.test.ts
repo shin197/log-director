@@ -855,7 +855,75 @@ import {
   loadAutosave,
   clearAutosave,
 } from './storage.ts';
-test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, 스토리지 저장 및 복원', () => {
+function createMockIndexedDB() {
+  const stores = new Map<string, Map<string, unknown>>();
+  return {
+    open(_name: string, _version?: number) {
+      const req: any = {
+        result: null,
+        error: null,
+        onupgradeneeded: null,
+        onsuccess: null,
+        onerror: null,
+      };
+      const db: any = {
+        objectStoreNames: {
+          contains: (storeName: string) => stores.has(storeName),
+        },
+        createObjectStore: (storeName: string) => {
+          if (!stores.has(storeName)) stores.set(storeName, new Map());
+        },
+        transaction: (storeName: string) => {
+          const map = stores.get(storeName) ?? new Map<string, unknown>();
+          stores.set(storeName, map);
+          const tx: any = { oncomplete: null, onerror: null, onabort: null };
+          const scheduleComplete = () =>
+            queueMicrotask(() => {
+              tx.oncomplete?.();
+            });
+          return {
+            objectStore: () => ({
+              get: (key: string) => {
+                const getReq: any = { result: undefined, onsuccess: null, onerror: null };
+                queueMicrotask(() => {
+                  getReq.result = map.get(key);
+                  getReq.onsuccess?.();
+                });
+                return getReq;
+              },
+              put: (val: unknown, key: string) => {
+                map.set(key, val);
+                scheduleComplete();
+              },
+              delete: (key: string) => {
+                map.delete(key);
+                scheduleComplete();
+              },
+            }),
+            set oncomplete(fn: any) {
+              tx.oncomplete = fn;
+            },
+            set onerror(fn: any) {
+              tx.onerror = fn;
+            },
+            set onabort(fn: any) {
+              tx.onabort = fn;
+            },
+          };
+        },
+        close: () => {},
+      };
+      req.result = db;
+      queueMicrotask(() => {
+        req.onupgradeneeded?.();
+        req.onsuccess?.();
+      });
+      return req;
+    },
+  };
+}
+
+test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, IndexedDB 저장 및 복원', async () => {
   const baseTime = 1700000000000;
   assert.equal(formatRelativeTime(baseTime, baseTime + 20_000), '방금 전');
   assert.equal(formatRelativeTime(baseTime, baseTime + 5 * 60_000), '5분 전');
@@ -894,13 +962,14 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
     true,
   );
 
-  // mock localStorage 설정 후 저장 및 복원 검증
-  const store = new Map<string, string>();
+  // mock IndexedDB + localStorage 설정 후 저장 및 복원 검증
+  const legacyStore = new Map<string, string>();
   (globalThis as any).localStorage = {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => store.set(k, v),
-    removeItem: (k: string) => store.delete(k),
+    getItem: (k: string) => legacyStore.get(k) ?? null,
+    setItem: (k: string, v: string) => legacyStore.set(k, v),
+    removeItem: (k: string) => legacyStore.delete(k),
   };
+  (globalThis as any).indexedDB = createMockIndexedDB();
 
   const sampleProject = {
     format: 'log-studio' as const,
@@ -918,30 +987,34 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
     ],
   };
 
-  clearAutosave();
-  assert.equal(loadAutosave(), null);
+  await clearAutosave();
+  assert.equal(await loadAutosave(), null);
 
-  assert.equal(saveAutosave(sampleProject, baseTime), true);
-  const loaded = loadAutosave();
+  assert.equal(await saveAutosave(sampleProject, baseTime), true);
+  const loaded = await loadAutosave();
   assert.ok(loaded);
   assert.equal(loaded.savedAt, baseTime);
   assert.equal(loaded.project.title, '테스트 세션');
   assert.equal(loaded.project.blocks.length, 1);
   assert.equal(loaded.project.blocks[0].text, '세션 시작');
 
-  clearAutosave();
-  assert.equal(loadAutosave(), null);
+  await clearAutosave();
+  assert.equal(await loadAutosave(), null);
 
-  // 5MB 이상 대용량 프로젝트는 localStorage 자동저장을 건너뜀
+  // 5MB 이상 대용량 프로젝트도 IndexedDB에서는 정상 자동저장 및 복원 가능
   const oversizedProject = {
     format: 'log-studio' as const,
     version: 1 as const,
     title: '대용량 테스트',
-    original: [{ name: 'big.json', raw: 'x'.repeat(3 * 1024 * 1024) }],
+    original: [{ name: 'big.json', raw: 'x'.repeat(6 * 1024 * 1024) }],
     blocks: [],
   };
-  assert.equal(saveAutosave(oversizedProject, baseTime), false);
-  assert.equal(loadAutosave(), null);
+  assert.equal(await saveAutosave(oversizedProject, baseTime), true);
+  const loadedOversized = await loadAutosave();
+  assert.ok(loadedOversized);
+  assert.equal(loadedOversized.project.title, '대용량 테스트');
+
+  await clearAutosave();
 });
 
 import fs from 'node:fs';
@@ -1440,7 +1513,8 @@ test('불러오기 매니저: 파일 순서 이동, 이어붙이기(Append/Inser
   );
 });
 
-test('내부 이미지 풀: oversized_json 중복 제거 직렬화, 미사용 이미지 정리, 5MB 자동저장 가드', () => {
+test('내부 이미지 풀: oversized_json 중복 제거 직렬화, 미사용 이미지 정리, IndexedDB 자동저장', async () => {
+  (globalThis as any).indexedDB = createMockIndexedDB();
   const oversizedRaw = fs.readFileSync('sample_log/oversized_json.json', 'utf8');
   const oversized = parse(oversizedRaw, 'oversized_json.json');
 
@@ -1455,11 +1529,15 @@ test('내부 이미지 풀: oversized_json 중복 제거 직렬화, 미사용 �
   const serialized = JSON.stringify(oversized);
   assert.ok(serialized.length < 20 * 1024 * 1024);
 
-  // project.json 왕복 및 자동저장 5MB 상한 가드 확인
+  // project.json 왕복 및 IndexedDB 대용량 자동저장/복원 확인
   const roundtrip = parse(serialized, 'oversized.project.json');
   assert.equal(roundtrip.blocks.length, 7108);
   assert.equal(Object.keys(roundtrip.images ?? {}).length, 50);
-  assert.equal(saveAutosave(oversized), false);
+  assert.equal(await saveAutosave(oversized), true);
+  const restored = await loadAutosave();
+  assert.ok(restored);
+  assert.equal(restored.project.blocks.length, 7108);
+  await clearAutosave();
 
   // 참조가 모두 사라진 이미지는 normalizeProjectImagePool에서 정리됨
   const pruned = normalizeProjectImagePool({

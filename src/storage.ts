@@ -1,43 +1,15 @@
-import { parse, type Project } from './core.ts';
+import { validateLogStudioProject, type Project } from './core.ts';
 
+export const AUTOSAVE_DB_NAME = 'log-studio';
+export const AUTOSAVE_DB_VERSION = 1;
+export const AUTOSAVE_STORE_NAME = 'autosave';
 export const AUTOSAVE_KEY = 'log-studio:autosave';
-export const AUTOSAVE_MAX_BYTES = 5 * 1024 * 1024;
 
 export type AutosavePayload = {
   version: 1;
   savedAt: number;
   project: Project;
 };
-
-export function estimateProjectByteSize(p: Project): number {
-  let bytes = (p.title?.length ?? 0) * 2 + 128;
-  for (const orig of p.original ?? []) {
-    bytes += (orig.name.length + orig.raw.length) * 2 + 32;
-  }
-  if (p.images) {
-    for (const [key, val] of Object.entries(p.images)) {
-      bytes += key.length + val.length + 16;
-    }
-  }
-  for (const c of p.characters ?? []) {
-    bytes += (c.name.length + c.iconUrl.length) * 2 + 96;
-    for (const f of c.faces ?? []) {
-      bytes += (f.name.length + f.iconUrl.length) * 2 + 32;
-    }
-  }
-  for (const b of p.blocks) {
-    bytes +=
-      (b.text.length +
-        b.diceResult.length +
-        (b.speaker?.length ?? 0) +
-        (b.iconUrl?.length ?? 0) +
-        (b.timestamp?.length ?? 0) +
-        (b.channel?.length ?? 0)) *
-        2 +
-      128;
-  }
-  return bytes;
-}
 
 export function isMeaningfulProject(p: Project): boolean {
   if (p.blocks.length > 0) return true;
@@ -64,49 +36,128 @@ export function formatRelativeTime(savedAt: number, now = Date.now()): string {
   return `${month}월 ${date}일`;
 }
 
-export function saveAutosave(p: Project, now = Date.now()): boolean {
+function openAutosaveDb(): Promise<IDBDatabase | null> {
+  const idb = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  if (!idb) return Promise.resolve(null);
+
+  return new Promise((resolve, reject) => {
+    const req = idb.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
+        db.createObjectStore(AUTOSAVE_STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB 열기 실패'));
+  });
+}
+
+async function idbGet(key: string): Promise<unknown> {
+  const db = await openAutosaveDb();
+  if (!db) return undefined;
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readonly');
+      const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error ?? new Error('IndexedDB 읽기 실패'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function idbPut(key: string, value: unknown): Promise<boolean> {
+  const db = await openAutosaveDb();
+  if (!db) return false;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+      store.put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('IndexedDB 쓰기 실패'));
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB 쓰기 중단'));
+    });
+    return true;
+  } finally {
+    db.close();
+  }
+}
+
+async function idbDelete(key: string): Promise<void> {
+  const db = await openAutosaveDb();
+  if (!db) return;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+      store.delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('IndexedDB 삭제 실패'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function saveAutosave(p: Project, now = Date.now()): Promise<boolean> {
   if (!isMeaningfulProject(p)) return false;
-  if (estimateProjectByteSize(p) >= AUTOSAVE_MAX_BYTES) return false;
   try {
     const payload: AutosavePayload = {
       version: 1,
       savedAt: now,
       project: p,
     };
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
-    return true;
+    return await idbPut(AUTOSAVE_KEY, payload);
   } catch (err) {
-    console.warn('자동저장 실패 (로컬 스토리지 한도 등):', err);
+    console.warn('자동저장 실패 (IndexedDB):', err);
     return false;
   }
 }
 
-export function loadAutosave(): AutosavePayload | null {
+function parseAutosaveRecord(parsed: unknown): AutosavePayload | null {
+  if (!parsed || typeof parsed !== 'object') return null;
+  const record = parsed as Record<string, unknown>;
+  if (!record.savedAt || typeof record.savedAt !== 'number') return null;
+
+  const project = validateLogStudioProject(record.project);
+  if (!isMeaningfulProject(project)) return null;
+
+  return {
+    version: 1,
+    savedAt: record.savedAt,
+    project,
+  };
+}
+
+export async function loadAutosave(): Promise<AutosavePayload | null> {
   try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (!parsed.savedAt || typeof parsed.savedAt !== 'number') return null;
+    const record = await idbGet(AUTOSAVE_KEY);
+    if (record !== undefined) {
+      return parseAutosaveRecord(record);
+    }
 
-    // Project 유효성 검증은 core parse를 활용
-    const project = parse(JSON.stringify(parsed.project), 'autosave.json');
-    if (!isMeaningfulProject(project)) return null;
-
-    return {
-      version: 1,
-      savedAt: parsed.savedAt,
-      project,
-    };
+    // 기존 localStorage 자동저장 데이터가 남아 있는 경우 1회 호환 읽기
+    const legacyRaw = globalThis.localStorage?.getItem(AUTOSAVE_KEY);
+    if (!legacyRaw) return null;
+    return parseAutosaveRecord(JSON.parse(legacyRaw));
   } catch (err) {
     console.warn('자동저장 불러오기 실패:', err);
     return null;
   }
 }
 
-export function clearAutosave(): void {
+export async function clearAutosave(): Promise<void> {
   try {
-    localStorage.removeItem(AUTOSAVE_KEY);
+    await idbDelete(AUTOSAVE_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    globalThis.localStorage?.removeItem(AUTOSAVE_KEY);
   } catch {
     // ignore
   }
