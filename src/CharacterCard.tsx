@@ -1,4 +1,6 @@
 import { isSafeImageUrl } from './importFormats';
+import { resolveImageUrl } from './imagePool';
+import { useImagePool } from './ImagePoolContext';
 
 export function CharacterAvatar({
   url,
@@ -9,10 +11,12 @@ export function CharacterAvatar({
   fallback?: string;
   color?: string;
 }) {
-  return isSafeImageUrl(url) ? (
+  const images = useImagePool();
+  const resolved = resolveImageUrl(url, images);
+  return isSafeImageUrl(resolved) ? (
     <img
       className="char-avatar-img"
-      src={url}
+      src={resolved}
       alt=""
       width="44"
       height="44"

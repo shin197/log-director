@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Project } from './core';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import {
@@ -14,55 +14,42 @@ import { normalizeScenes } from './scenes';
 import { isMeaningfulProject } from './storage';
 
 type Props = {
-  open: boolean;
   project: Project;
   initialItems: ImportedLogItem[];
   onClose: () => void;
   onApply: (nextProject: Project, summaryText: string) => void;
-  onError: (message: string, detail?: unknown) => void;
+  onError: (message: string) => void;
 };
 
 export function ImportDialog({
-  open,
   project,
   initialItems,
   onClose,
   onApply,
   onError,
 }: Props) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const scenes = useMemo(
+    () => normalizeScenes(project.scenes ?? [], project.blocks),
+    [project.scenes, project.blocks],
+  );
+  const hasExistingProject = isMeaningfulProject(project) && project.blocks.length > 0;
+
   const [items, setItems] = useState<ImportedLogItem[]>(initialItems);
-  const [options, setOptions] = useState<ImportManagerOptions>(DEFAULT_IMPORT_OPTIONS);
+  const [options, setOptions] = useState<ImportManagerOptions>(() => ({
+    ...DEFAULT_IMPORT_OPTIONS,
+    targetSceneId: scenes[0]?.id ?? '',
+  }));
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [fileDropActive, setFileDropActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const scenes = normalizeScenes(project.scenes ?? [], project.blocks);
-  const hasExistingProject = isMeaningfulProject(project) && project.blocks.length > 0;
 
   useEffect(() => {
-    if (!open) return;
-    setItems(initialItems);
-    setOptions((prev) => ({
-      ...DEFAULT_IMPORT_OPTIONS,
-      mode: prev.mode === 'insert-scene' && scenes.length === 0 ? 'append' : prev.mode,
-      targetSceneId: scenes[0]?.id ?? '',
-    }));
-  }, [open, initialItems]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
+    dialog.current?.showModal();
+    return () => dialog.current?.close();
+  }, []);
 
   const appendFiles = async (fileList: FileList | File[]) => {
     const files = Array.from(fileList);
@@ -74,7 +61,11 @@ export function ImportDialog({
         const raw = await file.text();
         loaded.push(createImportedLogItem(file.name, raw));
       } catch (err) {
-        onError(`'${file.name}' 파일을 읽거나 해석하지 못했습니다.`, err);
+        onError(
+          err instanceof Error
+            ? `'${file.name}': ${err.message}`
+            : `'${file.name}' 파일을 읽거나 해석하지 못했습니다.`,
+        );
       }
     }
     if (loaded.length > 0) {
@@ -113,99 +104,112 @@ export function ImportDialog({
         skippedDuplicateCount > 0 ? ` (경계 중복 ${skippedDuplicateCount}개 건너뜀)` : '';
       onApply(
         merged,
-        `파일 ${items.length}개 · 메시지 ${addedBlockCount}개를 불러왔습니다${dupText}`,
+        `파일 ${items.length}개 · 메시지 ${addedBlockCount.toLocaleString()}개를 불러왔습니다${dupText}`,
       );
       onClose();
     } catch (err) {
-      onError('로그를 병합하는 중 오류가 발생했습니다.', err);
+      onError(
+        err instanceof Error
+          ? `로그 병합 오류: ${err.message}`
+          : '로그를 병합하는 중 오류가 발생했습니다.',
+      );
     }
   };
 
   const totalMessages = items.reduce((sum, item) => sum + item.project.blocks.length, 0);
+  const modeSummary =
+    options.mode === 'insert-scene'
+      ? '선택한 장면 앞에 삽입'
+      : options.mode === 'interleave'
+        ? '타임스탬프 기준 시간순 교차 정렬'
+        : hasExistingProject
+          ? '현재 타임라인 맨 뒤에 추가'
+          : '목록 순서대로 새 로그 생성';
 
   return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+    <dialog
+      ref={dialog}
+      className="export-dialog import-dialog"
+      aria-labelledby="import-dialog-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onMouseDown={(e) => {
+        if (e.target === dialog.current) onClose();
       }}
     >
-      <section
-        className="export-dialog import-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="import-dialog-title"
-      >
-        <header className="export-dialog-header">
-          <div>
-            <p className="eyebrow">IMPORT MANAGER</p>
-            <h2 id="import-dialog-title">로그 불러오기 매니저</h2>
-          </div>
-          <button
-            type="button"
-            className="ghost-icon"
-            onClick={onClose}
-            aria-label="불러오기 매니저 닫기"
-          >
-            ✕
-          </button>
-        </header>
+      <div className="export-heading">
+        <div className="export-heading-left">
+          <h2 id="import-dialog-title">로그 불러오기 매니저</h2>
+          <span className="count-pill">
+            {items.length}개 파일 · {totalMessages.toLocaleString()}개 메시지
+          </span>
+        </div>
+        <button
+          type="button"
+          className="ghost icon-btn"
+          onClick={onClose}
+          aria-label="불러오기 매니저 닫기"
+        >
+          ×
+        </button>
+      </div>
 
-        <div className="export-dialog-body import-dialog-body">
-          <div className="export-field">
-            <div className="import-queue-header">
-              <span>불러올 파일 목록 ({items.length}개)</span>
-              <button
-                type="button"
-                className="mini"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                ＋ 파일 추가
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".json,.html,.htm,.md,.markdown,.txt"
-                hidden
-                onChange={async (e) => {
-                  if (e.target.files) {
-                    await appendFiles(e.target.files);
-                  }
-                  e.target.value = '';
-                }}
-              />
-            </div>
-
-            <div
-              className={`import-queue-dropzone ${fileDropActive ? 'drop-active' : ''}`}
-              onDragOver={(e) => {
-                if (e.dataTransfer.types.includes('Files')) {
-                  e.preventDefault();
-                  setFileDropActive(true);
-                }
-              }}
-              onDragLeave={() => setFileDropActive(false)}
-              onDrop={async (e) => {
-                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                  e.preventDefault();
-                  setFileDropActive(false);
-                  await appendFiles(e.dataTransfer.files);
-                }
-              }}
+      <div className="import-body">
+        <section className="import-queue-panel" aria-label="불러올 파일 목록">
+          <div className="import-section-head">
+            <span className="import-section-title">불러올 파일 목록</span>
+            <button
+              type="button"
+              className="compact-btn"
+              onClick={() => fileInputRef.current?.click()}
             >
-              {items.length === 0 ? (
-                <div className="import-queue-empty">
-                  <p>
-                    불러올 로그 파일을 이곳에 끌어놓거나 [＋ 파일 추가] 버튼을 눌러
-                    선택하세요.
-                  </p>
-                  <small>
-                    JSON · HTML · Markdown · TXT 파일을 여러 개 선택할 수 있습니다.
-                  </small>
-                </div>
-              ) : (
+              ＋ 파일 추가
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".json,.html,.htm,.md,.markdown,.txt"
+              hidden
+              onChange={async (e) => {
+                if (e.target.files) {
+                  await appendFiles(e.target.files);
+                }
+                e.target.value = '';
+              }}
+            />
+          </div>
+
+          <div
+            className={`import-queue-dropzone ${fileDropActive ? 'drop-active' : ''}`}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes('Files')) {
+                e.preventDefault();
+                setFileDropActive(true);
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                setFileDropActive(false);
+              }
+            }}
+            onDrop={async (e) => {
+              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                e.preventDefault();
+                setFileDropActive(false);
+                await appendFiles(e.dataTransfer.files);
+              }
+            }}
+          >
+            {items.length === 0 ? (
+              <div className="import-queue-empty">
+                <p>불러올 로그 파일을 이곳에 끌어놓거나 [＋ 파일 추가]를 누르세요.</p>
+                <small>JSON · HTML · Markdown · TXT 다중 선택 지원</small>
+              </div>
+            ) : (
+              <>
                 <div className="import-card-list" role="list">
                   {items.map((item, idx) => {
                     const charCount = (item.project.characters ?? []).filter(
@@ -255,14 +259,14 @@ export function ImportDialog({
                             {item.name}
                           </strong>
                           <span className="import-card-meta">
-                            메시지 {item.project.blocks.length}개 · 캐릭터 {charCount}명
-                            {firstTs ? ` · 시작 ${firstTs}` : ''}
+                            메시지 {item.project.blocks.length.toLocaleString()}개 ·
+                            캐릭터 {charCount}명{firstTs ? ` · ${firstTs}` : ''}
                           </span>
                         </div>
                         <div className="import-card-actions">
                           <button
                             type="button"
-                            className="mini ghost-icon"
+                            className="ghost icon-btn"
                             disabled={idx === 0}
                             onClick={() => handleMoveItem(idx, idx - 1)}
                             aria-label={`${item.name} 위로 이동`}
@@ -272,7 +276,7 @@ export function ImportDialog({
                           </button>
                           <button
                             type="button"
-                            className="mini ghost-icon"
+                            className="ghost icon-btn"
                             disabled={idx === items.length - 1}
                             onClick={() => handleMoveItem(idx, idx + 1)}
                             aria-label={`${item.name} 아래로 이동`}
@@ -282,7 +286,7 @@ export function ImportDialog({
                           </button>
                           <button
                             type="button"
-                            className="mini ghost-icon danger-icon"
+                            className="ghost icon-btn danger"
                             onClick={() => handleRemoveItem(item.id)}
                             aria-label={`${item.name} 목록에서 제거`}
                             title="목록에서 제거"
@@ -294,19 +298,24 @@ export function ImportDialog({
                     );
                   })}
                 </div>
-              )}
-            </div>
+                <div className="import-queue-hint">
+                  카드를 드래그하거나 ▲/▼로 순서를 바꾸고, 파일을 끌어놓아 추가하세요.
+                </div>
+              </>
+            )}
           </div>
+        </section>
 
-          <div className="export-field">
-            <span>이어붙이기 모드</span>
+        <section className="import-options-panel" aria-label="불러오기 옵션">
+          <div className="import-option-group">
+            <span className="import-section-title">이어붙이기 모드</span>
             <div
               className="import-mode-list"
               role="radiogroup"
               aria-label="이어붙이기 모드"
             >
               <label
-                className={`import-mode-card ${options.mode === 'append' ? 'active' : ''}`}
+                className={`format-option ${options.mode === 'append' ? 'active' : ''}`}
               >
                 <input
                   type="radio"
@@ -314,20 +323,20 @@ export function ImportDialog({
                   checked={options.mode === 'append'}
                   onChange={() => handleModeChange('append')}
                 />
-                <div className="import-mode-info">
+                <span>
                   <strong>맨 뒤에 붙이기 (Append)</strong>
                   <small>
                     {hasExistingProject
-                      ? '현재 작업중인 타임라인의 맨 끝에 순서대로 이어붙입니다.'
+                      ? '현재 작업 중인 타임라인의 맨 끝에 순서대로 추가합니다.'
                       : '선택한 파일들을 목록 순서대로 이어붙입니다.'}
                   </small>
-                </div>
+                </span>
               </label>
 
               <label
-                className={`import-mode-card ${options.mode === 'insert-scene' ? 'active' : ''} ${
-                  scenes.length === 0 ? 'disabled' : ''
-                }`}
+                className={`format-option ${
+                  options.mode === 'insert-scene' ? 'active' : ''
+                } ${scenes.length === 0 ? 'disabled' : ''}`}
               >
                 <input
                   type="radio"
@@ -336,7 +345,7 @@ export function ImportDialog({
                   checked={options.mode === 'insert-scene'}
                   onChange={() => handleModeChange('insert-scene')}
                 />
-                <div className="import-mode-info">
+                <span className="import-mode-content">
                   <strong>장면에 삽입 (Insert)</strong>
                   <small>
                     {scenes.length > 0
@@ -348,7 +357,10 @@ export function ImportDialog({
                       className="import-scene-select"
                       value={options.targetSceneId || scenes[0]?.id || ''}
                       onChange={(e) =>
-                        setOptions((prev) => ({ ...prev, targetSceneId: e.target.value }))
+                        setOptions((prev) => ({
+                          ...prev,
+                          targetSceneId: e.target.value,
+                        }))
                       }
                       aria-label="삽입할 기준 장면 선택"
                     >
@@ -365,11 +377,11 @@ export function ImportDialog({
                       })}
                     </select>
                   )}
-                </div>
+                </span>
               </label>
 
               <label
-                className={`import-mode-card ${options.mode === 'interleave' ? 'active' : ''}`}
+                className={`format-option ${options.mode === 'interleave' ? 'active' : ''}`}
               >
                 <input
                   type="radio"
@@ -377,95 +389,91 @@ export function ImportDialog({
                   checked={options.mode === 'interleave'}
                   onChange={() => handleModeChange('interleave')}
                 />
-                <div className="import-mode-info">
+                <span>
                   <strong>시간순 정렬 (Interleave)</strong>
                   <small>
-                    로그들의 타임스탬프를 해석해 시간순으로 교차 인터리빙합니다.
-                    타임스탬프가 없는 메시지는 직전 메시지의 시간대를 따라 원래 순서를
-                    유지합니다.
+                    타임스탬프를 해석해 시간순으로 교차 정렬합니다. 시각이 없는 메시지는
+                    직전 메시지 시간대를 따라 원래 순서를 유지합니다.
                   </small>
-                </div>
+                </span>
               </label>
             </div>
           </div>
 
-          <div className="export-field">
-            <span>분할 세션 옵션</span>
-            <div className="export-Checks">
-              <label className="check-line">
-                <input
-                  type="checkbox"
-                  checked={options.registerScenes}
-                  onChange={(e) =>
-                    setOptions((prev) => ({ ...prev, registerScenes: e.target.checked }))
-                  }
-                />
-                <div>
-                  <strong>각 파일 시작점에 장면(북마크) 등록하기</strong>
-                  <small>
-                    각 파일의 첫 번째 메시지에 파일 이름으로 장면 북마크를 자동
-                    등록합니다.
-                  </small>
-                </div>
-              </label>
-              <label className="check-line">
-                <input
-                  type="checkbox"
-                  checked={options.mergeCharacters}
-                  onChange={(e) =>
-                    setOptions((prev) => ({ ...prev, mergeCharacters: e.target.checked }))
-                  }
-                />
-                <div>
-                  <strong>동일 캐릭터 및 표정 목록 병합하기</strong>
-                  <small>
-                    이름이 같은 캐릭터를 하나로 통합하고, 새로운 표정 이미지를 해당
-                    캐릭터의 표정 목록에 자동 추가합니다.
-                  </small>
-                </div>
-              </label>
-              <label className="check-line">
-                <input
-                  type="checkbox"
-                  checked={options.skipBoundaryDuplicates}
-                  onChange={(e) =>
-                    setOptions((prev) => ({
-                      ...prev,
-                      skipBoundaryDuplicates: e.target.checked,
-                    }))
-                  }
-                />
-                <div>
-                  <strong>파일 경계선의 중복 메시지 건너뛰기</strong>
-                  <small>
-                    연속된 두 파일의 경계에서 화자와 본문이 일치하는 중복 메시지를
-                    자동으로 걸러냅니다.
-                  </small>
-                </div>
-              </label>
-            </div>
+          <div className="import-option-group import-checks-group">
+            <span className="import-section-title">분할 세션 옵션</span>
+            <label className="import-check-row">
+              <input
+                type="checkbox"
+                checked={options.registerScenes}
+                onChange={(e) =>
+                  setOptions((prev) => ({ ...prev, registerScenes: e.target.checked }))
+                }
+              />
+              <span>
+                <strong>각 파일 시작점에 장면(북마크) 등록하기</strong>
+                <small>
+                  각 파일 첫 메시지에 파일 이름으로 장면 북마크를 자동 등록합니다.
+                </small>
+              </span>
+            </label>
+            <label className="import-check-row">
+              <input
+                type="checkbox"
+                checked={options.mergeCharacters}
+                onChange={(e) =>
+                  setOptions((prev) => ({ ...prev, mergeCharacters: e.target.checked }))
+                }
+              />
+              <span>
+                <strong>동일 캐릭터 및 표정 목록 병합하기</strong>
+                <small>
+                  이름이 같은 캐릭터를 하나로 통합하고 새 표정을 표정 목록에 자동
+                  추가합니다.
+                </small>
+              </span>
+            </label>
+            <label className="import-check-row">
+              <input
+                type="checkbox"
+                checked={options.skipBoundaryDuplicates}
+                onChange={(e) =>
+                  setOptions((prev) => ({
+                    ...prev,
+                    skipBoundaryDuplicates: e.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <strong>파일 경계선의 중복 메시지 건너뛰기</strong>
+                <small>
+                  연속된 두 파일의 경계에서 화자와 본문이 일치하는 중복 메시지를
+                  걸러냅니다.
+                </small>
+              </span>
+            </label>
           </div>
+        </section>
+      </div>
+
+      <footer className="export-footer">
+        <span className="muted-note">
+          {modeSummary} · 적용 후 Ctrl+Z로 한 번에 되돌릴 수 있습니다.
+        </span>
+        <div className="export-footer-actions">
+          <button type="button" className="ghost" onClick={onClose}>
+            취소
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={items.length === 0}
+            onClick={handleApply}
+          >
+            불러오기 적용
+          </button>
         </div>
-
-        <footer className="export-dialog-footer">
-          <span className="export-summary">
-            파일 {items.length}개 · 총 메시지 {totalMessages}개
-          </span>
-          <div className="export-dialog-actions">
-            <button type="button" onClick={onClose}>
-              취소
-            </button>
-            <button
-              type="button"
-              className="primary"
-              disabled={items.length === 0}
-              onClick={handleApply}
-            >
-              불러오기 적용
-            </button>
-          </div>
-        </footer>
-      </section>
-    </div>
+      </footer>
+    </dialog>
   );
 }

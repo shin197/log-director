@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import type { Character } from './core';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { isSafeImageUrl } from './importFormats';
+import { resolveImageUrl } from './imagePool';
+import { useImagePool } from './ImagePoolContext';
 
 export function FacePicker({
   character,
@@ -18,6 +20,8 @@ export function FacePicker({
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const images = useImagePool();
+  const resolvedValue = resolveImageUrl(value, images);
   const disabled = !character || character.id === SYSTEM_CHARACTER_ID;
 
   useEffect(() => {
@@ -49,8 +53,8 @@ export function FacePicker({
         disabled={disabled}
         onClick={() => setOpen(!open)}
       >
-        {imageButton && isSafeImageUrl(value) ? (
-          <img src={value} alt="현재 표정" />
+        {imageButton && isSafeImageUrl(resolvedValue) ? (
+          <img src={resolvedValue} alt="현재 표정" />
         ) : (
           fallbackText || '☺'
         )}
@@ -68,7 +72,7 @@ export function FacePicker({
                   setOpen(false);
                 }}
               >
-                <img src={face.iconUrl} alt="" loading="lazy" />
+                <img src={resolveImageUrl(face.iconUrl, images)} alt="" loading="lazy" />
                 <span>{face.name || `표정 ${i + 1}`}</span>
               </button>
             ))

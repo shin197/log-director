@@ -1,5 +1,6 @@
 import { defaultDisplay, displayTime } from './presentation.ts';
 import { isSafeImageUrl } from './importFormats.ts';
+import { hashDataUri, resolveImageUrl } from './imagePool.ts';
 import { compileQuery, sanitizeLiveQuery } from './query.ts';
 import type { Project, Block } from './core';
 
@@ -19,21 +20,6 @@ const escape = (s: string) =>
   );
 
 const md = (s: string) => s.replace(/([\\`*_{}\[\]<>#!|])/g, '\\$1');
-
-function hashDataUri(input: string): string {
-  const seeds = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
-    0x5be0cd19,
-  ];
-  for (let i = 0; i < input.length; i++) {
-    const code = input.charCodeAt(i);
-    const idx = i & 7;
-    seeds[idx] = Math.imul(seeds[idx] ^ code, 0x01000193) >>> 0;
-    seeds[(idx + 1) & 7] =
-      (seeds[(idx + 1) & 7] + ((seeds[idx] << 5) | (seeds[idx] >>> 27))) >>> 0;
-  }
-  return seeds.map((n) => n.toString(16).padStart(8, '0')).join('');
-}
 
 export function exportLog(
   p: Project,
@@ -58,7 +44,7 @@ export function exportLog(
   }
 
   const resolveIcon = (url?: string): string => {
-    const raw = url?.trim() ?? '';
+    const raw = resolveImageUrl(url, p.images).trim();
     if (!raw) return '';
     if (encodeBase64 && options?.urlToBase64?.[raw]) {
       return options.urlToBase64[raw];

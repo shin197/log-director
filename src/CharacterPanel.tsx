@@ -5,6 +5,7 @@ import type { Project, Character } from './core';
 import { moveCharacter, updateCharacter } from './characters';
 import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
 import { isSafeImageUrl } from './importFormats';
+import { type ImagePool, internImageUrl, resolveImageUrl } from './imagePool';
 import { CharacterCard } from './CharacterCard';
 
 type FaceDraft = { name: string; iconUrl: string; originalUrl: string };
@@ -68,31 +69,39 @@ export function CharacterPanel({
   function save() {
     if (!draft) return;
     try {
+      const pool: ImagePool = { ...(p.images ?? {}) };
+      const validateAndIntern = (rawUrl: string): string => {
+        const resolved = resolveImageUrl(rawUrl, p.images);
+        const validated = imageUrl(resolved);
+        return internImageUrl(validated, pool);
+      };
       const faces = draft.faces.map((f) => ({
         name: f.name,
-        iconUrl: imageUrl(f.iconUrl),
+        iconUrl: validateAndIntern(f.iconUrl),
       }));
       if (faces.some((f) => !f.iconUrl))
         throw Error('빈 표정의 이미지 URL을 입력하거나 해당 표정을 삭제해주세요.');
       if (new Set(faces.map((f) => f.iconUrl)).size !== faces.length)
         throw Error('중복된 표정 URL이 있습니다.');
+      const internedDefault = validateAndIntern(draft.iconUrl);
       const next: Character = {
         id: draft.id,
         name: draft.name.trim(),
         color: draft.color,
         faces,
-        iconUrl: faces.some((f) => f.iconUrl === draft.iconUrl)
-          ? draft.iconUrl
+        iconUrl: faces.some((f) => f.iconUrl === internedDefault)
+          ? internedDefault
           : faces[0]?.iconUrl || '',
       };
       const updated = updateCharacter(p, next);
       const mapping = new Map(
         draft.faces
           .filter((f) => f.originalUrl)
-          .map((f) => [f.originalUrl, imageUrl(f.iconUrl)]),
+          .map((f, idx) => [f.originalUrl, faces[idx].iconUrl]),
       );
       commit({
         ...updated,
+        images: Object.keys(pool).length > 0 ? pool : undefined,
         blocks: updated.blocks.map((b) =>
           b.characterId === next.id && mapping.has(b.iconUrl ?? '')
             ? { ...b, iconUrl: mapping.get(b.iconUrl!) }
@@ -438,14 +447,14 @@ export function CharacterPanel({
                           title="표정 이미지 업로드 또는 URL/base64 입력"
                           aria-label={`${f.name || `표정 ${i + 1}`} 이미지 설정`}
                           onClick={() => {
-                            setFaceImageDraft(f.iconUrl);
+                            setFaceImageDraft(resolveImageUrl(f.iconUrl, p.images));
                             setEditingFaceIndex(i);
                           }}
                         >
-                          {isSafeImageUrl(f.iconUrl) ? (
+                          {isSafeImageUrl(resolveImageUrl(f.iconUrl, p.images)) ? (
                             <img
                               className="char-avatar-img"
-                              src={f.iconUrl}
+                              src={resolveImageUrl(f.iconUrl, p.images)}
                               alt=""
                               width="44"
                               height="44"

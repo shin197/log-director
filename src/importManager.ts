@@ -6,6 +6,12 @@ import {
   type Scene,
   parse,
 } from './core.ts';
+import {
+  type ImagePool,
+  internImageUrl,
+  normalizeProjectImagePool,
+  resolveImageUrl,
+} from './imagePool.ts';
 import { isMeaningfulProject } from './storage.ts';
 import {
   SYSTEM_CHARACTER_ID,
@@ -236,6 +242,17 @@ export const mergeImportedLogs = (
 
   const baseIsMeaningful = isMeaningfulProject(baseProject);
   const nextOriginals: OriginalFile[] = baseIsMeaningful ? [...baseProject.original] : [];
+  const mergedImages: ImagePool = baseIsMeaningful
+    ? { ...(baseProject.images ?? {}) }
+    : {};
+  const internCache = new Map<string, string>();
+  const resolveAndInternFrom = (
+    url: string | undefined,
+    sourcePool?: ImagePool,
+  ): string => {
+    const resolved = resolveImageUrl(url, sourcePool).trim();
+    return resolved ? internImageUrl(resolved, mergedImages, internCache) : '';
+  };
 
   // Clone base characters
   const nextCharacters: Character[] = baseIsMeaningful
@@ -301,12 +318,12 @@ export const mergeImportedLogs = (
         const targetChar = charByName.get(trimmedName)!;
         charIdMap.set(srcChar.id, targetChar.id);
 
-        // Merge missing faces by iconUrl
+        // Merge missing faces by canonical iconUrl
         const existingUrls = new Set(
           targetChar.faces.map((f) => (f.iconUrl ?? '').trim()).filter(Boolean),
         );
         for (const face of srcChar.faces ?? []) {
-          const iconUrl = (face.iconUrl ?? '').trim();
+          const iconUrl = resolveAndInternFrom(face.iconUrl, itemProj.images);
           if (iconUrl && !existingUrls.has(iconUrl)) {
             existingUrls.add(iconUrl);
             targetChar.faces.push({
@@ -329,7 +346,11 @@ export const mergeImportedLogs = (
         const clonedChar: Character = {
           ...srcChar,
           id: newCharId,
-          faces: (srcChar.faces ?? []).map((f) => ({ ...f })),
+          iconUrl: resolveAndInternFrom(srcChar.iconUrl, itemProj.images),
+          faces: (srcChar.faces ?? []).map((f) => ({
+            ...f,
+            iconUrl: resolveAndInternFrom(f.iconUrl, itemProj.images),
+          })),
         };
         nextCharacters.push(clonedChar);
         if (trimmedName && !charByName.has(trimmedName)) {
@@ -375,6 +396,7 @@ export const mergeImportedLogs = (
         ...b,
         id: nextId,
         characterId: mappedCharId,
+        iconUrl: b.iconUrl ? resolveAndInternFrom(b.iconUrl, itemProj.images) : b.iconUrl,
         sourceFileIndex: (b.sourceFileIndex ?? 0) + sourceOffset,
       };
     });
@@ -463,14 +485,17 @@ export const mergeImportedLogs = (
     : items[0].project.title || stripExtension(items[0].name) || baseProject.title;
 
   return {
-    project: ensureSystemCharacter({
-      ...baseProject,
-      title: nextTitle,
-      original: nextOriginals,
-      characters: nextCharacters,
-      blocks: combinedBlocks,
-      scenes: sortedScenes,
-    }),
+    project: normalizeProjectImagePool(
+      ensureSystemCharacter({
+        ...baseProject,
+        title: nextTitle,
+        original: nextOriginals,
+        ...(Object.keys(mergedImages).length > 0 ? { images: mergedImages } : {}),
+        characters: nextCharacters,
+        blocks: combinedBlocks,
+        scenes: sortedScenes,
+      }),
+    ),
     addedBlockCount,
     skippedDuplicateCount,
   };

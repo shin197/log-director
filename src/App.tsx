@@ -10,6 +10,8 @@ import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { createImportedLogItem, type ImportedLogItem } from './importManager';
+import { normalizeProjectImagePool } from './imagePool';
+import { EMPTY_IMAGE_POOL, ImagePoolContext } from './ImagePoolContext';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
@@ -126,9 +128,10 @@ function App() {
   }
 
   const commit = (next: Project) => {
-    const normalized: Project = next.scenes
+    const withScenes: Project = next.scenes
       ? { ...next, scenes: normalizeScenes(next.scenes, next.blocks) }
       : next;
+    const normalized = normalizeProjectImagePool(withScenes);
     setPast((x) => [...x, p].slice(-100));
     setFuture([]);
     setP(normalized);
@@ -678,7 +681,7 @@ function App() {
               : 'log';
 
   return (
-    <>
+    <ImagePoolContext.Provider value={p.images ?? EMPTY_IMAGE_POOL}>
       <header className="app-header">
         <div className="header-left">
           <span className="brand-mark">LOG DIRECTOR</span>
@@ -825,18 +828,19 @@ function App() {
         />
       )}
       {exportOpen && <ExportDialog project={p} onClose={() => setExportOpen(false)} />}
-      <ImportDialog
-        open={importOpen}
-        project={p}
-        initialItems={initialImportItems}
-        onClose={() => setImportOpen(false)}
-        onApply={(nextProject, summaryText) => {
-          commit(nextProject);
-          resetInteraction();
-          setNotice(summaryText);
-        }}
-        onError={(msg) => notifyError(msg)}
-      />
+      {importOpen && (
+        <ImportDialog
+          project={p}
+          initialItems={initialImportItems}
+          onClose={() => setImportOpen(false)}
+          onApply={(nextProject, summaryText) => {
+            commit(nextProject);
+            resetInteraction();
+            setNotice(summaryText);
+          }}
+          onError={(msg) => notifyError(msg)}
+        />
+      )}
       {helpOpen && <HelpSheet context={helpContext} onClose={() => setHelpOpen(false)} />}
       {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
       {tab === '설정' && (
@@ -1357,7 +1361,7 @@ function App() {
           </div>
         </main>
       </div>
-    </>
+    </ImagePoolContext.Provider>
   );
 }
 

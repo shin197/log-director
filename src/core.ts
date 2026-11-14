@@ -7,6 +7,11 @@ import {
   parseMarkdownLog,
   parseTxtLog,
 } from './importFormats.ts';
+import {
+  type ImagePool,
+  internImageUrl,
+  normalizeProjectImagePool,
+} from './imagePool.ts';
 import type { DisplaySettings } from './presentation';
 export type Character = {
   id: string;
@@ -43,6 +48,7 @@ export type Project = {
   version: 1;
   title: string;
   original: OriginalFile[];
+  images?: ImagePool;
   blocks: Block[];
   characters?: Character[];
   scenes?: Scene[];
@@ -68,13 +74,15 @@ export function parse(raw: string, name: string): Project {
     trimmed.startsWith('<')
   ) {
     const { title, blocks } = parseHtmlLog(cleaned, name);
-    return migrateCharacters({
-      format: 'log-studio',
-      version: 1,
-      title,
-      original: [{ name, raw }],
-      blocks,
-    });
+    return normalizeProjectImagePool(
+      migrateCharacters({
+        format: 'log-studio',
+        version: 1,
+        title,
+        original: [{ name, raw }],
+        blocks,
+      }),
+    );
   }
 
   if (
@@ -84,13 +92,15 @@ export function parse(raw: string, name: string): Project {
       (/^\s*#\s+/m.test(trimmed) || /^\*\*.+?\*\*.*:\s*$/m.test(trimmed)))
   ) {
     const { title, blocks } = parseMarkdownLog(cleaned, name);
-    return migrateCharacters({
-      format: 'log-studio',
-      version: 1,
-      title,
-      original: [{ name, raw }],
-      blocks,
-    });
+    return normalizeProjectImagePool(
+      migrateCharacters({
+        format: 'log-studio',
+        version: 1,
+        title,
+        original: [{ name, raw }],
+        blocks,
+      }),
+    );
   }
 
   if (
@@ -98,13 +108,15 @@ export function parse(raw: string, name: string): Project {
     (!lowerName.endsWith('.json') && !trimmed.startsWith('{') && !trimmed.startsWith('['))
   ) {
     const { title, blocks } = parseTxtLog(cleaned, name);
-    return migrateCharacters({
-      format: 'log-studio',
-      version: 1,
-      title,
-      original: [{ name, raw }],
-      blocks,
-    });
+    return normalizeProjectImagePool(
+      migrateCharacters({
+        format: 'log-studio',
+        version: 1,
+        title,
+        original: [{ name, raw }],
+        blocks,
+      }),
+    );
   }
 
   const d = JSON.parse(cleaned);
@@ -125,64 +137,81 @@ export function parse(raw: string, name: string): Project {
       !Array.isArray(d.original) ||
       !d.original.every(
         (o: any) => o && typeof o.raw === 'string' && typeof o.name === 'string',
-      )
+      ) ||
+      (d.images !== undefined &&
+        (!d.images ||
+          typeof d.images !== 'object' ||
+          Array.isArray(d.images) ||
+          !Object.values(d.images).every((v: unknown) => typeof v === 'string')))
     )
       throw Error('프로젝트 구조를 확인해주세요.');
     const migrated = migrateCharacters(d);
     if (Array.isArray(d.scenes)) {
       migrated.scenes = normalizeScenes(d.scenes, migrated.blocks);
     }
-    return migrated;
+    return normalizeProjectImagePool(migrated);
   }
   if (!Array.isArray(d.messages)) throw Error('messages 배열을 가진 JSON이 필요합니다.');
   const imagesMap =
     d.images && typeof d.images === 'object'
       ? (d.images as Record<string, unknown>)
       : null;
-  return migrateCharacters({
-    format: 'log-studio',
-    version: 1,
-    title: typeof d.title === 'string' ? d.title : name,
-    original: [{ name, raw }],
-    blocks: d.messages.map((m: any, i: number) => {
-      if (
-        !m ||
-        typeof m.text !== 'string' ||
-        (m.speaker !== undefined &&
-          !(m.type === 'system' && m.speaker === null) &&
-          typeof m.speaker !== 'string') ||
-        (m.diceResult !== undefined && typeof m.diceResult !== 'string')
-      )
-        throw Error(
-          `${i + 1}번째 메시지 형식을 확인해주세요. 원본은 변경되지 않았습니다.`,
-        );
-      let iconUrl = '';
-      if (typeof m.iconImage === 'string' && m.iconImage) {
-        if (isSafeImageUrl(m.iconImage)) {
-          iconUrl = m.iconImage;
-        } else {
-          const mapped = imagesMap?.[m.iconImage];
-          if (typeof mapped === 'string' && isSafeImageUrl(mapped)) {
-            iconUrl = mapped;
-          }
+  const pool: ImagePool = {};
+  const internCache = new Map<string, string>();
+  const resolvedSourceCache = new Map<string, string>();
+  const resolveAndIntern = (rawUrl: string): string => {
+    const hit = resolvedSourceCache.get(rawUrl);
+    if (hit !== undefined) return hit;
+    const ref = internImageUrl(rawUrl, pool, internCache);
+    resolvedSourceCache.set(rawUrl, ref);
+    return ref;
+  };
+  const blocks: Block[] = d.messages.map((m: any, i: number) => {
+    if (
+      !m ||
+      typeof m.text !== 'string' ||
+      (m.speaker !== undefined &&
+        !(m.type === 'system' && m.speaker === null) &&
+        typeof m.speaker !== 'string') ||
+      (m.diceResult !== undefined && typeof m.diceResult !== 'string')
+    )
+      throw Error(`${i + 1}번째 메시지 형식을 확인해주세요. 원본은 변경되지 않았습니다.`);
+    let iconUrl = '';
+    if (typeof m.iconImage === 'string' && m.iconImage) {
+      if (isSafeImageUrl(m.iconImage)) {
+        iconUrl = resolveAndIntern(m.iconImage);
+      } else {
+        const mapped = imagesMap?.[m.iconImage];
+        if (typeof mapped === 'string' && isSafeImageUrl(mapped)) {
+          iconUrl = resolveAndIntern(mapped);
         }
-      } else if (typeof m.iconUrl === 'string') {
-        iconUrl = m.iconUrl;
       }
-      return {
-        id: crypto.randomUUID(),
-        sourceIndex: i,
-        ...(m.type === 'system' ? {} : { speaker: m.speaker ?? '' }),
-        text: m.text,
-        diceResult: m.diceResult ?? '',
-        color: typeof m.color === 'string' ? m.color : '',
-        iconUrl,
-        timestamp: typeof m.timestamp === 'string' ? m.timestamp : '',
-        channel: typeof m.channelName === 'string' ? m.channelName.trim() : '',
-        sourceType: typeof m.type === 'string' ? m.type : '',
-      };
-    }),
+    } else if (typeof m.iconUrl === 'string') {
+      iconUrl = resolveAndIntern(m.iconUrl);
+    }
+    return {
+      id: crypto.randomUUID(),
+      sourceIndex: i,
+      ...(m.type === 'system' ? {} : { speaker: m.speaker ?? '' }),
+      text: m.text,
+      diceResult: m.diceResult ?? '',
+      color: typeof m.color === 'string' ? m.color : '',
+      iconUrl,
+      timestamp: typeof m.timestamp === 'string' ? m.timestamp : '',
+      channel: typeof m.channelName === 'string' ? m.channelName.trim() : '',
+      sourceType: typeof m.type === 'string' ? m.type : '',
+    };
   });
+  return normalizeProjectImagePool(
+    migrateCharacters({
+      format: 'log-studio',
+      version: 1,
+      title: typeof d.title === 'string' ? d.title : name,
+      original: [{ name, raw }],
+      ...(Object.keys(pool).length > 0 ? { images: pool } : {}),
+      blocks,
+    }),
+  );
 }
 export function replaceBlocks(
   p: Project,

@@ -10,6 +10,8 @@ import { applyBulkReplacedText, type BulkEditState } from './bulkEdit';
 import { BulkTextEditor } from './BulkTextEditor';
 import { handleWrapKeyDown } from './textEdit';
 import { isSafeImageUrl } from './importFormats';
+import { resolveImageUrl } from './imagePool';
+import { useImagePool } from './ImagePoolContext';
 import { BookmarkRibbon } from './BookmarkRibbon';
 
 export type BulkEditContext = {
@@ -83,6 +85,7 @@ export function MessageBlock({
   const [options, setOptions] = useState(false);
   const [dice, setDice] = useState(!!b.diceResult);
   const [over, setOver] = useState('');
+  const images = useImagePool();
 
   const isBulk = !!bulkContext;
   const isEditing = editing || isBulk;
@@ -281,10 +284,11 @@ export function MessageBlock({
               }}
               imageButton
             />
-          ) : activeBlock.iconUrl && isSafeImageUrl(activeBlock.iconUrl) ? (
+          ) : activeBlock.iconUrl &&
+            isSafeImageUrl(resolveImageUrl(activeBlock.iconUrl, images)) ? (
             <img
               draggable={false}
-              src={activeBlock.iconUrl}
+              src={resolveImageUrl(activeBlock.iconUrl, images)}
               alt=""
               loading="lazy"
               referrerPolicy="no-referrer"
@@ -494,11 +498,12 @@ export function MessageBlock({
                 type="url"
                 aria-label="표정 이미지 URL"
                 placeholder="표정 이미지 URL (https://…)"
-                value={
+                value={resolveImageUrl(
                   isBulk
                     ? (bulkContext.state.iconUrl ?? activeBlock.iconUrl ?? '')
-                    : (draft.iconUrl ?? '')
-                }
+                    : (draft.iconUrl ?? ''),
+                  images,
+                )}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (bulkContext) {

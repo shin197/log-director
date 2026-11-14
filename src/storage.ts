@@ -1,12 +1,43 @@
 import { parse, type Project } from './core.ts';
 
 export const AUTOSAVE_KEY = 'log-studio:autosave';
+export const AUTOSAVE_MAX_BYTES = 5 * 1024 * 1024;
 
 export type AutosavePayload = {
   version: 1;
   savedAt: number;
   project: Project;
 };
+
+export function estimateProjectByteSize(p: Project): number {
+  let bytes = (p.title?.length ?? 0) * 2 + 128;
+  for (const orig of p.original ?? []) {
+    bytes += (orig.name.length + orig.raw.length) * 2 + 32;
+  }
+  if (p.images) {
+    for (const [key, val] of Object.entries(p.images)) {
+      bytes += key.length + val.length + 16;
+    }
+  }
+  for (const c of p.characters ?? []) {
+    bytes += (c.name.length + c.iconUrl.length) * 2 + 96;
+    for (const f of c.faces ?? []) {
+      bytes += (f.name.length + f.iconUrl.length) * 2 + 32;
+    }
+  }
+  for (const b of p.blocks) {
+    bytes +=
+      (b.text.length +
+        b.diceResult.length +
+        (b.speaker?.length ?? 0) +
+        (b.iconUrl?.length ?? 0) +
+        (b.timestamp?.length ?? 0) +
+        (b.channel?.length ?? 0)) *
+        2 +
+      128;
+  }
+  return bytes;
+}
 
 export function isMeaningfulProject(p: Project): boolean {
   if (p.blocks.length > 0) return true;
@@ -35,6 +66,7 @@ export function formatRelativeTime(savedAt: number, now = Date.now()): string {
 
 export function saveAutosave(p: Project, now = Date.now()): boolean {
   if (!isMeaningfulProject(p)) return false;
+  if (estimateProjectByteSize(p) >= AUTOSAVE_MAX_BYTES) return false;
   try {
     const payload: AutosavePayload = {
       version: 1,

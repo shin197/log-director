@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Block, Project } from './core';
 import { exportLog, type ExportFormat } from './export';
 import { collectChannels } from './channels';
+import { resolveImageUrl } from './imagePool';
 import { compileQuery, sanitizeLiveQuery } from './query';
 import { SearchBar } from './SearchBar';
 
@@ -11,31 +12,31 @@ const formats: {
   description: string;
   btnClass: string;
 }[] = [
-    {
-      id: 'html',
-      label: 'HTML',
-      description: '초상화·색상이 포함된 웹 문서',
-      btnClass: 'mb-led-btn-primary',
-    },
-    {
-      id: 'txt',
-      label: 'TXT',
-      description: '캐릭터·시각·본문 일반 텍스트',
-      btnClass: 'mb-led-btn-txt',
-    },
-    {
-      id: 'json',
-      label: 'JSON',
-      description: '완성 로그 데이터 (프로젝트와 별개)',
-      btnClass: 'mb-led-btn-json',
-    },
-    {
-      id: 'md',
-      label: 'Markdown',
-      description: '제목·캐릭터·시스템 인용문',
-      btnClass: 'mb-led-btn-md',
-    },
-  ];
+  {
+    id: 'html',
+    label: 'HTML',
+    description: '초상화·색상이 포함된 웹 문서',
+    btnClass: 'mb-led-btn-primary',
+  },
+  {
+    id: 'txt',
+    label: 'TXT',
+    description: '캐릭터·시각·본문 일반 텍스트',
+    btnClass: 'mb-led-btn-txt',
+  },
+  {
+    id: 'json',
+    label: 'JSON',
+    description: '완성 로그 데이터 (프로젝트와 별개)',
+    btnClass: 'mb-led-btn-json',
+  },
+  {
+    id: 'md',
+    label: 'Markdown',
+    description: '제목·캐릭터·시스템 인용문',
+    btnClass: 'mb-led-btn-md',
+  },
+];
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -89,7 +90,7 @@ export function ExportDialog({
     const urls = [
       ...new Set(
         project.blocks
-          .map((b: Block) => b.iconUrl?.trim() ?? '')
+          .map((b: Block) => resolveImageUrl(b.iconUrl, project.images).trim())
           .filter((u) => /^https?:\/\//i.test(u) && !(u in urlToBase64)),
       ),
     ];
@@ -195,7 +196,7 @@ export function ExportDialog({
           characters={project.characters ?? []}
           channels={channels}
           scenes={project.scenes ?? []}
-          onActivate={() => { }}
+          onActivate={() => {}}
           onChangeQuery={setQuery}
         />
       </div>

@@ -931,10 +931,26 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, �
 
   clearAutosave();
   assert.equal(loadAutosave(), null);
+
+  // 5MB 이상 대용량 프로젝트는 localStorage 자동저장을 건너뜀
+  const oversizedProject = {
+    format: 'log-studio' as const,
+    version: 1 as const,
+    title: '대용량 테스트',
+    original: [{ name: 'big.json', raw: 'x'.repeat(3 * 1024 * 1024) }],
+    blocks: [],
+  };
+  assert.equal(saveAutosave(oversizedProject, baseTime), false);
+  assert.equal(loadAutosave(), null);
 });
 
 import fs from 'node:fs';
 import { isSafeImageUrl } from './importFormats.ts';
+import {
+  isImagePoolRef,
+  normalizeProjectImagePool,
+  resolveImageUrl,
+} from './imagePool.ts';
 test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 project.json', () => {
   // 1) base64 이미지 URL 안전성 검증
   assert.equal(isSafeImageUrl('https://example.com/a.png'), true);
@@ -950,8 +966,12 @@ test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 proj
   const jsonBase64Raw = fs.readFileSync('sample_log/json_sample_base64.json', 'utf8');
   const jsonBase64Proj = parse(jsonBase64Raw, 'json_sample_base64.json');
   assert.equal(jsonBase64Proj.blocks.length, jsonProj.blocks.length);
+  assert.ok(jsonBase64Proj.images && Object.keys(jsonBase64Proj.images).length > 0);
+  assert.ok(jsonBase64Proj.blocks.some((b) => isImagePoolRef(b.iconUrl)));
   assert.ok(
-    jsonBase64Proj.blocks.some((b) => (b.iconUrl ?? '').startsWith('data:image/')),
+    jsonBase64Proj.blocks.some((b) =>
+      resolveImageUrl(b.iconUrl, jsonBase64Proj.images).startsWith('data:image/'),
+    ),
   );
 
   const htmlRaw = fs.readFileSync('sample_log/html_sample.html', 'utf8');
@@ -965,7 +985,12 @@ test('다중 포맷 파싱: HTML(일반/Raw/CCF base64), Markdown, JSON 및 proj
   const htmlCcfRaw = fs.readFileSync('sample_log/html_ccf_sample.html', 'utf8');
   const htmlCcfProj = parse(htmlCcfRaw, 'html_ccf_sample.html');
   assert.ok(htmlCcfProj.blocks.length > 100);
-  assert.ok(htmlCcfProj.blocks.some((b) => (b.iconUrl ?? '').startsWith('data:image/')));
+  assert.ok(htmlCcfProj.images && Object.keys(htmlCcfProj.images).length > 0);
+  assert.ok(
+    htmlCcfProj.blocks.some((b) =>
+      resolveImageUrl(b.iconUrl, htmlCcfProj.images).startsWith('data:image/'),
+    ),
+  );
 
   const htmlRawText = fs.readFileSync('sample_log/html_raw_sample.html', 'utf8');
   const htmlRawProj = parse(htmlRawText, 'html_raw_sample.html');
@@ -1067,8 +1092,10 @@ test('imageUrl allows safe data:image base64 and HTML export deduplicates identi
 
   const reparsed = parse(html, 'dedupe.html');
   assert.equal(reparsed.blocks.length, 2);
-  assert.equal(reparsed.blocks[0]?.iconUrl, dataUri);
-  assert.equal(reparsed.blocks[1]?.iconUrl, dataUri);
+  assert.ok(isImagePoolRef(reparsed.blocks[0]?.iconUrl));
+  assert.equal(reparsed.blocks[0]?.iconUrl, reparsed.blocks[1]?.iconUrl);
+  assert.equal(resolveImageUrl(reparsed.blocks[0]?.iconUrl, reparsed.images), dataUri);
+  assert.equal(resolveImageUrl(reparsed.blocks[1]?.iconUrl, reparsed.images), dataUri);
 });
 
 test('내보내기 옵션(검색 필터, 시스템 채널 표시, Base64 인코딩) 및 4종 포맷 왕복 파싱', () => {
@@ -1146,8 +1173,8 @@ test('내보내기 옵션(검색 필터, 시스템 채널 표시, Base64 인코�
   assert.equal(htmlB64.split(dataUri).length - 1, 1);
   assert.ok(!htmlB64.includes(extUrl));
   const reHtmlB64 = parse(htmlB64, 'b64.html');
-  assert.equal(reHtmlB64.blocks[1]?.iconUrl, dataUri);
-  assert.equal(reHtmlB64.blocks[2]?.iconUrl, dataUri);
+  assert.equal(resolveImageUrl(reHtmlB64.blocks[1]?.iconUrl, reHtmlB64.images), dataUri);
+  assert.equal(resolveImageUrl(reHtmlB64.blocks[2]?.iconUrl, reHtmlB64.images), dataUri);
 
   const jsonB64 = exportLog(proj, 'json', { encodeBase64: true, urlToBase64: urlMap });
   assert.equal(jsonB64.split(dataUri).length - 1, 1);
@@ -1156,8 +1183,8 @@ test('내보내기 옵션(검색 필터, 시스템 채널 표시, Base64 인코�
   assert.equal(parsedJsonObj.messages[1].iconUrl, undefined);
   assert.ok(typeof parsedJsonObj.messages[1].iconImage === 'string');
   const reJsonB64 = parse(jsonB64, 'b64.json');
-  assert.equal(reJsonB64.blocks[1]?.iconUrl, dataUri);
-  assert.equal(reJsonB64.blocks[2]?.iconUrl, dataUri);
+  assert.equal(resolveImageUrl(reJsonB64.blocks[1]?.iconUrl, reJsonB64.images), dataUri);
+  assert.equal(resolveImageUrl(reJsonB64.blocks[2]?.iconUrl, reJsonB64.images), dataUri);
 });
 
 test('moveCharacter는 드래그 순서 변경 시 원본 불변성과 객체 참조를 유지한다', () => {
@@ -1411,4 +1438,34 @@ test('불러오기 매니저: 파일 순서 이동, 이어붙이기(Append/Inser
     interleaved.project.blocks.map((b) => b.text),
     ['1부 첫 대사', '8시 2분 귓속말', '타임스탬프 없는 연속 귓속말', '경계 중복 대사'],
   );
+});
+
+test('내부 이미지 풀: oversized_json 중복 제거 직렬화, 미사용 이미지 정리, 5MB 자동저장 가드', () => {
+  const oversizedRaw = fs.readFileSync('sample_log/oversized_json.json', 'utf8');
+  const oversized = parse(oversizedRaw, 'oversized_json.json');
+
+  assert.equal(oversized.blocks.length, 7108);
+  assert.ok(oversized.images && Object.keys(oversized.images).length === 50);
+  assert.ok(
+    oversized.blocks.every((b) => !b.iconUrl || isImagePoolRef(b.iconUrl)),
+    '모든 블록의 data:image는 내부 이미지 풀 참조(img:)로 저장되어야 함',
+  );
+
+  // 기존에는 ~2.86 GB 문자열 생성으로 Invalid string length가 발생했으나 이제 정상 직렬화 가능
+  const serialized = JSON.stringify(oversized);
+  assert.ok(serialized.length < 20 * 1024 * 1024);
+
+  // project.json 왕복 및 자동저장 5MB 상한 가드 확인
+  const roundtrip = parse(serialized, 'oversized.project.json');
+  assert.equal(roundtrip.blocks.length, 7108);
+  assert.equal(Object.keys(roundtrip.images ?? {}).length, 50);
+  assert.equal(saveAutosave(oversized), false);
+
+  // 참조가 모두 사라진 이미지는 normalizeProjectImagePool에서 정리됨
+  const pruned = normalizeProjectImagePool({
+    ...roundtrip,
+    characters: roundtrip.characters?.filter((c) => c.id === SYSTEM_CHARACTER_ID),
+    blocks: [],
+  });
+  assert.equal(pruned.images, undefined);
 });
