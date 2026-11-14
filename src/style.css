@@ -812,7 +812,7 @@ code {
   background: rgba(77, 184, 154, 0.04);
 }
 
-.log-message.is-cut > :not(.paste-indicator) {
+.log-message.is-cut> :not(.paste-indicator) {
   opacity: 0.42;
 }
 
@@ -1058,7 +1058,7 @@ code {
   color: var(--text-secondary);
 }
 
-.bulk-replace-summary > span {
+.bulk-replace-summary>span {
   margin-right: auto;
 }
 
@@ -1439,8 +1439,43 @@ code {
   max-width: 1080px;
   margin: 0 auto;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
+}
+
+.composer-top {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer-bottom {
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.composer-collapse-btn {
+  width: 60px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.composer-send-btn {
+  width: 60px;
+  height: auto;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .composer-expand-btn {
@@ -1454,10 +1489,11 @@ code {
 }
 
 .composer-speaker-group {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 8px;
 }
 
 .composer-avatar {
@@ -1476,6 +1512,7 @@ code {
 }
 
 .composer-speaker {
+  flex: 1;
   width: 145px;
   position: relative;
 }
@@ -1750,7 +1787,7 @@ code {
   gap: 8px;
 }
 
-.field-inline > input {
+.field-inline>input {
   flex: 1;
   min-width: 0;
 }
@@ -1991,7 +2028,7 @@ code {
   flex-wrap: wrap;
 }
 
-.settings-row > .stack-field {
+.settings-row>.stack-field {
   flex: 1 1 200px;
 }
 
@@ -2039,7 +2076,7 @@ code {
   flex-wrap: wrap;
 }
 
-.original-box-head > div:first-child {
+.original-box-head>div:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2379,7 +2416,7 @@ dialog::backdrop {
   animation: toast-fade 6.5s linear forwards;
 }
 
-.error-toast > div {
+.error-toast>div {
   flex: 1;
   min-width: 0;
 }
@@ -2405,6 +2442,7 @@ dialog::backdrop {
 }
 
 @keyframes toast-fade {
+
   0%,
   25% {
     opacity: 1;

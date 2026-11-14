@@ -118,130 +118,130 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer-inner">
-        <div className="composer-speaker-group">
-          <div className="composer-avatar">
-            <FacePicker
-              character={character}
-              value={icon}
-              onChange={setIcon}
-              imageButton
-              fallbackText={(name || '?').slice(0, 1)}
-            />
-          </div>
-          <div className="composer-speaker">
-            <input
-              aria-label="전송 화자"
-              placeholder="화자"
-              value={name}
-              onFocus={() => setOpen(true)}
-              onBlur={() => setOpen(false)}
-              onChange={(e) => {
-                setName(e.target.value);
-                setId(null);
-                setIcon('');
-                setOpen(true);
-                setIndex(0);
-              }}
-              onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  setOpen(true);
-                  setIndex(
-                    (selected + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) %
-                      Math.max(1, matches.length),
-                  );
-                }
-                if (e.key === 'Enter' && open && matches.length) {
-                  e.preventDefault();
-                  pick(matches[selected]);
-                }
-              }}
-            />
-            {open && (
-              <div className="composer-candidates">
-                {matches.map((c) => (
-                  <button
-                    type="button"
-                    key={c.id}
-                    aria-selected={matches[selected]?.id === c.id}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => pick(c)}
-                  >
-                    {c.name}
-                  </button>
-                ))}
-                {!matches.length && <small>사용자 지정 화자</small>}
-              </div>
-            )}
-          </div>
-          {isCustomSpeaker && (
-            <div className="color-input-group composer-color-group" title="화자 색상">
-              <input
-                type="color"
-                aria-label="색상 선택"
-                value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#888888'}
-                onChange={(e) => setColor(e.target.value)}
-              />
-              <input
-                aria-label="색상 (#RRGGBB)"
-                placeholder="#RRGGBB"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
+        <div className="composer-top">
+          <div className="composer-speaker-group">
+            <div className="composer-avatar">
+              <FacePicker
+                character={character}
+                value={icon}
+                onChange={setIcon}
+                imageButton
+                fallbackText={(name || '?').slice(0, 1)}
               />
             </div>
-          )}
-          <ChannelPicker
-            value={channel}
-            channels={channels}
-            onChange={setChannel}
-            compact
-          />
-        </div>
-
-        <textarea
-          ref={textareaRef}
-          aria-label="전송 내용"
-          disabled={disabled}
-          placeholder={
-            disabled
-              ? '편집 또는 오려붙이기 완료 후 새 메시지를 입력할 수 있습니다.'
-              : '새 메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
-          }
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (handleWrapKeyDown(e, text, setText)) return;
-            if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-              e.preventDefault();
-              e.currentTarget.blur();
-              return;
-            }
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
-
-        <div className="composer-actions">
+            <div className="composer-speaker">
+              <input
+                aria-label="전송 화자"
+                placeholder="화자"
+                value={name}
+                onFocus={() => setOpen(true)}
+                onBlur={() => setOpen(false)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setId(null);
+                  setIcon('');
+                  setOpen(true);
+                  setIndex(0);
+                }}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setOpen(true);
+                    setIndex(
+                      (selected + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) %
+                      Math.max(1, matches.length),
+                    );
+                  }
+                  if (e.key === 'Enter' && open && matches.length) {
+                    e.preventDefault();
+                    pick(matches[selected]);
+                  }
+                }}
+              />
+              {open && (
+                <div className="composer-candidates">
+                  {matches.map((c) => (
+                    <button
+                      type="button"
+                      key={c.id}
+                      aria-selected={matches[selected]?.id === c.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pick(c)}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                  {!matches.length && <small>사용자 지정 화자</small>}
+                </div>
+              )}
+            </div>
+            {isCustomSpeaker && (
+              <div className="color-input-group composer-color-group" title="화자 색상">
+                <input
+                  type="color"
+                  aria-label="색상 선택"
+                  value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#888888'}
+                  onChange={(e) => setColor(e.target.value)}
+                />
+                <input
+                  aria-label="색상 (#RRGGBB)"
+                  placeholder="#RRGGBB"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                />
+              </div>
+            )}
+            <ChannelPicker
+              value={channel}
+              channels={channels}
+              onChange={setChannel}
+              compact
+            />
+          </div>
           <button
             type="button"
-            className="primary"
-            onClick={submit}
-            disabled={disabled || !text.trim()}
-          >
-            전송
-          </button>
-          <button
-            type="button"
-            className="ghost icon-btn"
+            className="ghost icon-btn composer-collapse-btn"
             title="입력창 접기"
             aria-label="입력창 접기"
             onClick={() => setCollapsed(true)}
           >
-            ▾
+            ×
+          </button>
+        </div>
+        <div className="composer-bottom">
+          <textarea
+            ref={textareaRef}
+            aria-label="전송 내용"
+            disabled={disabled}
+            placeholder={
+              disabled
+                ? '편집 또는 오려붙이기 완료 후 새 메시지를 입력할 수 있습니다.'
+                : '새 메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
+            }
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (handleWrapKeyDown(e, text, setText)) return;
+              if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                e.preventDefault();
+                e.currentTarget.blur();
+                return;
+              }
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="primary composer-send-btn"
+            onClick={submit}
+            disabled={disabled || !text.trim()}
+          >
+            전송
           </button>
         </div>
       </div>
