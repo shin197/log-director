@@ -91,7 +91,7 @@ export function SceneSidebar({
           <span>장면 {ranges.length}개</span>
         </div>
         <div className="scene-sidebar-actions">
-          <button
+          {/* <button
             type="button"
             className="primary compact-btn"
             disabled={!canAddFromSelection}
@@ -103,7 +103,7 @@ export function SceneSidebar({
             onClick={onAddFromSelection}
           >
             ＋ 추가
-          </button>
+          </button> */}
           <button
             type="button"
             className="ghost icon-btn"
