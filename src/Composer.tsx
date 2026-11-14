@@ -5,12 +5,14 @@ import { FacePicker } from './FacePicker';
 import { ChannelPicker } from './ChannelPicker';
 import type { ChannelSummary } from './channels';
 import { handleWrapKeyDown } from './textEdit';
+import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 
 export type EyedropPayload = {
   speaker: string;
   characterId: string | null;
   iconUrl: string;
   channel: string;
+  color?: string;
   key: number;
 };
 
@@ -32,6 +34,7 @@ export function Composer({
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
     [icon, setIcon] = useState(''),
+    [color, setColor] = useState(''),
     [channel, setChannel] = useState('메인'),
     [text, setText] = useState(''),
     [open, setOpen] = useState(false),
@@ -52,6 +55,7 @@ export function Composer({
     setName(eyedrop.speaker);
     setId(eyedrop.characterId);
     setIcon(eyedrop.iconUrl);
+    setColor(eyedrop.color ?? '');
     setChannel(eyedrop.channel);
     setOpen(false);
     setCollapsed(false);
@@ -59,12 +63,14 @@ export function Composer({
 
   const character = characters.find((c) => c.id === id);
   const matches = characters.filter((c) => fuzzyName(c.name, name));
+  const isCustomSpeaker = !character && !matches.length;
   const selected = Math.min(index, Math.max(0, matches.length - 1));
 
   function pick(c: Character) {
     setId(c.id);
     setName(c.name);
     setIcon(c.iconUrl || c.faces[0]?.iconUrl || '');
+    setColor(c.id === SYSTEM_CHARACTER_ID ? '' : c.color || '');
     setOpen(false);
   }
 
@@ -85,6 +91,8 @@ export function Composer({
     if (c) {
       b = inheritCharacter(b, c);
       if (c.id === id && b.sourceType !== 'system') b.iconUrl = icon;
+    } else if (color) {
+      b.color = color;
     }
     send(b);
     if (c && !character) pick(c);
@@ -167,6 +175,22 @@ export function Composer({
               </div>
             )}
           </div>
+          {isCustomSpeaker && (
+            <div className="color-input-group composer-color-group" title="화자 색상">
+              <input
+                type="color"
+                aria-label="색상 선택"
+                value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#888888'}
+                onChange={(e) => setColor(e.target.value)}
+              />
+              <input
+                aria-label="색상 (#RRGGBB)"
+                placeholder="#RRGGBB"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+              />
+            </div>
+          )}
           <ChannelPicker
             value={channel}
             channels={channels}

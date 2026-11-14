@@ -184,11 +184,13 @@ function App() {
     const characterId = isSystem ? SYSTEM_CHARACTER_ID : (b.characterId ?? null);
     const iconUrl = isSystem ? '' : (b.iconUrl ?? '');
     const channel = b.channel ?? '';
+    const color = isSystem ? '' : (linked?.color ?? b.color ?? '');
     setEyedrop({
       speaker,
       characterId,
       iconUrl,
       channel,
+      color,
       key: Date.now() + Math.random(),
     });
     setNotice(`‘${speaker || '캐릭터 없음'}’ 캐릭터 정보를 입력창에 가져왔습니다.`);
@@ -536,12 +538,12 @@ function App() {
     : undefined;
   const bulkMixedSpeakers = bulkEdit
     ? new Set(
-      bulkTargetBlocks.map((b) =>
-        b.sourceType === 'system'
-          ? 'system'
-          : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
-      ),
-    ).size > 1
+        bulkTargetBlocks.map((b) =>
+          b.sourceType === 'system'
+            ? 'system'
+            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+        ),
+      ).size > 1
     : false;
   const bulkMixedChannels = bulkEdit
     ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
@@ -1001,11 +1003,11 @@ function App() {
                     onPasteHover={
                       cutIds
                         ? (after) =>
-                          setPasteTarget((prev) =>
-                            prev?.id === b.id && prev.after === after
-                              ? prev
-                              : { id: b.id, after },
-                          )
+                            setPasteTarget((prev) =>
+                              prev?.id === b.id && prev.after === after
+                                ? prev
+                                : { id: b.id, after },
+                            )
                         : undefined
                     }
                     onPasteHere={
@@ -1016,26 +1018,26 @@ function App() {
                     bulkContext={
                       isBulkRep && bulkEdit
                         ? {
-                          count: bulkEdit.selectedIds.size,
-                          state: bulkEdit,
-                          originalRepText: bulkRepOriginalText,
-                          faceCharacter: bulkFaceCharacter,
-                          mixedSpeakers: bulkMixedSpeakers,
-                          mixedChannels: bulkMixedChannels,
-                          hasAnyDice: bulkHasAnyDice,
-                          replaceOpen: bulkReplaceOpen,
-                          replaceMatchCount: bulkReplaceMatchCount,
-                          onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                          onCloseReplace: () => setBulkReplaceOpen(false),
-                          onChangeState: (updater) =>
-                            setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                          onSave: saveBulkEdit,
-                          onCancel: () => {
-                            setBulkEdit(null);
-                            setBulkReplaceOpen(false);
-                          },
-                          onDelete: deleteSelected,
-                        }
+                            count: bulkEdit.selectedIds.size,
+                            state: bulkEdit,
+                            originalRepText: bulkRepOriginalText,
+                            faceCharacter: bulkFaceCharacter,
+                            mixedSpeakers: bulkMixedSpeakers,
+                            mixedChannels: bulkMixedChannels,
+                            hasAnyDice: bulkHasAnyDice,
+                            replaceOpen: bulkReplaceOpen,
+                            replaceMatchCount: bulkReplaceMatchCount,
+                            onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                            onCloseReplace: () => setBulkReplaceOpen(false),
+                            onChangeState: (updater) =>
+                              setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                            onSave: saveBulkEdit,
+                            onCancel: () => {
+                              setBulkEdit(null);
+                              setBulkReplaceOpen(false);
+                            },
+                            onDelete: deleteSelected,
+                          }
                         : undefined
                     }
                     onJump={

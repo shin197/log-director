@@ -1783,6 +1783,12 @@ code {
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 
+.composer-color-group,
+.editor-color-group {
+  flex: 0 0 auto;
+  width: 128px;
+}
+
 .faces-heading {
   display: flex;
   align-items: center;

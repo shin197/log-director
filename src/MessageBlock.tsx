@@ -135,6 +135,23 @@ export function MessageBlock({
     ? bulkContext.faceCharacter
     : characters.find((c) => c.id === activeBlock.characterId);
   const canEditFace = isBulk ? !!bulkContext.faceCharacter : !isSystem;
+  const isCustomSpeaker = isBulk
+    ? bulkContext.state.speakerAction
+      ? bulkContext.state.speakerAction.type === 'unlink' ||
+        bulkContext.state.speakerAction.type === 'custom'
+      : !bulkContext.mixedSpeakers && !isSystem && !b.characterId
+    : !isSystem && !draft.characterId;
+  const customColorValue = isBulk
+    ? (bulkContext.state.color ??
+      (bulkContext.state.speakerAction ? '' : (b.color ?? '')))
+    : (draft.color ?? '');
+  const setCustomColor = (val: string) => {
+    if (bulkContext) {
+      bulkContext.onChangeState((prev) => ({ ...prev, color: val }));
+    } else {
+      setDraft({ ...draft, color: val });
+    }
+  };
 
   const diceValue = isBulk ? bulkContext.state.diceResult : draft.diceResult;
   const setDiceValue = (nextDice: string) => {
@@ -290,6 +307,7 @@ export function MessageBlock({
                     bulkContext.onChangeState((prev) => ({
                       ...prev,
                       speakerAction: { type: 'character', character },
+                      color: undefined,
                       iconUrl: undefined,
                     }))
                   }
@@ -314,6 +332,27 @@ export function MessageBlock({
                   characters={characters}
                   onChange={setDraft}
                 />
+              )}
+
+              {isCustomSpeaker && (
+                <div className="color-input-group editor-color-group" title="화자 색상">
+                  <input
+                    type="color"
+                    aria-label="색상 선택"
+                    value={
+                      /^#[0-9a-fA-F]{6}$/.test(customColorValue)
+                        ? customColorValue
+                        : '#888888'
+                    }
+                    onChange={(e) => setCustomColor(e.target.value)}
+                  />
+                  <input
+                    aria-label="색상 (#RRGGBB)"
+                    placeholder="#RRGGBB"
+                    value={customColorValue}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                  />
+                </div>
               )}
 
               <ChannelPicker

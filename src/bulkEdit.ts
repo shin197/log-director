@@ -16,6 +16,7 @@ export type BulkEditState = {
   replaceFind: string;
   replaceTo: string;
   speakerAction: SpeakerAction;
+  color?: string;
   iconUrl?: string;
   channel?: string;
   timestamp?: string;
@@ -120,6 +121,9 @@ export function applyBulkPatch(block: Block, bulk: BulkEditState): Block {
     }
   }
 
+  if (bulk.color !== undefined && next.sourceType !== 'system') {
+    next = { ...next, color: bulk.color };
+  }
   if (bulk.iconUrl !== undefined && next.sourceType !== 'system') {
     next = { ...next, iconUrl: bulk.iconUrl };
   }
