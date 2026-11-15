@@ -7,6 +7,7 @@ import type { ChannelSummary } from './channels';
 import { handleWrapKeyDown } from './textEdit';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { CharacterCard } from './CharacterCard';
+import { ColorInput } from './ColorInput';
 
 export type EyedropPayload = {
   speaker: string;
@@ -182,20 +183,12 @@ export function Composer({
               )}
             </div>
             {isCustomSpeaker && (
-              <div className="color-input-group composer-color-group" title="화자 색상">
-                <input
-                  type="color"
-                  aria-label="색상 선택"
-                  value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#888888'}
-                  onChange={(e) => setColor(e.target.value)}
-                />
-                <input
-                  aria-label="색상 (#RRGGBB)"
-                  placeholder="#RRGGBB"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                />
-              </div>
+              <ColorInput
+                className="composer-color-group"
+                title="화자 색상"
+                value={color}
+                onChange={setColor}
+              />
             )}
             <ChannelPicker
               value={channel}

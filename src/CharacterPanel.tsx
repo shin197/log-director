@@ -7,6 +7,7 @@ import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
 import { isSafeImageUrl } from './importFormats';
 import { type ImagePool, internImageUrl, resolveImageUrl } from './imagePool';
 import { CharacterCard } from './CharacterCard';
+import { ColorInput } from './ColorInput';
 
 type FaceDraft = { name: string; iconUrl: string; originalUrl: string };
 type Draft = Omit<Character, 'faces'> & { faces: FaceDraft[] };
@@ -297,22 +298,11 @@ export function CharacterPanel({
                   </div>
                   <div className="field-inline">
                     <span className="field-label">색상</span>
-                    <div className="color-input-group">
-                      <input
-                        type="color"
-                        aria-label="색상 선택"
-                        value={
-                          /^#[0-9a-fA-F]{6}$/.test(draft.color) ? draft.color : '#888888'
-                        }
-                        onChange={(e) => change({ ...draft, color: e.target.value })}
-                      />
-                      <input
-                        aria-label="색상 (#RRGGBB)"
-                        placeholder="#RRGGBB"
-                        value={draft.color}
-                        onChange={(e) => change({ ...draft, color: e.target.value })}
-                      />
-                    </div>
+                    <ColorInput
+                      title="캐릭터 색상"
+                      value={draft.color}
+                      onChange={(nextColor) => change({ ...draft, color: nextColor })}
+                    />
                   </div>
                 </div>
 

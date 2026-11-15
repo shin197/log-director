@@ -2,6 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse, replaceBlocks } from './core.ts';
 import {
+  formatColorCodeForInput,
+  getContrastTextColor,
+  normalizeColorCodeInput,
+  resolvePickerColor,
+  toStoredColorValue,
+} from './color.ts';
+import {
   compileQuery,
   formatChipDisplay,
   formatChipToken,
@@ -1631,4 +1638,35 @@ test('내부 이미지 풀: oversized_json 중복 제거 직렬화, 미사용 �
     blocks: [],
   });
   assert.equal(pruned.images, undefined);
+});
+
+test('컬러 입력 유틸: # 자동 제거(직접 입력·붙여넣기), 저장값 변환, 대비 글자색 계산', () => {
+  // # 직접 입력 및 클립보드 붙여넣기 시 #·공백 자동 제거, 대문자 변환 및 6자리 유지
+  assert.equal(normalizeColorCodeInput('#123456'), '123456');
+  assert.equal(normalizeColorCodeInput(' #aBcDeF '), 'ABCDEF');
+  assert.equal(normalizeColorCodeInput('12#3456'), '123456');
+  assert.equal(normalizeColorCodeInput('###'), '');
+  assert.equal(normalizeColorCodeInput('#12345678'), '123456');
+  assert.equal(normalizeColorCodeInput('abcdef'), 'ABCDEF');
+
+  // 표시용/저장용 변환 (모두 대문자)
+  assert.equal(formatColorCodeForInput('#6cd4bc'), '6CD4BC');
+  assert.equal(formatColorCodeForInput(''), '');
+  assert.equal(toStoredColorValue('#ff00aa'), '#FF00AA');
+  assert.equal(toStoredColorValue('ff00aa'), '#FF00AA');
+  assert.equal(toStoredColorValue('#'), '');
+
+  // 피커 색상 폴백 (유효하면 대문자 반환)
+  assert.equal(resolvePickerColor('#123abc'), '#123ABC');
+  assert.equal(resolvePickerColor('#123'), '#888888');
+  assert.equal(resolvePickerColor(''), '#888888');
+
+  // 배경색 명도에 따른 # 글자색(흰색/검은색) 결정
+  assert.equal(getContrastTextColor('#000000'), '#ffffff');
+  assert.equal(getContrastTextColor('#161c24'), '#ffffff');
+  assert.equal(getContrastTextColor('#0000ff'), '#ffffff');
+  assert.equal(getContrastTextColor('#ffffff'), '#000000');
+  assert.equal(getContrastTextColor('#6cd4bc'), '#000000');
+  assert.equal(getContrastTextColor('#ffff00'), '#000000');
+  assert.equal(getContrastTextColor('#888888'), '#000000');
 });
