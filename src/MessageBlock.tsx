@@ -251,13 +251,6 @@ export function MessageBlock({
         }
       }}
     >
-      {searchMatch && (
-        <span
-          className="search-match-dot"
-          title="검색 조건 일치"
-          aria-label="검색 조건 일치"
-        />
-      )}
       {pasteIndicator && onPasteHere && (
         <div
           className={`paste-indicator ${pasteIndicator}`}
