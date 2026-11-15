@@ -167,6 +167,21 @@ function App() {
     if (queryError) notifyError(queryError);
   }, [queryError]);
 
+  const searchMatchPredicate = useMemo(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return null;
+    try {
+      return compileQuery(
+        sanitizeLiveQuery(trimmed),
+        p.characters ?? [],
+        p.scenes ?? [],
+        p.blocks,
+      );
+    } catch {
+      return null;
+    }
+  }, [query, p.characters, p.scenes, p.blocks]);
+
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
     current = Math.min(page, pages - 1);
@@ -201,7 +216,8 @@ function App() {
   function jumpToMessage(id: string) {
     const index = p.blocks.findIndex((b) => b.id === id);
     if (index < 0) return;
-    disableSearch();
+    // disableSearch();
+    setSearchActive(false);
     setEditingId(null);
     setBulkEdit(null);
     setSelected(new Set([id]));
@@ -1264,11 +1280,9 @@ function App() {
                                 }
                               : undefined
                           }
+                          searchMatch={Boolean(searchMatchPredicate?.(b))}
                           onJump={
-                            !bulkEdit &&
-                            searchActive &&
-                            query.trim() &&
-                            selected.has(b.id)
+                            !bulkEdit && searchActive && query.trim()
                               ? () => jumpToMessage(b.id)
                               : undefined
                           }

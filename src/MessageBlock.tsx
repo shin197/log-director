@@ -48,6 +48,7 @@ export function MessageBlock({
   bulkTarget = false,
   bulkDisabled = false,
   bulkContext,
+  searchMatch = false,
   toggle,
   save,
   remove,
@@ -58,6 +59,7 @@ export function MessageBlock({
   onBookmark,
 }: {
   block: Block;
+  searchMatch?: boolean;
   onJump?: () => void;
   onEyedrop?: () => void;
   scene?: Scene;
@@ -179,7 +181,7 @@ export function MessageBlock({
   return (
     <article
       data-message-id={b.id}
-      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${dropClass}`}
+      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${searchMatch ? 'search-match' : ''} ${dropClass}`}
       draggable={!isEditing && !bulkDisabled && !cutMode}
       onDragStart={(e) => {
         if (bulkDisabled || cutMode) return;
@@ -249,6 +251,13 @@ export function MessageBlock({
         }
       }}
     >
+      {searchMatch && (
+        <span
+          className="search-match-dot"
+          title="검색 조건 일치"
+          aria-label="검색 조건 일치"
+        />
+      )}
       {pasteIndicator && onPasteHere && (
         <div
           className={`paste-indicator ${pasteIndicator}`}
