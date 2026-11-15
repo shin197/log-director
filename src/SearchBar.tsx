@@ -12,6 +12,8 @@ import {
   parseQueryToChipsAndText,
   tryParseFilterToken,
   type SearchChip,
+  parseFilterValueInput,
+  splitSearchTokens,
 } from './query';
 
 const HISTORY_STORAGE_KEY = 'log-studio:search-history';
@@ -19,42 +21,42 @@ const MAX_HISTORY = 6;
 
 type SuggestionItem =
   | {
-    id: string;
-    section: string;
-    kind: 'prefix';
-    prefix: string;
-    icon: string;
-    label: string;
-    syntax: string;
-    description: string;
-  }
+      id: string;
+      section: string;
+      kind: 'prefix';
+      prefix: string;
+      icon: string;
+      label: string;
+      syntax: string;
+      description: string;
+    }
   | {
-    id: string;
-    section: string;
-    kind: 'chip';
-    chip: Omit<SearchChip, 'id'>;
-    icon: string;
-    label: string;
-    syntax: string;
-    meta?: string;
-    characterCard?: { name: string; iconUrl: string; color: string };
-  }
+      id: string;
+      section: string;
+      kind: 'chip';
+      chip: Omit<SearchChip, 'id'>;
+      icon: string;
+      label: string;
+      syntax: string;
+      meta?: string;
+      characterCard?: { name: string; iconUrl: string; color: string };
+    }
   | {
-    id: string;
-    section: string;
-    kind: 'text-commit';
-    icon: string;
-    label: string;
-    syntax: string;
-  }
+      id: string;
+      section: string;
+      kind: 'text-commit';
+      icon: string;
+      label: string;
+      syntax: string;
+    }
   | {
-    id: string;
-    section: string;
-    kind: 'history';
-    query: string;
-    icon: string;
-    label: string;
-  };
+      id: string;
+      section: string;
+      kind: 'history';
+      query: string;
+      icon: string;
+      label: string;
+    };
 
 function loadSearchHistory(): string[] {
   try {
@@ -82,18 +84,20 @@ function splitTrailingToken(input: string): {
   leading: string;
   activeToken: string;
 } {
-  if (!input || /\s$/.test(input)) {
+  if (!input) {
     return { leading: input, activeToken: '' };
   }
-  const tokens = input.match(/(?:[^\s"]|"[^"]*")+/g);
-  if (!tokens || !tokens.length) {
-    return { leading: '', activeToken: input };
+  const tokens = splitSearchTokens(input);
+  if (!tokens.length) {
+    return { leading: input, activeToken: '' };
   }
   const last = tokens[tokens.length - 1];
-  const idx = input.lastIndexOf(last);
+  if (last.end < input.length) {
+    return { leading: input, activeToken: '' };
+  }
   return {
-    leading: input.slice(0, idx),
-    activeToken: input.slice(idx),
+    leading: input.slice(0, last.start),
+    activeToken: last.raw,
   };
 }
 
@@ -243,10 +247,7 @@ export function SearchBar({
   }, [blocks, characters]);
 
   const { leading, activeToken } = splitTrailingToken(text);
-  const sceneRanges = useMemo(
-    () => computeSceneRanges(scenes, blocks),
-    [scenes, blocks],
-  );
+  const sceneRanges = useMemo(() => computeSceneRanges(scenes, blocks), [scenes, blocks]);
 
   // 컨텍스트 드롭다운 항목 생성
   const suggestions = useMemo<SuggestionItem[]>(() => {
@@ -256,7 +257,7 @@ export function SearchBar({
     // 1. from: 또는 -from: (캐릭터 검색)
     if (lowerToken.startsWith('from:') || lowerToken.startsWith('-from:')) {
       const negative = lowerToken.startsWith('-');
-      const rawVal = activeToken.slice(negative ? 6 : 5).replace(/^"|"$/g, '');
+      const rawVal = parseFilterValueInput(activeToken.slice(negative ? 6 : 5));
       const sub = rawVal.toLowerCase();
       const section = negative ? '제외할 캐릭터 (-from:)' : '캐릭터로 검색 (from:)';
 
@@ -300,7 +301,7 @@ export function SearchBar({
     // 2. in: 또는 -in: (채널 검색)
     if (lowerToken.startsWith('in:') || lowerToken.startsWith('-in:')) {
       const negative = lowerToken.startsWith('-');
-      const rawVal = activeToken.slice(negative ? 4 : 3).replace(/^"|"$/g, '');
+      const rawVal = parseFilterValueInput(activeToken.slice(negative ? 4 : 3));
       const sub = rawVal.toLowerCase();
       const section = negative ? '제외할 채널 (-in:)' : '채널로 검색 (in:)';
 
@@ -346,7 +347,7 @@ export function SearchBar({
     // 3. dice: 또는 -dice: (주사위 판정 텍스트 필터)
     if (lowerToken.startsWith('dice:') || lowerToken.startsWith('-dice:')) {
       const negative = lowerToken.startsWith('-');
-      const rawVal = activeToken.slice(negative ? 6 : 5).replace(/^"|"$/g, '');
+      const rawVal = parseFilterValueInput(activeToken.slice(negative ? 6 : 5));
       const clean = rawVal.trim();
       const section = negative ? '제외할 주사위 판정 (-dice:)' : '주사위 필터 (dice:)';
 
@@ -410,7 +411,7 @@ export function SearchBar({
     // 4-2. scene: 또는 -scene: (장면 검색)
     if (lowerToken.startsWith('scene:') || lowerToken.startsWith('-scene:')) {
       const negative = lowerToken.startsWith('-');
-      const rawVal = activeToken.slice(negative ? 7 : 6).replace(/^"|"$/g, '');
+      const rawVal = parseFilterValueInput(activeToken.slice(negative ? 7 : 6));
       const sub = rawVal.toLowerCase();
       const section = negative ? '제외할 장면 (-scene:)' : '장면으로 검색 (scene:)';
 
@@ -436,9 +437,7 @@ export function SearchBar({
 
       if (
         rawVal.trim() &&
-        !matched.some(
-          (r) => r.scene.name.toLowerCase() === rawVal.trim().toLowerCase(),
-        )
+        !matched.some((r) => r.scene.name.toLowerCase() === rawVal.trim().toLowerCase())
       ) {
         const clean = rawVal.trim();
         items.push({
@@ -457,7 +456,7 @@ export function SearchBar({
 
     // 5. 제외 조건 (-)
     if (lowerToken.startsWith('-')) {
-      const sub = activeToken.slice(1).replace(/^"|"$/g, '').trim();
+      const sub = parseFilterValueInput(activeToken.slice(1)).trim();
       const section = '제외 조건 (-)';
 
       if (sub) {
@@ -478,37 +477,37 @@ export function SearchBar({
         label: string;
         description: string;
       }[] = [
-          {
-            prefix: '-from:',
-            icon: '-👤',
-            label: '특정 캐릭터 제외',
-            description: '화자가 해당 캐릭터가 아닌 메시지',
-          },
-          {
-            prefix: '-in:',
-            icon: '-#',
-            label: '특정 채널 제외',
-            description: '해당 탭/채널이 아닌 메시지',
-          },
-          {
-            prefix: '-dice:',
-            icon: '-🎲',
-            label: '특정 주사위 판정 제외',
-            description: '판정 결과에 특정 텍스트가 없는 메시지',
-          },
-          {
-            prefix: '-is:',
-            icon: '-✨',
-            label: '특정 상태 메시지 제외',
-            description: '시스템·판정·미연결 등 제외',
-          },
-          {
-            prefix: '-scene:',
-            icon: '-★',
-            label: '특정 장면 제외',
-            description: '해당 장면 구간에 속하지 않는 메시지',
-          },
-        ];
+        {
+          prefix: '-from:',
+          icon: '-👤',
+          label: '특정 캐릭터 제외',
+          description: '화자가 해당 캐릭터가 아닌 메시지',
+        },
+        {
+          prefix: '-in:',
+          icon: '-#',
+          label: '특정 채널 제외',
+          description: '해당 탭/채널이 아닌 메시지',
+        },
+        {
+          prefix: '-dice:',
+          icon: '-🎲',
+          label: '특정 주사위 판정 제외',
+          description: '판정 결과에 특정 텍스트가 없는 메시지',
+        },
+        {
+          prefix: '-is:',
+          icon: '-✨',
+          label: '특정 상태 메시지 제외',
+          description: '시스템·판정·미연결 등 제외',
+        },
+        {
+          prefix: '-scene:',
+          icon: '-★',
+          label: '특정 장면 제외',
+          description: '해당 장면 구간에 속하지 않는 메시지',
+        },
+      ];
 
       for (const np of negPrefixes) {
         if (!sub || np.prefix.includes(lowerToken)) {
@@ -535,49 +534,49 @@ export function SearchBar({
       description: string;
       keywords: string[];
     }[] = [
-        {
-          prefix: 'from:',
-          icon: '👤',
-          label: '캐릭터로 검색',
-          description: '특정 캐릭터/화자의 메시지 필터링',
-          keywords: ['from', 'character', 'speaker', '캐릭터', '화자'],
-        },
-        {
-          prefix: 'in:',
-          icon: '#',
-          label: '채널로 검색',
-          description: '특정 탭/채널의 메시지 필터링',
-          keywords: ['in', 'channel', 'tab', '채널', '탭'],
-        },
-        {
-          prefix: 'dice:',
-          icon: '🎲',
-          label: '주사위 필터',
-          description: '주사위 판정 내부 텍스트 필터링',
-          keywords: ['dice', 'roll', '주사위', '판정'],
-        },
-        {
-          prefix: 'is:',
-          icon: '✨',
-          label: '상태 필터',
-          description: 'is:dice, is:system, is:normal, is:unlinked',
-          keywords: ['is', 'system', 'normal', 'unlinked', '상태', '시스템', '미연결'],
-        },
-        {
-          prefix: 'scene:',
-          icon: '★',
-          label: '장면으로 검색',
-          description: '특정 장면부터 다음 장면까지의 메시지',
-          keywords: ['scene', 'bookmark', '장면', '북마크'],
-        },
-        {
-          prefix: '-',
-          icon: '🚫',
-          label: '제외 조건',
-          description: '-from:제타 등 조건에 해당하지 않는 메시지',
-          keywords: ['-', 'not', 'exclude', '제외'],
-        },
-      ];
+      {
+        prefix: 'from:',
+        icon: '👤',
+        label: '캐릭터로 검색',
+        description: '특정 캐릭터/화자의 메시지 필터링',
+        keywords: ['from', 'character', 'speaker', '캐릭터', '화자'],
+      },
+      {
+        prefix: 'in:',
+        icon: '#',
+        label: '채널로 검색',
+        description: '특정 탭/채널의 메시지 필터링',
+        keywords: ['in', 'channel', 'tab', '채널', '탭'],
+      },
+      {
+        prefix: 'dice:',
+        icon: '🎲',
+        label: '주사위 필터',
+        description: '주사위 판정 내부 텍스트 필터링',
+        keywords: ['dice', 'roll', '주사위', '판정'],
+      },
+      {
+        prefix: 'is:',
+        icon: '✨',
+        label: '상태 필터',
+        description: 'is:dice, is:system, is:normal, is:unlinked',
+        keywords: ['is', 'system', 'normal', 'unlinked', '상태', '시스템', '미연결'],
+      },
+      {
+        prefix: 'scene:',
+        icon: '★',
+        label: '장면으로 검색',
+        description: '특정 장면부터 다음 장면까지의 메시지',
+        keywords: ['scene', 'bookmark', '장면', '북마크'],
+      },
+      {
+        prefix: '-',
+        icon: '🚫',
+        label: '제외 조건',
+        description: '-from:제타 등 조건에 해당하지 않는 메시지',
+        keywords: ['-', 'not', 'exclude', '제외'],
+      },
+    ];
 
     const matchingRoot = rootOptions.filter(
       (opt) =>
@@ -759,19 +758,19 @@ export function SearchBar({
 
     // 공백이 입력되었을 때 앞선 토큰이 완성된 필터 토큰이면 자동으로 Chip으로 변환
     if (/\s$/.test(rawValue)) {
-      const tokens = rawValue.match(/(?:[^\s"]|"[^"]*")+/g) ?? [];
-      if (tokens.length > 0) {
+      const tokens = splitSearchTokens(rawValue);
+      if (tokens.length > 0 && tokens[tokens.length - 1].end < rawValue.length) {
         const addedChips: SearchChip[] = [];
         const keptTokens: string[] = [];
         for (const tok of tokens) {
-          const parsed = tryParseFilterToken(tok);
+          const parsed = tryParseFilterToken(tok.raw);
           if (parsed) {
             addedChips.push({
               id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               ...parsed,
             });
           } else {
-            keptTokens.push(tok);
+            keptTokens.push(tok.raw);
           }
         }
         if (addedChips.length > 0) {
@@ -908,7 +907,7 @@ export function SearchBar({
               } else if (suggestions.length > 0) {
                 setActiveIndex(
                   (safeIndex + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) %
-                  suggestions.length,
+                    suggestions.length,
                 );
               }
               return;

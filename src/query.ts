@@ -62,9 +62,140 @@ function getSpeakerNames(b: Block, characters?: Character[]): string[] {
 }
 
 export function quoteValueIfNeeded(value: string): string {
-  const clean = value.replace(/"/g, '');
-  if (!clean) return '""';
-  return /\s/.test(clean) ? `"${clean}"` : clean;
+  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  if (!escaped) return '""';
+  return /\s/.test(escaped) || escaped.includes('"') ? `"${escaped}"` : escaped;
+}
+
+export function tokenizeQuery(query: string): { tokens: string[]; openQuote: boolean } {
+  const tokens: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < query.length; i++) {
+    const ch = query[i];
+    if (ch === '\\' && i + 1 < query.length) {
+      const next = query[i + 1];
+      if (next === '"' || next === '\\') {
+        cur += next;
+        i++;
+        continue;
+      }
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      cur += ch;
+    } else if (/\s/.test(ch) && !inQuotes) {
+      if (cur) {
+        tokens.push(cur);
+        cur = '';
+      }
+    } else {
+      cur += ch;
+    }
+  }
+
+  if (cur) {
+    tokens.push(cur);
+  }
+
+  return { tokens, openQuote: inQuotes };
+}
+
+export function unquoteSearchValue(raw: string): string {
+  let val = raw;
+  if (val.startsWith('"') && val.endsWith('"') && val.length >= 2) {
+    val = val.slice(1, -1);
+  }
+  return val;
+}
+
+/**
+ * 검색 입력 문자열의 이스케이프 시퀀스(\", \\)를 실제 문자로 복원합니다.
+ */
+export function unescapeSearchValue(raw: string): string {
+  let out = '';
+  for (let i = 0; i < raw.length; i++) {
+    if (
+      raw[i] === '\\' &&
+      i + 1 < raw.length &&
+      (raw[i + 1] === '"' || raw[i + 1] === '\\')
+    ) {
+      out += raw[i + 1];
+      i++;
+    } else {
+      out += raw[i];
+    }
+  }
+  return out;
+}
+
+/**
+ * SearchBar 자동완성/칩 생성 시 필터 값 입력(따옴표 열림/닫힘 및 \", \\ 이스케이프 포함)을
+ * 실제 표시·저장용 값으로 파싱합니다.
+ */
+export function parseFilterValueInput(raw: string): string {
+  if (!raw.startsWith('"')) {
+    return unescapeSearchValue(raw);
+  }
+  let out = '';
+  let i = 1;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (
+      ch === '\\' &&
+      i + 1 < raw.length &&
+      (raw[i + 1] === '"' || raw[i + 1] === '\\')
+    ) {
+      out += raw[i + 1];
+      i += 2;
+      continue;
+    }
+    if (ch === '"' && i === raw.length - 1) {
+      break;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
+ * 따옴표 및 이스케이프(\", \\)를 고려해 검색 입력을 공백 기준 토큰으로 분리합니다.
+ */
+export function splitSearchTokens(
+  input: string,
+): Array<{ raw: string; start: number; end: number }> {
+  const tokens: Array<{ raw: string; start: number; end: number }> = [];
+  let i = 0;
+  while (i < input.length) {
+    while (i < input.length && /\s/.test(input[i])) i++;
+    if (i >= input.length) break;
+    const start = i;
+    let inQuotes = false;
+    while (i < input.length) {
+      const ch = input[i];
+      if (
+        ch === '\\' &&
+        i + 1 < input.length &&
+        (input[i + 1] === '"' || input[i + 1] === '\\')
+      ) {
+        i += 2;
+        continue;
+      }
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        i++;
+        continue;
+      }
+      if (!inQuotes && /\s/.test(ch)) {
+        break;
+      }
+      i++;
+    }
+    tokens.push({ raw: input.slice(start, i), start, end: i });
+  }
+  return tokens;
 }
 
 export function formatChipToken(chip: Omit<SearchChip, 'id'>): string {
@@ -109,7 +240,6 @@ export function formatChipDisplay(chip: Omit<SearchChip, 'id'>): {
 export function tryParseFilterToken(rawToken: string): Omit<SearchChip, 'id'> | null {
   const trimmed = rawToken.trim();
   if (!trimmed) return null;
-  if ((trimmed.match(/"/g)?.length ?? 0) % 2 !== 0) return null;
 
   let token = trimmed;
   const negative = token.startsWith('-');
@@ -119,16 +249,13 @@ export function tryParseFilterToken(rawToken: string): Omit<SearchChip, 'id'> | 
   const colon = token.indexOf(':');
   if (colon < 0) {
     if (!negative) return null;
-    const value = token.replace(/^"|"$/g, '');
+    const value = unquoteSearchValue(token);
     if (!value) return null;
     return { key: 'text', value, negative: true };
   }
 
   const key = token.slice(0, colon).toLowerCase();
-  const value = token
-    .slice(colon + 1)
-    .replace(/^"|"$/g, '')
-    .trim();
+  const value = unquoteSearchValue(token.slice(colon + 1)).trim();
   if (!value) return null;
 
   if (key === 'from' || key === 'in' || key === 'dice' || key === 'scene') {
@@ -152,7 +279,7 @@ export function parseQueryToChipsAndText(query: string): {
   chips: SearchChip[];
   text: string;
 } {
-  const tokens = query.match(/(?:[^\s"]|"[^"]*")+/g) ?? [];
+  const { tokens } = tokenizeQuery(query);
   const chips: SearchChip[] = [];
   const remaining: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -168,30 +295,39 @@ export function parseQueryToChipsAndText(query: string): {
 
 export function sanitizeLiveQuery(query: string): string {
   let working = query;
-  if ((working.match(/"/g)?.length ?? 0) % 2 !== 0) {
+  const { openQuote } = tokenizeQuery(working);
+  if (openQuote) {
     working += '"';
   }
-  const tokens = working.match(/(?:[^\s"]|"[^"]*")+/g) ?? [];
-  const validTokens = tokens.filter((raw) => {
-    const t = raw.startsWith('-') ? raw.slice(1) : raw;
-    if (!t || t.endsWith(':')) return false;
+  const { tokens } = tokenizeQuery(working);
+  const formatted: string[] = [];
+  for (const raw of tokens) {
+    const negative = raw.startsWith('-');
+    const t = negative ? raw.slice(1) : raw;
+    if (!t || t.endsWith(':')) continue;
     const colon = t.indexOf(':');
-    if (colon < 0) return true;
+    if (colon < 0) {
+      const val = unquoteSearchValue(t);
+      if (!val) continue;
+      formatted.push(`${negative ? '-' : ''}${quoteValueIfNeeded(val)}`);
+      continue;
+    }
     const key = t.slice(0, colon);
-    const val = t
-      .slice(colon + 1)
-      .replace(/^"|"$/g, '')
-      .toLowerCase();
-    if (!val) return false;
+    const rawVal = unquoteSearchValue(t.slice(colon + 1));
+    const valLower = rawVal.toLowerCase();
+    if (!valLower) continue;
     if (key === 'is') {
       const validIs = ['dice', 'system', 'normal', 'unlinked'];
-      if (!validIs.includes(val) && validIs.some((flag) => flag.startsWith(val))) {
-        return false;
+      if (
+        !validIs.includes(valLower) &&
+        validIs.some((flag) => flag.startsWith(valLower))
+      ) {
+        continue;
       }
     }
-    return true;
-  });
-  return validTokens.join(' ');
+    formatted.push(`${negative ? '-' : ''}${key}:${quoteValueIfNeeded(rawVal)}`);
+  }
+  return formatted.join(' ');
 }
 
 export function compileQuery(
@@ -200,8 +336,8 @@ export function compileQuery(
   scenes?: Scene[],
   blocks?: Block[],
 ): (b: Block) => boolean {
-  const tokens = query.match(/(?:[^\s"]|"[^"]*")+/g) ?? [];
-  if ((query.match(/"/g)?.length ?? 0) % 2) throw Error('따옴표를 닫아주세요.');
+  const { tokens, openQuote } = tokenizeQuery(query);
+  if (openQuote) throw Error('따옴표를 닫아주세요.');
 
   let cachedSceneRanges: SceneRange[] | null = null;
 
@@ -214,7 +350,7 @@ export function compileQuery(
     const colon = token.indexOf(':');
     const key = colon < 0 ? 'all' : token.slice(0, colon);
     const rawValue = colon < 0 ? token : token.slice(colon + 1);
-    const value = rawValue.replace(/^"|"$/g, '').toLowerCase();
+    const value = unquoteSearchValue(rawValue).toLowerCase();
 
     if (!value) throw Error('검색어를 입력해주세요.');
 

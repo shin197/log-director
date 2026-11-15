@@ -6,9 +6,11 @@ import {
   formatChipDisplay,
   formatChipToken,
   moveBlocks,
+  parseFilterValueInput,
   parseQueryToChipsAndText,
   reorder,
   sanitizeLiveQuery,
+  splitSearchTokens,
 } from './query.ts';
 test('쿼리 조건 조합, 제외, 인용문과 오류 (Discord/GitHub 스타일)', () => {
   const b = {
@@ -81,6 +83,89 @@ test('쿼리 조건 조합, 제외, 인용문과 오류 (Discord/GitHub 스타�
   });
   assert.equal(parsed.text, '"급한 일"');
   assert.equal(sanitizeLiveQuery('from:제타 in:'), 'from:제타');
+
+  // 따옴표 이스케이프(\") 및 따옴표 문자 자체 검색 검증
+  const quoteBlock = {
+    id: '4',
+    characterId: null,
+    speaker: 'A',
+    text: '그는 "안녕"이라고 말했다.',
+    diceResult: '',
+    channel: '메인',
+    sourceType: 'normal',
+  };
+  const normalBlock = {
+    id: '5',
+    characterId: null,
+    speaker: 'B',
+    text: '일반적인 대사입니다.',
+    diceResult: '',
+    channel: '메인',
+    sourceType: 'normal',
+  };
+
+  // 1) 따옴표(\") 검색: 따옴표가 있는 블록만 일치
+  const predQuote = compileQuery('\\"');
+  assert.equal(predQuote(quoteBlock), true);
+  assert.equal(predQuote(normalBlock), false);
+
+  // 2) 따옴표 제외(-\"): 따옴표가 없는 블록만 일치
+  const predNoQuote = compileQuery('-\\"');
+  assert.equal(predNoQuote(quoteBlock), false);
+  assert.equal(predNoQuote(normalBlock), true);
+
+  // 3) 구문 내부 따옴표 이스케이프: "\"안녕\""
+  const predPhrase = compileQuery('"\\"안녕\\""');
+  assert.equal(predPhrase(quoteBlock), true);
+  assert.equal(predPhrase(normalBlock), false);
+
+  // 4) 구문 내부 따옴표 제외: -"\"안녕\""
+  const predNoPhrase = compileQuery('-"\\"안녕\\""');
+  assert.equal(predNoPhrase(quoteBlock), false);
+  assert.equal(predNoPhrase(normalBlock), true);
+
+  // 5) 칩 파싱에서 제외 텍스트 칩으로 정상 인식
+  const quoteChipParse = parseQueryToChipsAndText('-\\" -"\\"안녕\\""');
+  assert.equal(quoteChipParse.chips.length, 2);
+  assert.equal(quoteChipParse.chips[0].key, 'text');
+  assert.equal(quoteChipParse.chips[0].value, '"');
+  assert.equal(quoteChipParse.chips[0].negative, true);
+  assert.equal(quoteChipParse.chips[1].value, '"안녕"');
+  assert.equal(quoteChipParse.chips[1].negative, true);
+
+  // 6) 칩 UI 표시에서는 백슬래시가 제거되고, 직렬화 토큰은 compileQuery와 왕복 일치
+  assert.deepEqual(formatChipDisplay(quoteChipParse.chips[0]), {
+    icon: '🚫',
+    label: '"',
+  });
+  assert.deepEqual(formatChipDisplay(quoteChipParse.chips[1]), {
+    icon: '🚫',
+    label: '"안녕"',
+  });
+  const roundTripQuery = formatChipToken(quoteChipParse.chips[0]);
+  assert.equal(compileQuery(roundTripQuery)(quoteBlock), false);
+  assert.equal(compileQuery(roundTripQuery)(normalBlock), true);
+
+  // 7) SearchBar 자동완성/칩 입력 파싱 및 토큰 분리 (백슬래시 이스케이프 포함)
+  assert.equal(parseFilterValueInput('\\"'), '"');
+  assert.equal(parseFilterValueInput('"\\"'), '"');
+  assert.equal(parseFilterValueInput('"\\""'), '"');
+  assert.equal(parseFilterValueInput('"안녕 \\"세상\\""'), '안녕 "세상"');
+  assert.equal(parseFilterValueInput('"a\\\\b"'), 'a\\b');
+
+  assert.deepEqual(
+    splitSearchTokens('-"a \\"b\\"" -from:"제타 \\"1\\"" \\"').map((t) => t.raw),
+    ['-"a \\"b\\""', '-from:"제타 \\"1\\""', '\\"'],
+  );
+
+  // 8) sanitizeLiveQuery 후 compileQuery에서도 일반 텍스트 \" 및 -"\"가 정상 동작
+  const livePlainQuote = sanitizeLiveQuery('\\"');
+  assert.equal(compileQuery(livePlainQuote)(quoteBlock), true);
+  assert.equal(compileQuery(livePlainQuote)(normalBlock), false);
+
+  const liveNegPartialQuote = sanitizeLiveQuery('-"\\"');
+  assert.equal(compileQuery(liveNegPartialQuote)(quoteBlock), false);
+  assert.equal(compileQuery(liveNegPartialQuote)(normalBlock), true);
 });
 test('드래그 앞뒤 이동은 원본 배열을 변경하지 않음', () => {
   const blocks = ['a', 'b', 'c', 'd'].map((id) => ({
