@@ -1234,7 +1234,7 @@ function App() {
                         '--styled-system-indent': editorGlobalStyle.messageDefaults
                           ?.avatarHidden
                           ? '0px'
-                          : '52px',
+                          : `${(editorGlobalStyle.messageDefaults?.avatarSize ?? 40) + 12}px`,
                         '--styled-font-family':
                           editorGlobalStyle.messageDefaults?.fontFamily ||
                           'system-ui, sans-serif',

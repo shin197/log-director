@@ -293,7 +293,17 @@ export function MessageBlock({
         </div>
       )}
       {!isSystem && !hideAvatar && (
-        <div className="avatar">
+        <div
+          className="avatar"
+          style={
+            resolvedVisualStyle?.avatarStyle.width
+              ? {
+                  width: resolvedVisualStyle.avatarStyle.width,
+                  height: resolvedVisualStyle.avatarStyle.height,
+                }
+              : undefined
+          }
+        >
           {isEditing && faceCharacter ? (
             <FacePicker
               character={faceCharacter}

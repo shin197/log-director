@@ -1889,6 +1889,7 @@ test('스타일 확장 2: 화자 색 테두리, 점선 테두리, 아바타 배�
       panelBorderColor: 'speaker',
       panelPaddingY: 10,
       panelPaddingX: 18,
+      avatarSize: 56,
       avatarBgColor: '#1D2530',
       avatarBorderLineStyle: 'dotted',
       avatarBorderColor: 'speaker',
@@ -1905,6 +1906,9 @@ test('스타일 확장 2: 화자 색 테두리, 점선 테두리, 아바타 배�
 
   assert.equal(styled.panelStyle.border, '1px dashed #B8342C');
   assert.equal(styled.panelStyle.padding, '10px 18px');
+  assert.equal(styled.panelStyle.gridTemplateColumns, '56px minmax(0, 1fr)');
+  assert.equal(styled.avatarStyle.width, '56px');
+  assert.equal(styled.avatarStyle.height, '56px');
   assert.equal(styled.avatarStyle.backgroundColor, '#1D2530');
   assert.equal(styled.avatarStyle.border, '2px dotted #B8342C');
   assert.equal(styled.textStyle.textAlign, 'center');

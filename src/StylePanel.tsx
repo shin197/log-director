@@ -221,7 +221,9 @@ function SampleMessagePreview({
   const metaParts = [sampleBlock?.timestamp || '오후 09:15', `[${channelName}]`].filter(
     Boolean,
   );
-  const systemIndent = globalStyle.messageDefaults?.avatarHidden ? 0 : 52;
+  const systemIndent = globalStyle.messageDefaults?.avatarHidden
+    ? 0
+    : (globalStyle.messageDefaults?.avatarSize ?? 40) + 12;
 
   return (
     <div
@@ -313,7 +315,9 @@ function GlobalStylePreview({
   );
   const sysEffective = resolveSystemBaseStyle(globalStyle);
   const sysStyled = buildMessageStyleObjects(sysEffective, globalStyle.dividerColor);
-  const systemIndent = normalStyled.avatarHidden ? 0 : 52;
+  const systemIndent = normalStyled.avatarHidden
+    ? 0
+    : (globalStyle.messageDefaults?.avatarSize ?? 40) + 12;
 
   return (
     <div
@@ -727,6 +731,24 @@ function MessageStylePropsEditor({
           <div
             className={`style-props-grid ${props.avatarHidden ? 'is-disabled-group' : ''}`}
           >
+            <label className="style-prop-field">
+              <span className="field-label">아바타 크기 (px)</span>
+              <input
+                type="number"
+                disabled={Boolean(props.avatarHidden)}
+                min={16}
+                max={128}
+                placeholder={isGlobal ? '기본값 (40)' : inheritLabel}
+                value={props.avatarSize ?? ''}
+                onChange={(e) =>
+                  update({
+                    avatarSize:
+                      e.target.value !== '' ? Number(e.target.value) : undefined,
+                  })
+                }
+              />
+            </label>
+
             <label className="style-prop-field">
               <span className="field-label">인장 틀 모양</span>
               <select

@@ -333,11 +333,15 @@ export function exportLog(
         ? `--speaker-color:${color};color:${styled.speakerColor}`
         : `--speaker-color:${color}`;
       const avatarClass = styled.avatarHidden ? '' : getAvatarClass(resolveIcon(b.iconUrl));
+      const spacerSizeAttr =
+        !styled.avatarHidden && msgProps.avatarSize !== undefined
+          ? ` style="width:${msgProps.avatarSize}px;height:${msgProps.avatarSize}px"`
+          : '';
       const avatarEl = styled.avatarHidden
         ? ''
         : avatarClass
           ? `<span class="avatar ${avatarClass}"${avatarAttr ? ` style="${escape(avatarAttr)}"` : ''} aria-hidden="true"></span>`
-          : '<span class="avatar-spacer" aria-hidden="true"></span>';
+          : `<span class="avatar-spacer"${spacerSizeAttr} aria-hidden="true"></span>`;
       const timeDatetime =
         typeof source.createdAt === 'number'
           ? ` datetime="${new Date(source.createdAt).toISOString()}"`
@@ -360,7 +364,9 @@ export function exportLog(
   const bodyColor = globalStyle.messageDefaults.textColor ?? '#eee';
   const bodyFont = globalStyle.messageDefaults.fontFamily || 'system-ui';
   const systemColor = globalStyle.systemDefaults?.textColor || globalStyle.systemTextColor;
-  const systemIndent = globalStyle.messageDefaults.avatarHidden ? 0 : 52;
+  const systemIndent = globalStyle.messageDefaults.avatarHidden
+    ? 0
+    : (globalStyle.messageDefaults.avatarSize ?? 40) + 12;
   const listGapCss =
     globalStyle.messageGap > 0
       ? `display:flex;flex-direction:column;gap:${globalStyle.messageGap}px;`

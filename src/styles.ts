@@ -29,6 +29,7 @@ export type MessageStyleProps = {
   panelPaddingY?: number;
   panelPaddingX?: number;
   avatarHidden?: boolean;
+  avatarSize?: number;
   avatarShape?: AvatarShape;
   avatarBgColor?: string;
   avatarBorderColor?: string;
@@ -210,6 +211,14 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   }
   if (typeof raw.avatarHidden === 'boolean') {
     out.avatarHidden = raw.avatarHidden;
+  }
+  if (
+    typeof raw.avatarSize === 'number' &&
+    Number.isFinite(raw.avatarSize) &&
+    raw.avatarSize >= 16 &&
+    raw.avatarSize <= 128
+  ) {
+    out.avatarSize = Math.round(raw.avatarSize);
   }
   if (VALID_AVATAR_SHAPES.has(raw.avatarShape)) {
     out.avatarShape = raw.avatarShape;
@@ -620,8 +629,15 @@ export function buildMessageStyleObjects(
   if (props.panelPaddingY !== undefined || props.panelPaddingX !== undefined) {
     panelStyle.padding = `${props.panelPaddingY ?? 16}px ${props.panelPaddingX ?? 0}px`;
   }
+  if (!props.avatarHidden && props.avatarSize !== undefined) {
+    panelStyle.gridTemplateColumns = `${props.avatarSize}px minmax(0, 1fr)`;
+  }
 
   const avatarStyle: Record<string, string | number | undefined> = {};
+  if (!props.avatarHidden && props.avatarSize !== undefined) {
+    avatarStyle.width = `${props.avatarSize}px`;
+    avatarStyle.height = `${props.avatarSize}px`;
+  }
   if (props.avatarBgColor) {
     avatarStyle.backgroundColor = props.avatarBgColor;
   }
