@@ -2176,3 +2176,26 @@ test('개별 메시지 스타일 요약 칩/전체 해제, 일괄 스타일 편�
   const loopPred = compileQuery('style:"순환 A"', [cAlpha], [], proj.blocks, styles.cards);
   assert.deepEqual(proj.blocks.filter(loopPred), []);
 });
+
+import { binarySearchFirst, binarySearchLast } from './useVirtualScroll.ts';
+test('가상 스크롤 이진 탐색 및 가시 범위 계산', () => {
+  // 5개 아이템 각각 높이 100px: [0, 100, 200, 300, 400, 500]
+  const positions = new Float64Array([0, 100, 200, 300, 400, 500]);
+  const count = 5;
+
+  // 1) 스크롤 맨 위 (scrollTop=0, viewport=250): 아이템 0, 1, 2가 뷰포트 내에 포함
+  assert.equal(binarySearchFirst(positions, 0, count), 0);
+  assert.equal(binarySearchLast(positions, 250, count), 2);
+
+  // 2) 스크롤 중간 (scrollTop=150, viewport=200, bottom=350): 아이템 1(100~200), 2(200~300), 3(300~400)
+  assert.equal(binarySearchFirst(positions, 150, count), 1);
+  assert.equal(binarySearchLast(positions, 350, count), 3);
+
+  // 3) 스크롤 끝 (scrollTop=450, viewport=200, bottom=650): 아이템 4(400~500)
+  assert.equal(binarySearchFirst(positions, 450, count), 4);
+  assert.equal(binarySearchLast(positions, 650, count), 4);
+
+  // 4) 빈 배열 (count=0)
+  assert.equal(binarySearchFirst(new Float64Array([0]), 100, 0), 0);
+  assert.equal(binarySearchLast(new Float64Array([0]), 100, 0), 0);
+});

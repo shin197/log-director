@@ -5,6 +5,7 @@ import {
 } from './keyboardNavigation';
 import { Composer, type EyedropPayload } from './Composer';
 import { mergeConsecutive, PAGE_SIZE } from './logOperations';
+import { useVirtualScroll } from './useVirtualScroll';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { StylePanel } from './StylePanel';
@@ -202,8 +203,27 @@ function App() {
   }, [applyStylesInEditor, p.styles, p.characters, p.scenes, p.blocks]);
 
   const visible = p.blocks.filter(predicate);
-  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
-    current = Math.min(page, pages - 1);
+  const isVirtual = Boolean(p.display?.virtualScroll ?? true);
+  const virtualBuffer = p.display?.virtualBuffer ?? 25;
+
+  const {
+    scrollerRef,
+    startIndex,
+    endIndex,
+    offsetTop,
+    offsetBottom,
+    measureElement,
+    scrollToIndex,
+  } = useVirtualScroll({
+    items: visible,
+    getItemKey: (b) => b.id,
+    estimateHeight: 74,
+    overscan: virtualBuffer,
+    enabled: isVirtual,
+  });
+
+  const pages = isVirtual ? 1 : Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
+    current = isVirtual ? 0 : Math.min(page, pages - 1);
   const selectedCount = bulkEdit ? bulkEdit.selectedIds.size : selected.size;
   const pendingFocus = useRef<{
     id: string;
@@ -216,7 +236,8 @@ function App() {
     setQuery('');
     setSearchActive(false);
     selectionAnchor.current = null;
-    setPage(0);
+    if (!isVirtual) setPage(0);
+    else scrollerRef.current?.scrollTo({ top: 0 });
     searchInput.current?.blur();
   }
 
@@ -224,7 +245,7 @@ function App() {
     if (searchActive) {
       setSearchActive(false);
       selectionAnchor.current = null;
-      setPage(0);
+      if (!isVirtual) setPage(0);
       searchInput.current?.blur();
     } else {
       setSearchActive(true);
@@ -236,14 +257,17 @@ function App() {
   function jumpToMessage(id: string) {
     const index = p.blocks.findIndex((b) => b.id === id);
     if (index < 0) return;
-    // disableSearch();
     setSearchActive(false);
     setEditingId(null);
     setBulkEdit(null);
     setSelected(new Set([id]));
     if (cutIds) setPasteTarget({ id, after: true });
     pendingFocus.current = { id, direction: 1, center: true };
-    setPage(Math.floor(index / PAGE_SIZE));
+    if (isVirtual) {
+      scrollToIndex(index, 'center');
+    } else {
+      setPage(Math.floor(index / PAGE_SIZE));
+    }
   }
 
   function jumpToScene(scene: Scene) {
@@ -259,7 +283,11 @@ function App() {
     setSelected(new Set([scene.messageId]));
     if (cutIds) setPasteTarget({ id: scene.messageId, after: true });
     pendingFocus.current = { id: scene.messageId, direction: 1, top: true };
-    setPage(Math.floor(targetIndex / PAGE_SIZE));
+    if (isVirtual) {
+      scrollToIndex(targetIndex, 'start');
+    } else {
+      setPage(Math.floor(targetIndex / PAGE_SIZE));
+    }
     setNotice(`‘${scene.name || '장면'}’ 장면으로 이동했습니다.`);
   }
 
@@ -384,7 +412,10 @@ function App() {
     setBulkReplaceOpen(false);
     setBulkEdit(createBulkEditState(repId, selected, repBlock));
     const visibleIdx = visible.findIndex((b) => b.id === repId);
-    if (visibleIdx >= 0) setPage(Math.floor(visibleIdx / PAGE_SIZE));
+    if (visibleIdx >= 0) {
+      if (isVirtual) scrollToIndex(visibleIdx, 'center');
+      else setPage(Math.floor(visibleIdx / PAGE_SIZE));
+    }
     pendingFocus.current = { id: repId, direction: 1 };
   }
 
@@ -407,7 +438,8 @@ function App() {
     setBulkEdit(null);
     setQuery('');
     setSearchActive(false);
-    setPage(Math.floor(index / PAGE_SIZE));
+    if (isVirtual) scrollToIndex(index, 'center');
+    else setPage(Math.floor(index / PAGE_SIZE));
   }
 
   useEffect(() => {
@@ -543,7 +575,10 @@ function App() {
         commit({ ...p, blocks });
         pendingFocus.current = { id, direction };
         const index = blocks.filter(predicate).findIndex((b) => b.id === id);
-        if (index >= 0) setPage(Math.floor(index / PAGE_SIZE));
+        if (index >= 0) {
+          if (isVirtual) scrollToIndex(index, direction > 0 ? 'end' : 'start');
+          else setPage(Math.floor(index / PAGE_SIZE));
+        }
         return;
       }
       if (
@@ -554,6 +589,30 @@ function App() {
         (e.key === 'PageUp' || e.key === 'PageDown')
       ) {
         e.preventDefault();
+        if (isVirtual) {
+          const step = 1000;
+          const currentIdx = cursorId.current
+            ? visible.findIndex((b) => b.id === cursorId.current)
+            : 0;
+          const targetIdx =
+            e.key === 'PageDown'
+              ? Math.min(visible.length - 1, (currentIdx < 0 ? 0 : currentIdx) + step)
+              : Math.max(0, (currentIdx < 0 ? 0 : currentIdx) - step);
+          const targetBlock = visible[targetIdx];
+          if (targetBlock) {
+            cursorId.current = targetBlock.id;
+            selectionAnchor.current = { id: targetBlock.id, selected: true };
+            pendingFocus.current = {
+              id: targetBlock.id,
+              direction: e.key === 'PageDown' ? 1 : -1,
+              top: true,
+            };
+            setSelectedRaw(new Set([targetBlock.id]));
+            scrollToIndex(targetIdx, 'start');
+            setNotice(`${targetIdx + 1} / ${visible.length}번째 메시지로 이동했습니다.`);
+          }
+          return;
+        }
         if (pages <= 1) return;
         const targetPage =
           e.key === 'PageDown'
@@ -627,7 +686,7 @@ function App() {
         const beforeFirst = e.key === 'Home' || (e.key === 'ArrowUp' && next.index === 0);
         setPasteTarget({ id: next.id, after: !beforeFirst });
       }
-      setPage(Math.floor(next.index / PAGE_SIZE));
+      if (!isVirtual) setPage(Math.floor(next.index / PAGE_SIZE));
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
@@ -639,6 +698,8 @@ function App() {
     bulkEdit,
     cutIds,
     pasteTarget,
+    isVirtual,
+    scrollToIndex,
     past,
     future,
     searchActive,
@@ -649,32 +710,43 @@ function App() {
   useEffect(() => {
     const request = pendingFocus.current;
     if (!request) return;
-    const nodes = Array.from(
-      document.querySelectorAll<HTMLElement>('.log-scroll [data-message-id]'),
-    );
-    const index = nodes.findIndex((n) => n.dataset.messageId === request.id);
-    const node = nodes[index];
-    const scroller = document.querySelector<HTMLElement>('.log-scroll');
-    if (!node || !scroller) return;
+    const scroller = scrollerRef.current ?? document.querySelector<HTMLElement>('.log-scroll');
+    if (!scroller) return;
+
+    const node = scroller.querySelector<HTMLElement>(`[data-message-id="${request.id}"]`);
+    if (!node) {
+      if (isVirtual) {
+        const idx = visible.findIndex((b) => b.id === request.id);
+        if (idx >= 0) {
+          scrollToIndex(idx, request.center ? 'center' : request.top ? 'start' : 'auto');
+          return;
+        }
+      }
+      pendingFocus.current = null;
+      return;
+    }
+
     pendingFocus.current = null;
     // Allow the first and last messages to reach the center as well.
-    if (request.center) {
-      const room = Math.max(
-        0,
-        (scroller.clientHeight - node.getBoundingClientRect().height) / 2,
-      );
-      scroller.style.paddingTop = `${room}px`;
-      scroller.style.paddingBottom = `${room}px`;
-    } else if (request.top) {
-      scroller.style.paddingTop = '';
-      const roomBottom = Math.max(
-        0,
-        scroller.clientHeight - node.getBoundingClientRect().height,
-      );
-      scroller.style.paddingBottom = `${roomBottom}px`;
-    } else {
-      scroller.style.paddingTop = '';
-      scroller.style.paddingBottom = '';
+    if (!isVirtual) {
+      if (request.center) {
+        const room = Math.max(
+          0,
+          (scroller.clientHeight - node.getBoundingClientRect().height) / 2,
+        );
+        scroller.style.paddingTop = `${room}px`;
+        scroller.style.paddingBottom = `${room}px`;
+      } else if (request.top) {
+        scroller.style.paddingTop = '';
+        const roomBottom = Math.max(
+          0,
+          scroller.clientHeight - node.getBoundingClientRect().height,
+        );
+        scroller.style.paddingBottom = `${roomBottom}px`;
+      } else {
+        scroller.style.paddingTop = '';
+        scroller.style.paddingBottom = '';
+      }
     }
     node.focus({ preventScroll: true });
     const rect = node.getBoundingClientRect(),
@@ -688,6 +760,10 @@ function App() {
       scroller.scrollTop += rect.top - bounds.top - 8;
       return;
     }
+    const nodes = Array.from(
+      scroller.querySelectorAll<HTMLElement>('[data-message-id]'),
+    );
+    const index = nodes.indexOf(node);
     const neighbors = [
       nodes[index + request.direction],
       nodes[index + 2 * request.direction],
@@ -701,7 +777,19 @@ function App() {
       scroller.scrollTop += rect.bottom + margin - bounds.bottom;
     else if (request.direction < 0 && rect.top - margin < bounds.top)
       scroller.scrollTop += rect.top - margin - bounds.top;
-  }, [selected, current, p.blocks, searchActive, query, bulkEdit]);
+  }, [
+    selected,
+    current,
+    p.blocks,
+    searchActive,
+    query,
+    bulkEdit,
+    isVirtual,
+    startIndex,
+    endIndex,
+    scrollToIndex,
+    visible,
+  ]);
 
   function save(value: string, name: string) {
     const u = URL.createObjectURL(
@@ -805,27 +893,31 @@ function App() {
               <span className="count-pill" title="현재 표시 중인 블록 수">
                 {visible.length.toLocaleString()}건
               </span>
-              <button
-                type="button"
-                className="compact-btn icon-btn"
-                aria-label="이전 페이지"
-                disabled={!current}
-                onClick={() => setPage(current - 1)}
-              >
-                ◀
-              </button>
-              <span className="page-indicator">
-                {current + 1} / {pages}
-              </span>
-              <button
-                type="button"
-                className="compact-btn icon-btn"
-                aria-label="다음 페이지"
-                disabled={current + 1 >= pages}
-                onClick={() => setPage(current + 1)}
-              >
-                ▶
-              </button>
+              {!isVirtual && (
+                <>
+                  <button
+                    type="button"
+                    className="compact-btn icon-btn"
+                    aria-label="이전 페이지"
+                    disabled={!current}
+                    onClick={() => setPage(current - 1)}
+                  >
+                    ◀
+                  </button>
+                  <span className="page-indicator">
+                    {current + 1} / {pages}
+                  </span>
+                  <button
+                    type="button"
+                    className="compact-btn icon-btn"
+                    aria-label="다음 페이지"
+                    disabled={current + 1 >= pages}
+                    onClick={() => setPage(current + 1)}
+                  >
+                    ▶
+                  </button>
+                </>
+              )}
             </div>
           )}
           <label
@@ -1284,6 +1376,7 @@ function App() {
 
             <div className="log-main-content">
               <div
+                ref={scrollerRef}
                 className={applyStylesInEditor ? 'log-scroll is-styled' : 'log-scroll'}
                 style={
                   editorGlobalStyle
@@ -1311,18 +1404,21 @@ function App() {
                 }
               >
                 <div className="log-list">
-                  {applyStylesInEditor && editorGlobalStyle && current === 0 && p.title && (
-                    <h1
-                      className="styled-log-title"
-                      style={{
-                        color: editorGlobalStyle.titleColor,
-                        fontSize: `${editorGlobalStyle.titleSize}px`,
-                        textAlign: editorGlobalStyle.titleAlign,
-                      }}
-                    >
-                      {p.title}
-                    </h1>
-                  )}
+                  {applyStylesInEditor &&
+                    editorGlobalStyle &&
+                    (isVirtual ? startIndex === 0 : current === 0) &&
+                    p.title && (
+                      <h1
+                        className="styled-log-title"
+                        style={{
+                          color: editorGlobalStyle.titleColor,
+                          fontSize: `${editorGlobalStyle.titleSize}px`,
+                          textAlign: editorGlobalStyle.titleAlign,
+                        }}
+                      >
+                        {p.title}
+                      </h1>
+                    )}
                   {!visible.length && (
                     <div className="empty">
                       <h2>
@@ -1337,18 +1433,26 @@ function App() {
                       </p>
                     </div>
                   )}
-                  {visible
-                    .slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
-                    .map((b) => {
-                      const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
-                      const isBulkRep = bulkEdit?.repId === b.id;
-                      const displayBlock =
-                        isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
+                  {isVirtual && offsetTop > 0 && (
+                    <div
+                      style={{ height: offsetTop, pointerEvents: 'none' }}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {(isVirtual
+                    ? visible.slice(startIndex, endIndex + 1)
+                    : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
+                  ).map((b) => {
+                    const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
+                    const isBulkRep = bulkEdit?.repId === b.id;
+                    const displayBlock =
+                      isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
 
-                      return (
-                        <MessageBlock
-                          key={b.id}
-                          block={displayBlock}
+                    return (
+                      <MessageBlock
+                        key={b.id}
+                        block={displayBlock}
+                        itemRef={measureElement}
                           characters={p.characters}
                           channels={channels}
                           display={p.display}
@@ -1462,6 +1566,12 @@ function App() {
                         />
                       );
                     })}
+                  {isVirtual && offsetBottom > 0 && (
+                    <div
+                      style={{ height: offsetBottom, pointerEvents: 'none' }}
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
               </div>
 

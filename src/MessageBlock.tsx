@@ -72,6 +72,7 @@ export function MessageBlock({
   onEyedrop,
   scene,
   onBookmark,
+  itemRef,
 }: {
   block: Block;
   searchMatch?: boolean;
@@ -82,6 +83,7 @@ export function MessageBlock({
   onEyedrop?: () => void;
   scene?: Scene;
   onBookmark?: () => void;
+  itemRef?: (node: HTMLElement | null) => void;
   characters?: Character[];
   channels?: ChannelSummary[];
   display?: DisplaySettings;
@@ -250,6 +252,7 @@ export function MessageBlock({
 
   return (
     <article
+      ref={itemRef}
       data-message-id={b.id}
       className={`log-message ${isSystem ? 'system' : ''} ${hideAvatar ? 'no-avatar' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${searchMatch ? 'search-match' : ''} ${dropClass}`}
       style={articlePanelStyle}

@@ -3,12 +3,16 @@ export type DisplaySettings = {
   showTimestamp: boolean;
   timestampFormat: string;
   applyStylesInEditor?: boolean;
+  virtualScroll?: boolean;
+  virtualBuffer?: number;
 };
 export const defaultDisplay: DisplaySettings = {
   showChannel: true,
   showTimestamp: true,
   timestampFormat: 'original',
   applyStylesInEditor: false,
+  virtualScroll: true,
+  virtualBuffer: 30,
 };
 export function displayTime(raw: string | undefined, settings: DisplaySettings): string {
   if (!settings.showTimestamp || !raw) return '';
