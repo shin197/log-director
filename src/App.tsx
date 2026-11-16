@@ -204,6 +204,7 @@ function App() {
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
     current = Math.min(page, pages - 1);
+  const selectedCount = bulkEdit ? bulkEdit.selectedIds.size : selected.size;
   const pendingFocus = useRef<{
     id: string;
     direction: number;
@@ -546,8 +547,38 @@ function App() {
         return;
       }
       if (
-        (e.ctrlKey || e.metaKey) &&
         !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        e.shiftKey &&
+        (e.key === 'PageUp' || e.key === 'PageDown')
+      ) {
+        e.preventDefault();
+        if (pages <= 1) return;
+        const targetPage =
+          e.key === 'PageDown'
+            ? Math.min(pages - 1, current + 1)
+            : Math.max(0, current - 1);
+        if (targetPage === current) return;
+        setPage(targetPage);
+        const pageFirstBlock = visible[targetPage * PAGE_SIZE];
+        if (pageFirstBlock) {
+          cursorId.current = pageFirstBlock.id;
+          selectionAnchor.current = { id: pageFirstBlock.id, selected: true };
+          pendingFocus.current = {
+            id: pageFirstBlock.id,
+            direction: e.key === 'PageDown' ? 1 : -1,
+            top: true,
+          };
+          setSelectedRaw(new Set([pageFirstBlock.id]));
+        }
+        setNotice(`${targetPage + 1} / ${pages} 페이지로 이동했습니다.`);
+        return;
+      }
+      if (
+        !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
         !e.shiftKey &&
         (e.key === 'PageUp' || e.key === 'PageDown')
       ) {
@@ -568,17 +599,19 @@ function App() {
       }
       if (
         e.altKey ||
-        !['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)
+        !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)
       )
         return;
       const wholeLog = e.key === 'Home' || e.key === 'End';
       const order = (wholeLog ? p.blocks : visible).map((b) => b.id);
+      const step = arrow && e.shiftKey ? 10 : 1;
       const next = navigateMessages(
         order,
         cursorId.current,
         selected,
         e.key as NavigationKey,
         e.ctrlKey && arrow,
+        step,
       );
       if (!next) return;
       e.preventDefault();
@@ -695,12 +728,12 @@ function App() {
     : undefined;
   const bulkMixedSpeakers = bulkEdit
     ? new Set(
-        bulkTargetBlocks.map((b) =>
-          b.sourceType === 'system'
-            ? 'system'
-            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
-        ),
-      ).size > 1
+      bulkTargetBlocks.map((b) =>
+        b.sourceType === 'system'
+          ? 'system'
+          : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+      ),
+    ).size > 1
     : false;
   const bulkMixedChannels = bulkEdit
     ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
@@ -753,7 +786,7 @@ function App() {
               title="단축키 및 컨텍스트 도움말 (?)"
               onClick={() => setHelpOpen((v) => !v)}
             >
-              도움말
+              ?
             </button>
           </nav>
           <input
@@ -767,6 +800,34 @@ function App() {
           />
         </div>
         <div className="header-actions">
+          {tab === '로그' && (
+            <div className="header-pagination">
+              <span className="count-pill" title="현재 표시 중인 블록 수">
+                {visible.length.toLocaleString()}건
+              </span>
+              <button
+                type="button"
+                className="compact-btn icon-btn"
+                aria-label="이전 페이지"
+                disabled={!current}
+                onClick={() => setPage(current - 1)}
+              >
+                ◀
+              </button>
+              <span className="page-indicator">
+                {current + 1} / {pages}
+              </span>
+              <button
+                type="button"
+                className="compact-btn icon-btn"
+                aria-label="다음 페이지"
+                disabled={current + 1 >= pages}
+                onClick={() => setPage(current + 1)}
+              >
+                ▶
+              </button>
+            </div>
+          )}
           <label
             className="button compact-btn"
             title="JSON, HTML, Markdown, TXT 로그 또는 프로젝트 JSON 열기"
@@ -995,7 +1056,11 @@ function App() {
       <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
         <main className="log-editor">
           <div className="toolbar">
-            <div className="toolbar-search">
+            <div
+              className={`toolbar-search${
+                !query.trim() && !searchActive ? ' is-minimized' : ''
+              }`}
+            >
               <SearchBar
                 inputRef={searchInput}
                 query={query}
@@ -1018,9 +1083,17 @@ function App() {
                 className="compact-btn filter-toggle-btn"
                 aria-pressed={searchActive}
                 onClick={toggleSearch}
-                title="검색 필터 켜기/끄기 (Ctrl+F)"
+                title={
+                  searchActive
+                    ? '검색 필터 끄기 (Ctrl+F)'
+                    : '검색 필터 켜기 (Ctrl+F)'
+                }
               >
-                {searchActive ? '필터 ON' : '필터 OFF'}
+                {searchActive
+                  ? '필터 ON'
+                  : !query.trim()
+                    ? '🔎'
+                    : '필터 OFF'}
               </button>
             </div>
 
@@ -1054,108 +1127,97 @@ function App() {
               >
                 전체 선택
               </button>
-              <button
-                type="button"
-                className="compact-btn"
-                disabled={!selected.size || !!bulkEdit}
-                onClick={() => setSelected(new Set())}
-              >
-                해제
-              </button>
-              <button
-                type="button"
-                className="compact-btn"
-                disabled={(!selected.size && !cutIds) || !!bulkEdit || !!editingId}
-                aria-pressed={!!cutIds}
-                onClick={() => (cutIds ? cancelCutMode() : startCutMode())}
-                title={
-                  cutIds ? '오려붙이기 취소 (Esc)' : '선택한 메시지 오려붙이기 (Ctrl+X)'
-                }
-              >
-                {cutIds ? '오리기 취소' : '오려붙이기'}
-              </button>
-              <button
-                type="button"
-                className="compact-btn"
-                disabled={selected.size < 2 || !!bulkEdit || !!cutIds}
-                aria-pressed={!!bulkEdit}
-                onClick={startBulkEdit}
-                title="선택한 여러 메시지 일괄 편집 (Ctrl+Shift+Enter)"
-              >
-                편집
-              </button>
-              <button
-                type="button"
-                className="compact-btn"
-                disabled={selected.size < 2 || !!bulkEdit || !!cutIds}
-                title="선택한 메시지 중 캐릭터·채널·유형이 같은 연속 메시지 병합"
-                onClick={() => {
-                  const blocks = mergeConsecutive(p.blocks, selected);
-                  const mergedCount = p.blocks.length - blocks.length;
-                  if (!mergedCount) {
-                    setNotice('선택한 메시지 중 병합할 연속 메시지가 없습니다.');
-                    return;
-                  }
-                  commit({ ...p, blocks });
-                  setSelected(new Set());
-                  setEditingId(null);
-                  setNotice(`${mergedCount}개 블록을 병합했습니다.`);
-                }}
-              >
-                연속 병합
-              </button>
-              <button
-                type="button"
-                className="compact-btn"
-                disabled={!!cutIds}
-                aria-pressed={bulkEdit ? bulkReplaceOpen : replaceOpen}
-                onClick={() =>
-                  bulkEdit ? setBulkReplaceOpen((v) => !v) : setReplaceOpen((v) => !v)
-                }
-                title="일괄 치환 열기/닫기 (Ctrl+H)"
-              >
-                치환
-              </button>
-              <button
-                type="button"
-                className="compact-btn danger"
-                disabled={(!selected.size && !bulkEdit) || !!cutIds}
-                onClick={deleteSelected}
-                title="선택 블록 삭제 (Delete)"
-              >
-                {bulkEdit
-                  ? `삭제 (${bulkEdit.selectedIds.size})`
-                  : selected.size
-                    ? `삭제 (${selected.size})`
-                    : '삭제'}
-              </button>
-            </div>
 
-            <div className="toolbar-pagination">
-              <span className="count-pill" title="현재 표시 중인 블록 수">
-                {visible.length.toLocaleString()}건
-              </span>
-              <button
-                type="button"
-                className="compact-btn icon-btn"
-                aria-label="이전 페이지"
-                disabled={!current}
-                onClick={() => setPage(current - 1)}
-              >
-                ◀
-              </button>
-              <span className="page-indicator">
-                {current + 1} / {pages}
-              </span>
-              <button
-                type="button"
-                className="compact-btn icon-btn"
-                aria-label="다음 페이지"
-                disabled={current + 1 >= pages}
-                onClick={() => setPage(current + 1)}
-              >
-                ▶
-              </button>
+              {/* 1개 이상 선택 시 나타나는 버튼들 */}
+              {(selectedCount > 0 || !!bulkEdit) && (
+                <button
+                  type="button"
+                  className="compact-btn"
+                  onClick={() => setSelected(new Set())}
+                >
+                  해제
+                </button>
+              )}
+
+              {(selectedCount > 0 || !!cutIds) && (
+                <button
+                  type="button"
+                  className="compact-btn"
+                  disabled={(!selected.size && !cutIds) || !!bulkEdit || !!editingId}
+                  aria-pressed={!!cutIds}
+                  onClick={() => (cutIds ? cancelCutMode() : startCutMode())}
+                  title={
+                    cutIds ? '오려붙이기 취소 (Esc)' : '선택한 메시지 오려붙이기 (Ctrl+X)'
+                  }
+                >
+                  {cutIds ? '오리기 취소' : '오려붙이기'}
+                </button>
+              )}
+
+              {/* 여러 개(2개 이상) 선택 시 나타나는 버튼들 */}
+              {(selectedCount >= 2 || !!bulkEdit) && !cutIds && (
+                <>
+                  <button
+                    type="button"
+                    className="compact-btn"
+                    aria-pressed={!!bulkEdit}
+                    onClick={startBulkEdit}
+                    title="선택한 여러 메시지 일괄 편집 (Ctrl+Shift+Enter)"
+                  >
+                    편집
+                  </button>
+                  <button
+                    type="button"
+                    className="compact-btn"
+                    title="선택한 메시지 중 캐릭터·채널·유형이 같은 연속 메시지 병합"
+                    onClick={() => {
+                      const blocks = mergeConsecutive(p.blocks, selected);
+                      const mergedCount = p.blocks.length - blocks.length;
+                      if (!mergedCount) {
+                        setNotice('선택한 메시지 중 병합할 연속 메시지가 없습니다.');
+                        return;
+                      }
+                      commit({ ...p, blocks });
+                      setSelected(new Set());
+                      setEditingId(null);
+                      setNotice(`${mergedCount}개 블록을 병합했습니다.`);
+                    }}
+                  >
+                    연속 병합
+                  </button>
+                </>
+              )}
+
+              {/* 치환: 메시지 선택 시 나타남 */}
+              {(selectedCount > 0 || !!bulkEdit) && !cutIds && (
+                <button
+                  type="button"
+                  className="compact-btn"
+                  aria-pressed={bulkEdit ? bulkReplaceOpen : replaceOpen}
+                  onClick={() =>
+                    bulkEdit ? setBulkReplaceOpen((v) => !v) : setReplaceOpen((v) => !v)
+                  }
+                  title="일괄 치환 열기/닫기 (Ctrl+H)"
+                >
+                  치환
+                </button>
+              )}
+
+              {/* 삭제: 메시지 선택 시 나타남 */}
+              {(selectedCount > 0 || !!bulkEdit) && !cutIds && (
+                <button
+                  type="button"
+                  className="compact-btn danger"
+                  onClick={deleteSelected}
+                  title="선택 블록 삭제 (Delete)"
+                >
+                  {bulkEdit
+                    ? `삭제 (${bulkEdit.selectedIds.size})`
+                    : selected.size
+                      ? `삭제 (${selected.size})`
+                      : '삭제'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1226,25 +1288,25 @@ function App() {
                 style={
                   editorGlobalStyle
                     ? ({
-                        '--styled-page-bg': editorGlobalStyle.pageBgColor,
-                        '--styled-container-width': `${editorGlobalStyle.containerWidth}px`,
-                        '--styled-message-gap': `${editorGlobalStyle.messageGap ?? 0}px`,
-                        '--styled-meta-color': editorGlobalStyle.metaColor,
-                        '--styled-divider-color': editorGlobalStyle.dividerColor,
-                        '--styled-system-color':
-                          editorGlobalStyle.systemDefaults?.textColor ||
-                          editorGlobalStyle.systemTextColor,
-                        '--styled-system-indent': editorGlobalStyle.messageDefaults
-                          ?.avatarHidden
-                          ? '0px'
-                          : `${(editorGlobalStyle.messageDefaults?.avatarSize ?? 40) + 12}px`,
-                        '--styled-font-family':
-                          editorGlobalStyle.messageDefaults?.fontFamily ||
-                          'system-ui, sans-serif',
-                        '--styled-font-size': `${editorGlobalStyle.messageDefaults?.fontSize ?? 16}px`,
-                        '--styled-text-color':
-                          editorGlobalStyle.messageDefaults?.textColor || '#eeeeee',
-                      } as React.CSSProperties)
+                      '--styled-page-bg': editorGlobalStyle.pageBgColor,
+                      '--styled-container-width': `${editorGlobalStyle.containerWidth}px`,
+                      '--styled-message-gap': `${editorGlobalStyle.messageGap ?? 0}px`,
+                      '--styled-meta-color': editorGlobalStyle.metaColor,
+                      '--styled-divider-color': editorGlobalStyle.dividerColor,
+                      '--styled-system-color':
+                        editorGlobalStyle.systemDefaults?.textColor ||
+                        editorGlobalStyle.systemTextColor,
+                      '--styled-system-indent': editorGlobalStyle.messageDefaults
+                        ?.avatarHidden
+                        ? '0px'
+                        : `${(editorGlobalStyle.messageDefaults?.avatarSize ?? 40) + 12}px`,
+                      '--styled-font-family':
+                        editorGlobalStyle.messageDefaults?.fontFamily ||
+                        'system-ui, sans-serif',
+                      '--styled-font-size': `${editorGlobalStyle.messageDefaults?.fontSize ?? 16}px`,
+                      '--styled-text-color':
+                        editorGlobalStyle.messageDefaults?.textColor || '#eeeeee',
+                    } as React.CSSProperties)
                     : undefined
                 }
               >
@@ -1308,11 +1370,11 @@ function App() {
                           onPasteHover={
                             cutIds
                               ? (after) =>
-                                  setPasteTarget((prev) =>
-                                    prev?.id === b.id && prev.after === after
-                                      ? prev
-                                      : { id: b.id, after },
-                                  )
+                                setPasteTarget((prev) =>
+                                  prev?.id === b.id && prev.after === after
+                                    ? prev
+                                    : { id: b.id, after },
+                                )
                               : undefined
                           }
                           onPasteHere={
@@ -1323,27 +1385,27 @@ function App() {
                           bulkContext={
                             isBulkRep && bulkEdit
                               ? {
-                                  count: bulkEdit.selectedIds.size,
-                                  targetBlocks: bulkTargetBlocks,
-                                  state: bulkEdit,
-                                  originalRepText: bulkRepOriginalText,
-                                  faceCharacter: bulkFaceCharacter,
-                                  mixedSpeakers: bulkMixedSpeakers,
-                                  mixedChannels: bulkMixedChannels,
-                                  hasAnyDice: bulkHasAnyDice,
-                                  replaceOpen: bulkReplaceOpen,
-                                  replaceMatchCount: bulkReplaceMatchCount,
-                                  onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                                  onCloseReplace: () => setBulkReplaceOpen(false),
-                                  onChangeState: (updater) =>
-                                    setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                                  onSave: saveBulkEdit,
-                                  onCancel: () => {
-                                    setBulkEdit(null);
-                                    setBulkReplaceOpen(false);
-                                  },
-                                  onDelete: deleteSelected,
-                                }
+                                count: bulkEdit.selectedIds.size,
+                                targetBlocks: bulkTargetBlocks,
+                                state: bulkEdit,
+                                originalRepText: bulkRepOriginalText,
+                                faceCharacter: bulkFaceCharacter,
+                                mixedSpeakers: bulkMixedSpeakers,
+                                mixedChannels: bulkMixedChannels,
+                                hasAnyDice: bulkHasAnyDice,
+                                replaceOpen: bulkReplaceOpen,
+                                replaceMatchCount: bulkReplaceMatchCount,
+                                onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                                onCloseReplace: () => setBulkReplaceOpen(false),
+                                onChangeState: (updater) =>
+                                  setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                                onSave: saveBulkEdit,
+                                onCancel: () => {
+                                  setBulkEdit(null);
+                                  setBulkReplaceOpen(false);
+                                },
+                                onDelete: deleteSelected,
+                              }
                               : undefined
                           }
                           searchMatch={Boolean(searchMatchPredicate?.(b))}

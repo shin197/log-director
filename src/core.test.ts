@@ -651,6 +651,22 @@ test('Home End와 10개 이동 및 페이지 경계', () => {
   const order = Array.from({ length: 1012 }, (_, i) => String(i));
   assert.equal(navigateMessages(order, '999', new Set(), 'PageDown', false)?.index, 1009);
   assert.equal(navigateMessages(order, '1009', new Set(), 'PageUp', false)?.index, 999);
+  // Shift + 위/아래 10칸 이동 (step=10, 단일 선택)
+  assert.equal(navigateMessages(order, '50', new Set(), 'ArrowDown', false, 10)?.index, 60);
+  assert.equal(navigateMessages(order, '50', new Set(), 'ArrowUp', false, 10)?.index, 40);
+  // Ctrl+Shift + 위/아래 10칸 이동 (extend=true, step=10): 지나간 10개를 모두 선택에 포함
+  const bulkDown = navigateMessages(order, '50', new Set(['50']), 'ArrowDown', true, 10)!;
+  assert.equal(bulkDown.index, 60);
+  assert.equal(bulkDown.selected.size, 11);
+  for (let i = 50; i <= 60; i++) {
+    assert.ok(bulkDown.selected.has(String(i)));
+  }
+  const bulkUp = navigateMessages(order, '60', new Set(['60']), 'ArrowUp', true, 10)!;
+  assert.equal(bulkUp.index, 50);
+  assert.equal(bulkUp.selected.size, 11);
+  for (let i = 50; i <= 60; i++) {
+    assert.ok(bulkUp.selected.has(String(i)));
+  }
   assert.equal(navigateMessages(order, '999', new Set(), 'Home', false)?.index, 0);
   assert.equal(navigateMessages(order, '999', new Set(), 'End', false)?.index, 1011);
   assert.equal(navigateMessages(order, '0', new Set(), 'ArrowUp', false)?.index, 0);

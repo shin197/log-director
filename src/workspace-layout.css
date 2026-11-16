@@ -1,7 +1,7 @@
 /* Viewport shell and independently scrolling editor columns. */
 :root {
   --header-height: 46px;
-  --sidebar-width: 320px;
+  --sidebar-width: 300px;
 }
 
 html,
@@ -82,7 +82,7 @@ body,
 }
 
 .scene-sidebar {
-  width: 280px;
+  width: 240px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;

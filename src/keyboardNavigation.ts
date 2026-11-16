@@ -8,11 +8,20 @@ export function navigateMessages(
   selected: Set<string>,
   key: NavigationKey,
   extend: boolean,
+  step: number = 1,
 ) {
   if (!order.length) return null;
   const previous = order.indexOf(cursor ?? '');
   const delta =
-    key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : key === 'PageUp' ? -10 : 10;
+    key === 'ArrowUp'
+      ? -step
+      : key === 'ArrowDown'
+        ? step
+        : key === 'PageUp'
+          ? -10
+          : key === 'PageDown'
+            ? 10
+            : 0;
   const index =
     key === 'Home'
       ? 0
@@ -20,11 +29,14 @@ export function navigateMessages(
         ? order.length - 1
         : Math.max(0, Math.min(order.length - 1, previous < 0 ? 0 : previous + delta));
   const id = order[index];
+  const start = previous < 0 ? index : Math.min(previous, index);
+  const end = previous < 0 ? index : Math.max(previous, index);
+  const range = order.slice(start, end + 1);
   return {
     id,
     index,
     direction: key === 'Home' || key === 'ArrowUp' || key === 'PageUp' ? -1 : 1,
-    selected: extend ? new Set([...selected, id]) : new Set([id]),
+    selected: extend ? new Set([...selected, ...range]) : new Set([id]),
   };
 }
 export function swapMessage(blocks: Block[], id: string, delta: number): Block[] {
