@@ -1003,7 +1003,7 @@ function createMockIndexedDB() {
             },
           };
         },
-        close: () => {},
+        close: () => { },
       };
       req.result = db;
       queueMicrotask(() => {
@@ -1574,7 +1574,7 @@ test('불러오기 매니저: 파일 순서 이동, 이어붙이기(Append/Inser
   // 시간순 정렬 (Interleave) 모드 및 타임스탬프 미기재 메시지 순서 보존 확인
   assert.ok(
     (parseLogTimestamp('2026. 10. 20. 오후 08:03:00') ?? 0) >
-      (parseLogTimestamp('2026. 10. 20. 오후 08:00:00') ?? 0),
+    (parseLogTimestamp('2026. 10. 20. 오후 08:00:00') ?? 0),
   );
   const rawSide = JSON.stringify({
     messages: [
