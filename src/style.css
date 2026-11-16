@@ -1757,57 +1757,165 @@ code {
   font-size: 13px;
 }
 
-/* Character Workspace */
+/* Character Workspace & Left Sidebar */
 .character-sidebar {
   background: var(--bg-surface);
   border-right: 1px solid var(--border-subtle);
+}
+
+.character-sidebar-expand-btn {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.character-sidebar-expand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .character-sidebar-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.character-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .character-sidebar nav {
   padding: 8px;
 }
 
-.character-sidebar nav button {
+.char-sidebar-item {
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.char-sidebar-item.is-selected:not(.is-editing)>.char-sidebar-card {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+
+.char-sidebar-item.is-editing {
+  background: var(--bg-elevated);
+  border-color: var(--accent-border);
+  margin-bottom: 8px;
+}
+
+.char-sidebar-item.drop-before {
+  border-top-color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.char-sidebar-item.drop-after {
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.char-sidebar-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   width: 100%;
   padding: 6px 8px;
-  margin-bottom: 4px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
+  cursor: pointer;
+  user-select: none;
 }
 
-.character-sidebar nav button:hover {
+.char-sidebar-card:hover {
   background: var(--bg-hover);
 }
 
-.character-sidebar nav button[aria-pressed='true'] {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
+.char-sidebar-item.is-editing>.char-sidebar-card {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.character-sidebar nav button.drop-before {
-  border-top-color: var(--accent);
-  box-shadow: inset 0 2px 0 var(--accent);
+.char-card-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.character-sidebar nav button.drop-after {
-  border-bottom-color: var(--accent);
-  box-shadow: inset 0 -2px 0 var(--accent);
+.char-editable-name {
+  cursor: text;
+  padding: 2px 5px;
+  margin: -2px -5px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed transparent;
+  transition:
+    border-color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.char-editable-name:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+}
+
+.char-inline-name-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.char-sidebar-detail {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.char-detail-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.char-detail-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.char-system-note {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .char-nav-main {
@@ -2021,7 +2129,6 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
 }
 
 .faces-heading-actions {
@@ -2039,14 +2146,14 @@ code {
 .expression-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .expression-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 2px 2px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);

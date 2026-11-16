@@ -57,6 +57,7 @@ import './workspace-layout.css';
 
 function App() {
   const [tab, setTab] = useState('로그');
+  const [charBarOpen, setCharBarOpen] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [p, setP] = useState<Project>(blank);
   const [past, setPast] = useState<Project[]>([]);
@@ -676,12 +677,12 @@ function App() {
     : undefined;
   const bulkMixedSpeakers = bulkEdit
     ? new Set(
-      bulkTargetBlocks.map((b) =>
-        b.sourceType === 'system'
-          ? 'system'
-          : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
-      ),
-    ).size > 1
+        bulkTargetBlocks.map((b) =>
+          b.sourceType === 'system'
+            ? 'system'
+            : `${b.characterId ?? ''}:${b.speaker ?? ''}`,
+        ),
+      ).size > 1
     : false;
   const bulkMixedChannels = bulkEdit
     ? new Set(bulkTargetBlocks.map((b) => b.channel ?? '')).size > 1
@@ -714,7 +715,7 @@ function App() {
         <div className="header-left">
           <span className="brand-mark">LOG DIRECTOR</span>
           <nav className="top-tabs" aria-label="작업 화면 전환">
-            {['로그', '캐릭터', '설정'].map((name) => (
+            {['로그', '설정'].map((name) => (
               <button
                 type="button"
                 key={name}
@@ -870,7 +871,6 @@ function App() {
         />
       )}
       {helpOpen && <HelpSheet context={helpContext} onClose={() => setHelpOpen(false)} />}
-      {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
       {tab === '설정' && (
         <div className="settings-scroll">
           <div className="settings-container">
@@ -1193,6 +1193,13 @@ function App() {
           )}
 
           <div className="log-editor-body">
+            <CharacterPanel
+              open={charBarOpen}
+              onToggleOpen={() => setCharBarOpen((v) => !v)}
+              project={p}
+              commit={commit}
+            />
+
             <div className="log-main-content">
               <div className="log-scroll">
                 <div className="log-list">
@@ -1243,11 +1250,11 @@ function App() {
                           onPasteHover={
                             cutIds
                               ? (after) =>
-                                setPasteTarget((prev) =>
-                                  prev?.id === b.id && prev.after === after
-                                    ? prev
-                                    : { id: b.id, after },
-                                )
+                                  setPasteTarget((prev) =>
+                                    prev?.id === b.id && prev.after === after
+                                      ? prev
+                                      : { id: b.id, after },
+                                  )
                               : undefined
                           }
                           onPasteHere={
@@ -1258,26 +1265,26 @@ function App() {
                           bulkContext={
                             isBulkRep && bulkEdit
                               ? {
-                                count: bulkEdit.selectedIds.size,
-                                state: bulkEdit,
-                                originalRepText: bulkRepOriginalText,
-                                faceCharacter: bulkFaceCharacter,
-                                mixedSpeakers: bulkMixedSpeakers,
-                                mixedChannels: bulkMixedChannels,
-                                hasAnyDice: bulkHasAnyDice,
-                                replaceOpen: bulkReplaceOpen,
-                                replaceMatchCount: bulkReplaceMatchCount,
-                                onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                                onCloseReplace: () => setBulkReplaceOpen(false),
-                                onChangeState: (updater) =>
-                                  setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                                onSave: saveBulkEdit,
-                                onCancel: () => {
-                                  setBulkEdit(null);
-                                  setBulkReplaceOpen(false);
-                                },
-                                onDelete: deleteSelected,
-                              }
+                                  count: bulkEdit.selectedIds.size,
+                                  state: bulkEdit,
+                                  originalRepText: bulkRepOriginalText,
+                                  faceCharacter: bulkFaceCharacter,
+                                  mixedSpeakers: bulkMixedSpeakers,
+                                  mixedChannels: bulkMixedChannels,
+                                  hasAnyDice: bulkHasAnyDice,
+                                  replaceOpen: bulkReplaceOpen,
+                                  replaceMatchCount: bulkReplaceMatchCount,
+                                  onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                                  onCloseReplace: () => setBulkReplaceOpen(false),
+                                  onChangeState: (updater) =>
+                                    setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                                  onSave: saveBulkEdit,
+                                  onCancel: () => {
+                                    setBulkEdit(null);
+                                    setBulkReplaceOpen(false);
+                                  },
+                                  onDelete: deleteSelected,
+                                }
                               : undefined
                           }
                           searchMatch={Boolean(searchMatchPredicate?.(b))}
