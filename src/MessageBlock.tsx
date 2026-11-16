@@ -4,20 +4,30 @@ import { ChannelPicker } from './ChannelPicker';
 import type { ChannelSummary } from './channels';
 import { defaultDisplay, displayTime, type DisplaySettings } from './presentation';
 import type { SelectionKeys } from './selection';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Block, Character, Scene } from './core';
-import { applyBulkReplacedText, type BulkEditState } from './bulkEdit';
+import {
+  applyBulkReplacedText,
+  getBulkStyleCheckboxState,
+  toggleBulkStyleOp,
+  type BulkEditState,
+} from './bulkEdit';
 import { BulkTextEditor } from './BulkTextEditor';
 import { handleWrapKeyDown } from './textEdit';
 import { isSafeImageUrl } from './importFormats';
 import { resolveImageUrl } from './imagePool';
 import { useImagePool } from './ImagePoolContext';
 import { BookmarkRibbon } from './BookmarkRibbon';
-import { buildMessageStyleObjects, type MessageStyleProps } from './styles';
+import {
+  buildMessageStyleObjects,
+  type MessageStyleProps,
+  type StyleCard,
+} from './styles';
 import { ColorInput } from './ColorInput';
 
 export type BulkEditContext = {
   count: number;
+  targetBlocks: Block[];
   state: BulkEditState;
   originalRepText: string;
   faceCharacter?: Character;
@@ -52,6 +62,7 @@ export function MessageBlock({
   bulkContext,
   searchMatch = false,
   styleProps,
+  styleCards = [],
   dividerColor,
   toggle,
   save,
@@ -65,6 +76,7 @@ export function MessageBlock({
   block: Block;
   searchMatch?: boolean;
   styleProps?: MessageStyleProps;
+  styleCards?: StyleCard[];
   dividerColor?: string;
   onJump?: () => void;
   onEyedrop?: () => void;
@@ -91,8 +103,10 @@ export function MessageBlock({
 }) {
   const [draft, setDraft] = useState(b);
   const [options, setOptions] = useState(false);
+  const [styleMenuOpen, setStyleMenuOpen] = useState(false);
   const [dice, setDice] = useState(!!b.diceResult);
   const [over, setOver] = useState('');
+  const stylePopoverRef = useRef<HTMLDivElement>(null);
   const images = useImagePool();
 
   const isBulk = !!bulkContext;
@@ -103,21 +117,41 @@ export function MessageBlock({
       setDraft(b);
       setDice(!!b.diceResult);
       setOptions(false);
+      setStyleMenuOpen(false);
     }
   }, [editing, isBulk, b]);
 
   useEffect(() => {
     if (isBulk) {
       setOptions(false);
+      setStyleMenuOpen(false);
     }
   }, [isBulk]);
+
+  useEffect(() => {
+    if (!styleMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (!stylePopoverRef.current?.contains(e.target as Node)) {
+        setStyleMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutside);
+    return () => window.removeEventListener('mousedown', handleOutside);
+  }, [styleMenuOpen]);
 
   const finish = () => {
     if (bulkContext) {
       bulkContext.onSave();
       return;
     }
-    save({ ...draft, diceResult: dice ? draft.diceResult : '' });
+    const cleanStyleIds = (draft.styleIds ?? []).filter(Boolean);
+    const nextBlock: Block = {
+      ...draft,
+      diceResult: dice ? draft.diceResult : '',
+    };
+    if (cleanStyleIds.length > 0) nextBlock.styleIds = cleanStyleIds;
+    else delete nextBlock.styleIds;
+    save(nextBlock);
     setEditing(false);
   };
 
@@ -530,6 +564,143 @@ export function MessageBlock({
                   URL
                 </button>
               )}
+
+              <div className="style-picker-popover-wrap" ref={stylePopoverRef}>
+                <button
+                  type="button"
+                  className={`compact-btn${
+                    isBulk
+                      ? styleCards.some(
+                          (c) =>
+                            getBulkStyleCheckboxState(
+                              c.id,
+                              bulkContext.targetBlocks,
+                              bulkContext.state.styleOps,
+                            ) !== 'unchecked',
+                        )
+                        ? ' is-has-styles'
+                        : ''
+                      : (draft.styleIds?.length ?? 0) > 0
+                        ? ' is-has-styles'
+                        : ''
+                  }`}
+                  aria-expanded={styleMenuOpen}
+                  aria-haspopup="dialog"
+                  title="개별 메시지에 스타일 카드 적용"
+                  onClick={() => setStyleMenuOpen((v) => !v)}
+                >
+                  스타일
+                  {(() => {
+                    if (isBulk) {
+                      const activeCount = styleCards.filter(
+                        (c) =>
+                          getBulkStyleCheckboxState(
+                            c.id,
+                            bulkContext.targetBlocks,
+                            bulkContext.state.styleOps,
+                          ) === 'checked',
+                      ).length;
+                      return activeCount > 0 ? ` (${activeCount})` : '';
+                    }
+                    const singleCount = (draft.styleIds ?? []).filter((id) =>
+                      styleCards.some((c) => c.id === id),
+                    ).length;
+                    return singleCount > 0 ? ` (${singleCount})` : '';
+                  })()}
+                </button>
+                {styleMenuOpen && (
+                  <div
+                    className="style-picker-popover"
+                    role="dialog"
+                    aria-label="스타일 카드 선택"
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        e.stopPropagation();
+                        setStyleMenuOpen(false);
+                      }
+                    }}
+                  >
+                    <div className="style-picker-header">
+                      {isBulk
+                        ? `${bulkContext.count}개 메시지에 스타일 적용`
+                        : '개별 스타일 적용'}
+                    </div>
+                    {styleCards.length === 0 ? (
+                      <p className="style-picker-empty">
+                        등록된 스타일 카드가 없습니다. 상단 &apos;스타일&apos; 탭에서 먼저
+                        만들어주세요.
+                      </p>
+                    ) : (
+                      <div className="style-picker-list">
+                        {styleCards.map((card) => {
+                          const triState = isBulk
+                            ? getBulkStyleCheckboxState(
+                                card.id,
+                                bulkContext.targetBlocks,
+                                bulkContext.state.styleOps,
+                              )
+                            : draft.styleIds?.includes(card.id)
+                              ? 'checked'
+                              : 'unchecked';
+                          const op = isBulk
+                            ? bulkContext.state.styleOps?.[card.id]
+                            : undefined;
+                          return (
+                            <label key={card.id} className="style-picker-item">
+                              <input
+                                type="checkbox"
+                                checked={triState === 'checked'}
+                                ref={(el) => {
+                                  if (el) el.indeterminate = triState === 'mixed';
+                                }}
+                                onChange={() => {
+                                  if (bulkContext) {
+                                    bulkContext.onChangeState((prev) => ({
+                                      ...prev,
+                                      styleOps: toggleBulkStyleOp(
+                                        card.id,
+                                        bulkContext.targetBlocks,
+                                        prev.styleOps,
+                                      ),
+                                    }));
+                                  } else {
+                                    setDraft((prev) => {
+                                      const cur = prev.styleIds ?? [];
+                                      const nextIds = cur.includes(card.id)
+                                        ? cur.filter((id) => id !== card.id)
+                                        : [...cur, card.id];
+                                      const copy = { ...prev };
+                                      if (nextIds.length > 0) copy.styleIds = nextIds;
+                                      else delete copy.styleIds;
+                                      return copy;
+                                    });
+                                  }
+                                }}
+                              />
+                              <span className="style-picker-name">
+                                {card.name || '이름 없는 스타일'}
+                              </span>
+                              {isBulk && triState === 'mixed' && (
+                                <span className="style-picker-meta">일부</span>
+                              )}
+                              {isBulk && op === 'add' && (
+                                <span className="style-picker-meta is-add">전체 적용</span>
+                              )}
+                              {isBulk && op === 'remove' && (
+                                <span className="style-picker-meta is-remove">
+                                  전체 해제
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {options && canEditFace && !isSystem && (

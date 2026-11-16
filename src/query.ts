@@ -1,8 +1,9 @@
 import type { Block, Character, Scene } from './core.ts';
+import type { StyleCard } from './styles.ts';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter.ts';
 import { computeSceneRanges, type SceneRange } from './scenes.ts';
 
-export type SearchFieldKey = 'from' | 'in' | 'dice' | 'is' | 'scene' | 'text';
+export type SearchFieldKey = 'from' | 'in' | 'dice' | 'is' | 'scene' | 'style' | 'text';
 export type IsFlag = 'dice' | 'system' | 'normal' | 'unlinked';
 
 export type SearchChip = {
@@ -225,6 +226,14 @@ export function formatChipDisplay(chip: Omit<SearchChip, 'id'>): {
       return { icon: `${neg}🎲`, label: chip.value };
     case 'scene':
       return { icon: `${neg}★`, label: chip.value };
+    case 'style':
+      return {
+        icon: `${neg}🎨`,
+        label:
+          chip.value.toLowerCase() === 'none' || chip.value === '(스타일 없음)'
+            ? '(스타일 없음)'
+            : chip.value,
+      };
     case 'is': {
       const found = IS_FLAGS.find((f) => f.value === chip.value.toLowerCase());
       return {
@@ -258,7 +267,13 @@ export function tryParseFilterToken(rawToken: string): Omit<SearchChip, 'id'> | 
   const value = unquoteSearchValue(token.slice(colon + 1)).trim();
   if (!value) return null;
 
-  if (key === 'from' || key === 'in' || key === 'dice' || key === 'scene') {
+  if (
+    key === 'from' ||
+    key === 'in' ||
+    key === 'dice' ||
+    key === 'scene' ||
+    key === 'style'
+  ) {
     return { key, value, negative };
   }
   if (key === 'is') {
@@ -330,11 +345,57 @@ export function sanitizeLiveQuery(query: string): string {
   return formatted.join(' ');
 }
 
+/**
+ * 스타일 카드의 직접 메시지 지정(styleIds), 캐릭터 지정(character.styleIds),
+ * 그리고 카드 내부 필터(OR 합집합)를 종합해 단일 메시지 판별 함수를 생성합니다.
+ */
+export function createStyleCardMatcher(
+  card: StyleCard,
+  characters: Character[] = [],
+  scenes: Scene[] = [],
+  blocks: Block[] = [],
+  styleCards: StyleCard[] = [],
+  visitedStyleIds?: Set<string>,
+  charMap?: Map<string, Character>,
+): (b: Block) => boolean {
+  const nextVisited = new Set(visitedStyleIds);
+  nextVisited.add(card.id);
+  const resolvedCharMap = charMap ?? new Map(characters.map((c) => [c.id, c]));
+  const predicates: ((b: Block) => boolean)[] = [];
+  for (const rawFilter of card.filters) {
+    const sanitized = sanitizeLiveQuery(rawFilter);
+    if (!sanitized) continue;
+    try {
+      predicates.push(
+        compileQuery(sanitized, characters, scenes, blocks, styleCards, nextVisited),
+      );
+    } catch {
+      try {
+        predicates.push(
+          compileQuery(rawFilter, characters, scenes, blocks, styleCards, nextVisited),
+        );
+      } catch {
+        // 잘못된 필터는 건너뜀
+      }
+    }
+  }
+  return (b: Block): boolean => {
+    if (b.styleIds?.includes(card.id)) return true;
+    if (b.characterId && resolvedCharMap.get(b.characterId)?.styleIds?.includes(card.id)) {
+      return true;
+    }
+    if (predicates.length === 0) return false;
+    return predicates.some((fn) => fn(b));
+  };
+}
+
 export function compileQuery(
   query: string,
   characters?: Character[],
   scenes?: Scene[],
   blocks?: Block[],
+  styleCards?: StyleCard[],
+  visitedStyleIds?: Set<string>,
 ): (b: Block) => boolean {
   const { tokens, openQuote } = tokenizeQuery(query);
   if (openQuote) throw Error('따옴표를 닫아주세요.');
@@ -396,6 +457,36 @@ export function compileQuery(
           }
         }
         match = (b) => matchedIds.has(b.id);
+        break;
+      }
+      case 'style': {
+        const cards = (styleCards ?? []).filter((c) => !visitedStyleIds?.has(c.id));
+        if (value === 'none' || value === '(스타일 없음)') {
+          const allMatchers = cards.map((card) =>
+            createStyleCardMatcher(
+              card,
+              characters ?? [],
+              scenes ?? [],
+              blocks ?? [],
+              styleCards ?? [],
+              visitedStyleIds,
+            ),
+          );
+          match = (b) => !allMatchers.some((fn) => fn(b));
+        } else {
+          const targetCards = cards.filter((c) => c.name.toLowerCase().includes(value));
+          const matchers = targetCards.map((card) =>
+            createStyleCardMatcher(
+              card,
+              characters ?? [],
+              scenes ?? [],
+              blocks ?? [],
+              styleCards ?? [],
+              visitedStyleIds,
+            ),
+          );
+          match = (b) => matchers.some((fn) => fn(b));
+        }
         break;
       }
       case 'is':

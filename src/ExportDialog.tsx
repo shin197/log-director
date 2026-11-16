@@ -75,12 +75,13 @@ export function ExportDialog({
         project.characters ?? [],
         project.scenes ?? [],
         project.blocks,
+        project.styles?.cards,
       );
       return project.blocks.filter(predicate);
     } catch {
       return project.blocks;
     }
-  }, [project.blocks, project.characters, project.scenes, query]);
+  }, [project.blocks, project.characters, project.scenes, project.styles?.cards, query]);
 
   useEffect(() => {
     if (!encodeBase64) {
@@ -196,6 +197,7 @@ export function ExportDialog({
           characters={project.characters ?? []}
           channels={channels}
           scenes={project.scenes ?? []}
+          styleCards={project.styles?.cards ?? []}
           onActivate={() => {}}
           onChangeQuery={setQuery}
         />

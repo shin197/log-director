@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Block, Character, Scene } from './core';
+import type { StyleCard } from './styles';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { fuzzyName } from './characters';
 import { formatChannelLabel, type ChannelSummary } from './channels';
@@ -109,6 +110,7 @@ export function SearchBar({
   characters,
   channels,
   scenes = [],
+  styleCards = [],
   onActivate,
   onChangeQuery,
 }: {
@@ -119,6 +121,7 @@ export function SearchBar({
   characters: Character[];
   channels: ChannelSummary[];
   scenes?: Scene[];
+  styleCards?: StyleCard[];
   onActivate: () => void;
   onChangeQuery: (nextQuery: string) => void;
 }) {
@@ -454,6 +457,66 @@ export function SearchBar({
       return items;
     }
 
+    // 4-3. style: 또는 -style: (스타일 검색)
+    if (lowerToken.startsWith('style:') || lowerToken.startsWith('-style:')) {
+      const negative = lowerToken.startsWith('-');
+      const rawVal = parseFilterValueInput(activeToken.slice(negative ? 7 : 6));
+      const sub = rawVal.toLowerCase();
+      const section = negative ? '제외할 스타일 (-style:)' : '스타일로 검색 (style:)';
+
+      const matched = styleCards.filter(
+        (c) =>
+          !sub ||
+          fuzzyName(c.name, sub) ||
+          c.name.toLowerCase().includes(sub),
+      );
+
+      for (const c of matched) {
+        items.push({
+          id: `style-${negative ? 'neg' : 'pos'}-${c.id}`,
+          section,
+          kind: 'chip',
+          chip: { key: 'style', value: c.name, negative },
+          icon: negative ? '-🎨' : '🎨',
+          label: c.name,
+          syntax: `${negative ? '-' : ''}style:${c.name}`,
+          meta: '스타일',
+        });
+      }
+
+      if (!sub || 'none'.includes(sub) || '스타일 없음'.includes(sub)) {
+        items.push({
+          id: `style-${negative ? 'neg' : 'pos'}-none`,
+          section,
+          kind: 'chip',
+          chip: { key: 'style', value: 'none', negative },
+          icon: negative ? '-🎨' : '🎨',
+          label: '(스타일 없음)',
+          syntax: `${negative ? '-' : ''}style:none`,
+          meta: '스타일 미적용',
+        });
+      }
+
+      if (
+        rawVal.trim() &&
+        !matched.some((c) => c.name.toLowerCase() === rawVal.trim().toLowerCase()) &&
+        rawVal.trim().toLowerCase() !== 'none'
+      ) {
+        const clean = rawVal.trim();
+        items.push({
+          id: `style-custom-${clean}`,
+          section,
+          kind: 'chip',
+          chip: { key: 'style', value: clean, negative },
+          icon: negative ? '-🎨' : '🎨',
+          label: `"${clean}" 스타일 지정`,
+          syntax: `${negative ? '-' : ''}style:${clean}`,
+          meta: '직접 지정',
+        });
+      }
+      return items;
+    }
+
     // 5. 제외 조건 (-)
     if (lowerToken.startsWith('-')) {
       const sub = parseFilterValueInput(activeToken.slice(1)).trim();
@@ -506,6 +569,12 @@ export function SearchBar({
             icon: '-★',
             label: '특정 장면 제외',
             description: '해당 장면 구간에 속하지 않는 메시지',
+          },
+          {
+            prefix: '-style:',
+            icon: '-🎨',
+            label: '특정 스타일 제외',
+            description: '해당 스타일이 적용되지 않은 메시지',
           },
         ];
 
@@ -570,6 +639,13 @@ export function SearchBar({
           keywords: ['scene', 'bookmark', '장면', '북마크'],
         },
         {
+          prefix: 'style:',
+          icon: '🎨',
+          label: '스타일로 검색',
+          description: '특정 스타일이 적용된 메시지 필터링',
+          keywords: ['style', 'theme', '스타일', '테마'],
+        },
+        {
           prefix: '-',
           icon: '🚫',
           label: '제외 조건',
@@ -587,7 +663,7 @@ export function SearchBar({
 
     // 사용자가 일반 단어를 입력 중일 때:
     // 키워드 프리픽스('from', 'in', 'dice', 'is')와 정확히 시작 일치하지 않으면 일반 텍스트 검색을 첫 항목으로 제공
-    const isTypingPrefixKeyword = ['from', 'in', 'dice', 'is', 'scene'].some((k) =>
+    const isTypingPrefixKeyword = ['from', 'in', 'dice', 'is', 'scene', 'style'].some((k) =>
       k.startsWith(lowerToken),
     );
     if (activeToken && !isTypingPrefixKeyword) {
@@ -663,6 +739,20 @@ export function SearchBar({
           });
         }
       }
+      for (const c of styleCards) {
+        if (fuzzyName(c.name, lowerToken) || c.name.toLowerCase().includes(lowerToken)) {
+          items.push({
+            id: `quick-style-${c.id}`,
+            section: '스타일로 검색',
+            kind: 'chip',
+            chip: { key: 'style', value: c.name, negative: false },
+            icon: '🎨',
+            label: c.name,
+            syntax: `style:${c.name}`,
+            meta: '스타일',
+          });
+        }
+      }
       for (const flag of IS_FLAGS) {
         if (flag.value.includes(lowerToken) || flag.label.includes(lowerToken)) {
           items.push({
@@ -693,7 +783,7 @@ export function SearchBar({
     }
 
     return items;
-  }, [activeToken, speakerCandidates, channels, history]);
+  }, [activeToken, speakerCandidates, channels, sceneRanges, styleCards, history]);
 
   const safeIndex = suggestions.length
     ? Math.min(activeIndex, suggestions.length - 1)

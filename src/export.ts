@@ -68,6 +68,9 @@ export function exportLog(
       const predicate = compileQuery(
         sanitizeLiveQuery(options.query),
         p.characters ?? [],
+        p.scenes ?? [],
+        p.blocks,
+        p.styles?.cards,
       );
       targetBlocks = p.blocks.filter(predicate);
     } catch {

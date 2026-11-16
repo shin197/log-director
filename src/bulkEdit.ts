@@ -22,7 +22,66 @@ export type BulkEditState = {
   timestamp?: string;
   diceMode: 'unchanged' | 'remove' | 'set';
   diceResult: string;
+  styleOps?: Record<string, 'add' | 'remove'>;
 };
+
+export type BulkStyleTriState = 'checked' | 'unchecked' | 'mixed';
+
+/**
+ * 선택된 메시지들의 기존 styleIds와 현재 일괄 편집 연산(styleOps)을 바탕으로
+ * 특정 스타일 카드의 체크박스 표시 상태('checked' | 'unchecked' | 'mixed')를 반환합니다.
+ */
+export function getBulkStyleCheckboxState(
+  cardId: string,
+  targetBlocks: Block[],
+  styleOps?: Record<string, 'add' | 'remove'>,
+): BulkStyleTriState {
+  const op = styleOps?.[cardId];
+  if (op === 'add') return 'checked';
+  if (op === 'remove') return 'unchecked';
+  if (targetBlocks.length === 0) return 'unchecked';
+  let hasCount = 0;
+  for (const b of targetBlocks) {
+    if (b.styleIds?.includes(cardId)) hasCount += 1;
+  }
+  if (hasCount === 0) return 'unchecked';
+  if (hasCount === targetBlocks.length) return 'checked';
+  return 'mixed';
+}
+
+/**
+ * 일괄 편집에서 스타일 카드 체크박스를 클릭했을 때 다음 styleOps 상태를 계산합니다.
+ * - 모두 미포함: 해제 <-> 일괄 추가('add')
+ * - 모두 포함: 유지 <-> 일괄 해제('remove')
+ * - 일부 포함(mixed): 유지(mixed) -> 일괄 추가('add') -> 일괄 해제('remove') -> 유지(mixed)
+ */
+export function toggleBulkStyleOp(
+  cardId: string,
+  targetBlocks: Block[],
+  styleOps?: Record<string, 'add' | 'remove'>,
+): Record<string, 'add' | 'remove'> | undefined {
+  const next = { ...(styleOps ?? {}) };
+  const curOp = next[cardId];
+  let hasCount = 0;
+  for (const b of targetBlocks) {
+    if (b.styleIds?.includes(cardId)) hasCount += 1;
+  }
+  const isMixed = hasCount > 0 && hasCount < targetBlocks.length;
+  const allHave = targetBlocks.length > 0 && hasCount === targetBlocks.length;
+
+  if (isMixed) {
+    if (!curOp) next[cardId] = 'add';
+    else if (curOp === 'add') next[cardId] = 'remove';
+    else delete next[cardId];
+  } else if (allHave) {
+    if (curOp === 'remove') delete next[cardId];
+    else next[cardId] = 'remove';
+  } else {
+    if (curOp === 'add') delete next[cardId];
+    else next[cardId] = 'add';
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
 
 export function createBulkEditState(
   repId: string,
@@ -142,6 +201,30 @@ export function applyBulkPatch(block: Block, bulk: BulkEditState): Block {
 
   if (bulk.textPrefix || bulk.textSuffix || bulk.replaceFind) {
     next = { ...next, text: applyBulkTextTransform(next.text, bulk) };
+  }
+
+  if (bulk.styleOps && Object.keys(bulk.styleOps).length > 0) {
+    const currentSet = new Set(next.styleIds ?? []);
+    let changed = false;
+    for (const [styleId, op] of Object.entries(bulk.styleOps)) {
+      if (op === 'add' && !currentSet.has(styleId)) {
+        currentSet.add(styleId);
+        changed = true;
+      } else if (op === 'remove' && currentSet.has(styleId)) {
+        currentSet.delete(styleId);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const nextIds = [...currentSet];
+      if (nextIds.length > 0) {
+        next = { ...next, styleIds: nextIds };
+      } else {
+        const copy = { ...next };
+        delete copy.styleIds;
+        next = copy;
+      }
+    }
   }
 
   return next;

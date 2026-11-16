@@ -1,9 +1,9 @@
 import type { Block, Character, Project, Scene } from './core.ts';
 import {
   compileQuery,
+  createStyleCardMatcher,
   formatChipDisplay,
   parseQueryToChipsAndText,
-  sanitizeLiveQuery,
 } from './query.ts';
 
 export type AvatarShape = 'square' | 'rounded' | 'circle' | 'diamond';
@@ -75,7 +75,7 @@ export type ProjectStyles = {
 export type StyleUsageItem =
   | { kind: 'filter'; filter: string; label: string }
   | { kind: 'character'; characterId: string; label: string }
-  | { kind: 'message'; messageId: string; label: string };
+  | { kind: 'messages'; count: number; label: string };
 
 export const FONT_FAMILY_PRESETS: { label: string; value: string }[] = [
   { label: '지정 안 함 (상위 스타일 유지)', value: '' },
@@ -517,21 +517,24 @@ export function collectStyleCardUsages(
       });
     }
   }
+  let messageCount = 0;
   for (const b of project.blocks) {
     if (b.styleIds?.includes(card.id)) {
-      const preview = (b.speaker ? `${b.speaker}: ` : '') + b.text.slice(0, 14);
-      usages.push({
-        kind: 'message',
-        messageId: b.id,
-        label: `메시지: ${preview}`,
-      });
+      messageCount += 1;
     }
+  }
+  if (messageCount > 0) {
+    usages.push({
+      kind: 'messages',
+      count: messageCount,
+      label: `개별 메시지 ${messageCount}건`,
+    });
   }
   return usages;
 }
 
 /**
- * 사용처 칩의 X 버튼을 눌렀을 때 해당 연결(필터·캐릭터·메시지)을 해제합니다.
+ * 사용처 칩의 X 버튼을 눌렀을 때 해당 연결(필터·캐릭터·개별 메시지 전체)을 해제합니다.
  */
 export function unlinkStyleUsageFromProject(
   project: Project,
@@ -566,7 +569,7 @@ export function unlinkStyleUsageFromProject(
   return {
     ...project,
     blocks: project.blocks.map((b) => {
-      if (b.id !== usage.messageId || !b.styleIds?.includes(cardId)) return b;
+      if (!b.styleIds?.includes(cardId)) return b;
       const nextIds = b.styleIds.filter((id) => id !== cardId);
       const copy = { ...b };
       if (nextIds.length > 0) copy.styleIds = nextIds;
@@ -814,34 +817,18 @@ export function createStyleResolver(
   const systemDefaults = resolveSystemBaseStyle(styles.global);
   const charMap = new Map(characters.map((c) => [c.id, c]));
 
-  const compiledCards = styles.cards.map((card) => {
-    const predicates: ((b: Block) => boolean)[] = [];
-    for (const rawFilter of card.filters) {
-      const sanitized = sanitizeLiveQuery(rawFilter);
-      if (!sanitized) continue;
-      try {
-        predicates.push(compileQuery(sanitized, characters, scenes, allBlocks));
-      } catch {
-        try {
-          predicates.push(compileQuery(rawFilter, characters, scenes, allBlocks));
-        } catch {
-          // 잘못된 필터는 건너뜀
-        }
-      }
-    }
-    return {
+  const compiledCards = styles.cards.map((card) => ({
+    card,
+    matches: createStyleCardMatcher(
       card,
-      matches: (b: Block): boolean => {
-        if (b.styleIds?.includes(card.id)) return true;
-        if (b.characterId && charMap.get(b.characterId)?.styleIds?.includes(card.id)) {
-          return true;
-        }
-        if (predicates.length === 0) return false;
-        // 필터끼리는 합연산(OR)
-        return predicates.some((fn) => fn(b));
-      },
-    };
-  });
+      characters,
+      scenes,
+      allBlocks,
+      styles.cards,
+      undefined,
+      charMap,
+    ),
+  }));
 
   return (block: Block): MessageStyleProps => {
     let resolved: MessageStyleProps =

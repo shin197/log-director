@@ -949,10 +949,12 @@ function MessageStylePropsEditor({
 function StyleCardFilterAdder({
   project,
   channels,
+  styleCards,
   onAddFilter,
 }: {
   project: Project;
   channels: ReturnType<typeof collectChannels>;
+  styleCards?: StyleCard[];
   onAddFilter: (filter: string) => void;
 }) {
   const [filterInput, setFilterInput] = useState('');
@@ -983,6 +985,7 @@ function StyleCardFilterAdder({
           characters={project.characters ?? []}
           channels={channels}
           scenes={project.scenes ?? []}
+          styleCards={styleCards}
           onActivate={() => { }}
           onChangeQuery={(nextQuery) => setFilterInput(nextQuery)}
         />
@@ -1469,9 +1472,7 @@ export function StylePanel({
                         ((u.kind === 'character' &&
                           removed.kind === 'character' &&
                           removed.characterId === u.characterId) ||
-                          (u.kind === 'message' &&
-                            removed.kind === 'message' &&
-                            removed.messageId === u.messageId)),
+                          (u.kind === 'messages' && removed.kind === 'messages')),
                     ),
                 )
                 : rawUsages;
@@ -1629,8 +1630,16 @@ export function StylePanel({
                               <button
                                 type="button"
                                 className="search-chip-remove"
-                                aria-label={`${u.label} 사용처 연결 해제`}
-                                title="이 사용처에서 스타일 적용 해제"
+                                aria-label={
+                                  u.kind === 'messages'
+                                    ? `${u.label} 전체 연결 해제`
+                                    : `${u.label} 사용처 연결 해제`
+                                }
+                                title={
+                                  u.kind === 'messages'
+                                    ? '개별 메시지에 지정된 이 스타일을 모두 해제'
+                                    : '이 사용처에서 스타일 적용 해제'
+                                }
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (u.kind === 'filter') {
@@ -1748,6 +1757,7 @@ export function StylePanel({
                           <StyleCardFilterAdder
                             project={p}
                             channels={channels}
+                            styleCards={styles.cards}
                             onAddFilter={(rawFilter) =>
                               changeCardDraft((prev) =>
                                 addFilterToStyleCard(prev, rawFilter),

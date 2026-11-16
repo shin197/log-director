@@ -162,6 +162,7 @@ function App() {
       p.characters ?? [],
       p.scenes ?? [],
       p.blocks,
+      p.styles?.cards,
     );
   } catch (error) {
     queryError = String(error);
@@ -179,11 +180,12 @@ function App() {
         p.characters ?? [],
         p.scenes ?? [],
         p.blocks,
+        p.styles?.cards,
       );
     } catch {
       return null;
     }
-  }, [query, p.characters, p.scenes, p.blocks]);
+  }, [query, p.characters, p.scenes, p.blocks, p.styles?.cards]);
 
   const applyStylesInEditor = Boolean(p.display?.applyStylesInEditor);
   const editorGlobalStyle = useMemo(
@@ -1002,6 +1004,7 @@ function App() {
                 characters={p.characters ?? []}
                 channels={channels}
                 scenes={p.scenes ?? []}
+                styleCards={p.styles?.cards ?? []}
                 onActivate={() => setSearchActive(true)}
                 onChangeQuery={(nextQuery) => {
                   selectionAnchor.current = null;
@@ -1321,6 +1324,7 @@ function App() {
                             isBulkRep && bulkEdit
                               ? {
                                   count: bulkEdit.selectedIds.size,
+                                  targetBlocks: bulkTargetBlocks,
                                   state: bulkEdit,
                                   originalRepText: bulkRepOriginalText,
                                   faceCharacter: bulkFaceCharacter,
@@ -1348,6 +1352,7 @@ function App() {
                               ? editorStyleResolver(displayBlock)
                               : undefined
                           }
+                          styleCards={p.styles?.cards ?? []}
                           dividerColor={p.styles?.global.dividerColor}
                           onJump={
                             !bulkEdit && searchActive && query.trim()

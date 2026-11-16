@@ -21,6 +21,14 @@ import {
   toStoredColorValue,
 } from './color.ts';
 import {
+  applyBulkEditToProject,
+  createBulkEditState,
+  getBulkFaceCharacter,
+  getBulkStyleCheckboxState,
+  pickRepresentativeId,
+  toggleBulkStyleOp,
+} from './bulkEdit.ts';
+import {
   compileQuery,
   formatChipDisplay,
   formatChipToken,
@@ -706,12 +714,6 @@ test('선택 텍스트 따옴표·괄호 자동 감싸기', () => {
   assert.equal(wrapSelectedText('대사', 0, 2, 'a'), null);
 });
 
-import {
-  applyBulkEditToProject,
-  createBulkEditState,
-  getBulkFaceCharacter,
-  pickRepresentativeId,
-} from './bulkEdit.ts';
 test('일괄 편집 대표 선택, 표정 조건, 일괄 패치 및 단일 적용', () => {
   const charA = {
     id: 'c-a',
@@ -2009,4 +2011,152 @@ test('컬러 입력 유틸: # 자동 제거(직접 입력·붙여넣기), 저장
   assert.equal(getContrastTextColor('#6cd4bc'), '#000000');
   assert.equal(getContrastTextColor('#ffff00'), '#000000');
   assert.equal(getContrastTextColor('#888888'), '#000000');
+});
+
+test('개별 메시지 스타일 요약 칩/전체 해제, 일괄 스타일 편집, style: 검색 필터', () => {
+  const styles = defaultProjectStyles();
+  const sEmp = createStyleCard({ id: 's-emp', name: '강조 연출', props: { panelBgColor: '#223344' } });
+  const sDice = createStyleCard({
+    id: 's-dice',
+    name: '치명타',
+    filters: ['dice:크리티컬'],
+    props: { textColor: '#FFDD55' },
+  });
+  // 순환 참조 방지 검증용 상호 참조 필터
+  const sLoopA = createStyleCard({
+    id: 's-loop-a',
+    name: '순환 A',
+    filters: ['style:"순환 B"'],
+  });
+  const sLoopB = createStyleCard({
+    id: 's-loop-b',
+    name: '순환 B',
+    filters: ['style:"순환 A"'],
+  });
+  styles.cards = [sEmp, sDice, sLoopA, sLoopB];
+
+  const cAlpha = {
+    id: 'c-alpha',
+    name: '알파',
+    color: '#6CD4BC',
+    iconUrl: '',
+    faces: [],
+    styleIds: ['s-emp'],
+  };
+
+  const b1 = {
+    id: 'b1',
+    characterId: null,
+    speaker: '베타',
+    text: '직접 강조 1',
+    diceResult: '',
+    channel: '메인',
+    sourceType: 'normal',
+    styleIds: ['s-emp', 's-dice'],
+  };
+  const b2 = {
+    id: 'b2',
+    characterId: null,
+    speaker: '베타',
+    text: '직접 강조 2',
+    diceResult: '',
+    channel: '메인',
+    sourceType: 'normal',
+    styleIds: ['s-emp'],
+  };
+  const b3 = {
+    id: 'b3',
+    characterId: 'c-alpha',
+    speaker: '알파',
+    text: '캐릭터 스타일 메시지',
+    diceResult: '1D100<=50 크리티컬',
+    channel: '메인',
+    sourceType: 'normal',
+  };
+  const b4 = {
+    id: 'b4',
+    characterId: null,
+    speaker: '감마',
+    text: '스타일 없는 메시지',
+    diceResult: '',
+    channel: '메인',
+    sourceType: 'normal',
+  };
+
+  const proj = {
+    ...blank(),
+    characters: [cAlpha],
+    blocks: [b1, b2, b3, b4],
+    styles,
+  };
+
+  // 1) 개별 메시지 N건 단일 요약 칩 및 X 버튼 전체 해제
+  const usages = collectStyleCardUsages(sEmp, proj);
+  const msgSummary = usages.find((u) => u.kind === 'messages');
+  assert.ok(msgSummary && msgSummary.kind === 'messages');
+  assert.equal(msgSummary.count, 2);
+  assert.equal(msgSummary.label, '개별 메시지 2건');
+
+  const afterUnlinkMsgs = unlinkStyleUsageFromProject(proj, 's-emp', msgSummary);
+  assert.deepEqual(afterUnlinkMsgs.blocks.find((x) => x.id === 'b1')?.styleIds, [
+    's-dice',
+  ]);
+  assert.equal(afterUnlinkMsgs.blocks.find((x) => x.id === 'b2')?.styleIds, undefined);
+  // 캐릭터 연결은 유지
+  assert.deepEqual(afterUnlinkMsgs.characters?.[0].styleIds, ['s-emp']);
+
+  // 2) 일괄 편집 3상태 체크박스 (all / mixed / none) 및 단일 커밋 적용
+  const targetBlocks = [b1, b2];
+  assert.equal(getBulkStyleCheckboxState('s-emp', targetBlocks), 'checked');
+  assert.equal(getBulkStyleCheckboxState('s-dice', targetBlocks), 'mixed');
+
+  // mixed -> add (전체 적용) -> remove (전체 해제) -> mixed (유지)
+  let ops = toggleBulkStyleOp('s-dice', targetBlocks, undefined);
+  assert.equal(getBulkStyleCheckboxState('s-dice', targetBlocks, ops), 'checked');
+  ops = toggleBulkStyleOp('s-dice', targetBlocks, ops);
+  assert.equal(getBulkStyleCheckboxState('s-dice', targetBlocks, ops), 'unchecked');
+  ops = toggleBulkStyleOp('s-dice', targetBlocks, ops);
+  assert.equal(ops, undefined);
+  assert.equal(getBulkStyleCheckboxState('s-dice', targetBlocks, ops), 'mixed');
+
+  const bulk = createBulkEditState('b1', new Set(['b1', 'b2']), b1);
+  bulk.styleOps = { 's-dice': 'add', 's-emp': 'remove' };
+  const afterBulk = applyBulkEditToProject(proj, bulk);
+  assert.deepEqual(afterBulk.blocks.find((x) => x.id === 'b1')?.styleIds, ['s-dice']);
+  assert.deepEqual(afterBulk.blocks.find((x) => x.id === 'b2')?.styleIds, ['s-dice']);
+
+  // 3) style: / -style: / style:none 검색 필터 및 칩 포맷팅
+  const parsed = parseQueryToChipsAndText('style:"강조 연출" -style:치명타');
+  assert.equal(parsed.chips.length, 2);
+  assert.equal(parsed.chips[0].key, 'style');
+  assert.equal(formatChipDisplay(parsed.chips[0]).label, '강조 연출');
+  assert.equal(formatChipDisplay(parsed.chips[1]).icon, '-🎨');
+
+  const byEmp = compileQuery('style:"강조 연출"', [cAlpha], [], proj.blocks, styles.cards);
+  assert.deepEqual(
+    proj.blocks.filter(byEmp).map((x) => x.id),
+    ['b1', 'b2', 'b3'],
+  );
+
+  const byDice = compileQuery('style:치명타', [cAlpha], [], proj.blocks, styles.cards);
+  assert.deepEqual(
+    proj.blocks.filter(byDice).map((x) => x.id),
+    ['b1', 'b3'],
+  );
+
+  const exclDice = compileQuery('-style:치명타', [cAlpha], [], proj.blocks, styles.cards);
+  assert.deepEqual(
+    proj.blocks.filter(exclDice).map((x) => x.id),
+    ['b2', 'b4'],
+  );
+
+  const noStyle = compileQuery('style:none', [cAlpha], [], proj.blocks, styles.cards);
+  assert.deepEqual(
+    proj.blocks.filter(noStyle).map((x) => x.id),
+    ['b4'],
+  );
+
+  // 순환 스타일 참조 시 무한 재귀 없이 false 반환
+  const loopPred = compileQuery('style:"순환 A"', [cAlpha], [], proj.blocks, styles.cards);
+  assert.deepEqual(proj.blocks.filter(loopPred), []);
 });
