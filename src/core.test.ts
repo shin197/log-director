@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parse, replaceBlocks } from './core.ts';
 import {
   addFilterToStyleCard,
+  buildMessageStyleObjects,
   collectStyleCardUsages,
   createStyleCard,
   createStyleResolver,
@@ -1878,6 +1879,91 @@ test('스타일 확장: 전역 시스템 메시지 스타일, 아바타 사용 �
   assert.equal(roundtrip.styles?.global.systemDefaults.textColor, '#AABBCC');
   assert.equal(roundtrip.styles?.global.systemDefaults.fontStyle, 'italic');
   assert.equal(roundtrip.styles?.cards[0].props.avatarHidden, true);
+});
+
+test('스타일 확장 2: 화자 색 테두리, 점선 테두리, 아바타 배경색, 정렬, 패딩 및 메시지 간격', () => {
+  const styled = buildMessageStyleObjects(
+    {
+      panelBorderStyle: 'box',
+      panelBorderLineStyle: 'dashed',
+      panelBorderColor: 'speaker',
+      panelPaddingY: 10,
+      panelPaddingX: 18,
+      avatarBgColor: '#1D2530',
+      avatarBorderLineStyle: 'dotted',
+      avatarBorderColor: 'speaker',
+      avatarBorderWidth: 2,
+      textAlign: 'center',
+      diceBorderStyle: 'left-accent',
+      diceBorderLineStyle: 'dashed',
+      diceBorderColor: 'speaker',
+      diceAlign: 'right',
+    },
+    '#262626',
+    '#B8342C',
+  );
+
+  assert.equal(styled.panelStyle.border, '1px dashed #B8342C');
+  assert.equal(styled.panelStyle.padding, '10px 18px');
+  assert.equal(styled.avatarStyle.backgroundColor, '#1D2530');
+  assert.equal(styled.avatarStyle.border, '2px dotted #B8342C');
+  assert.equal(styled.textStyle.textAlign, 'center');
+  assert.equal(styled.diceStyle.borderLeft, '2px dashed #B8342C');
+  assert.equal(styled.diceStyle.textAlign, 'right');
+  assert.equal(styled.diceStyle.display, 'block');
+
+  const noBorderStyled = buildMessageStyleObjects(
+    {
+      panelBorderColor: 'none',
+      avatarBorderColor: 'none',
+      diceBorderColor: 'none',
+    },
+    '#262626',
+    '#B8342C',
+  );
+  assert.equal(noBorderStyled.panelStyle.border, 'none');
+  assert.equal(noBorderStyled.avatarStyle.border, 'none');
+  assert.equal(noBorderStyled.diceStyle.border, 'none');
+
+  const baseProj = blank();
+  const styles = defaultProjectStyles();
+  styles.global.messageGap = 8;
+  styles.global.messageDefaults = {
+    panelPaddingY: 9,
+    panelPaddingX: 12,
+    avatarBgColor: '#1D2530',
+    panelBorderLineStyle: 'dashed',
+    panelBorderColor: 'speaker',
+    textAlign: 'center',
+  };
+  const proj = {
+    ...baseProj,
+    blocks: [
+      {
+        id: 'b1',
+        characterId: null,
+        speaker: '레드',
+        color: '#B8342C',
+        text: '가운데 정렬 대사',
+        diceResult: '',
+        channel: '메인',
+        sourceType: 'normal',
+      },
+    ],
+    styles,
+  };
+
+  const html = exportLog(proj, 'html');
+  assert.ok(html.includes('gap:8px'));
+  assert.ok(html.includes('padding:9px 12px'));
+  assert.ok(html.includes('border-bottom:1px dashed #B8342C'));
+  assert.ok(html.includes('text-align:center'));
+
+  const reloaded = parse(JSON.stringify(proj), 'gap-padding.project.json');
+  assert.equal(reloaded.styles?.global.messageGap, 8);
+  assert.equal(reloaded.styles?.global.messageDefaults.panelPaddingY, 9);
+  assert.equal(reloaded.styles?.global.messageDefaults.avatarBgColor, '#1D2530');
+  assert.equal(reloaded.styles?.global.messageDefaults.panelBorderColor, 'speaker');
 });
 
 test('컬러 입력 유틸: # 자동 제거(직접 입력·붙여넣기), 저장값 변환, 대비 글자색 계산', () => {

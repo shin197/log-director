@@ -184,18 +184,25 @@ export function MessageBlock({
 
   const dropClass = pasteIndicator ? `drop-${pasteIndicator}` : over;
   const resolvedVisualStyle =
-    !isEditing && styleProps ? buildMessageStyleObjects(styleProps, dividerColor) : null;
+    !isEditing && styleProps
+      ? buildMessageStyleObjects(
+          styleProps,
+          dividerColor,
+          isSystem ? undefined : b.color || '#888888',
+        )
+      : null;
   const hideAvatar = Boolean(resolvedVisualStyle?.avatarHidden);
+  const articlePanelStyle = resolvedVisualStyle
+    ? selected || bulkTarget || cut
+      ? { ...resolvedVisualStyle.panelStyle, backgroundColor: undefined }
+      : resolvedVisualStyle.panelStyle
+    : undefined;
 
   return (
     <article
       data-message-id={b.id}
       className={`log-message ${isSystem ? 'system' : ''} ${hideAvatar ? 'no-avatar' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${searchMatch ? 'search-match' : ''} ${dropClass}`}
-      style={
-        !selected && !bulkTarget && !cut && resolvedVisualStyle
-          ? resolvedVisualStyle.panelStyle
-          : undefined
-      }
+      style={articlePanelStyle}
       draggable={!isEditing && !bulkDisabled && !cutMode}
       onDragStart={(e) => {
         if (bulkDisabled || cutMode) return;

@@ -8,6 +8,8 @@ import {
 
 export type AvatarShape = 'square' | 'rounded' | 'circle' | 'diamond';
 export type PanelBorderStyle = 'bottom' | 'box' | 'left-accent' | 'none';
+export type BorderLineStyle = 'solid' | 'dashed' | 'dotted';
+export type TextAlignOption = 'left' | 'center' | 'right';
 export type FontWeightOption = 'normal' | 'bold';
 export type FontStyleOption = 'normal' | 'italic';
 
@@ -17,24 +19,34 @@ export type MessageStyleProps = {
   textColor?: string;
   fontWeight?: FontWeightOption;
   fontStyle?: FontStyleOption;
+  textAlign?: TextAlignOption;
   speakerColor?: string;
   panelBgColor?: string;
   panelBorderColor?: string;
   panelBorderStyle?: PanelBorderStyle;
+  panelBorderLineStyle?: BorderLineStyle;
   panelRadius?: number;
+  panelPaddingY?: number;
+  panelPaddingX?: number;
   avatarHidden?: boolean;
   avatarShape?: AvatarShape;
+  avatarBgColor?: string;
   avatarBorderColor?: string;
   avatarBorderWidth?: number;
+  avatarBorderLineStyle?: BorderLineStyle;
   diceBgColor?: string;
   diceTextColor?: string;
   diceBorderColor?: string;
+  diceBorderStyle?: PanelBorderStyle;
+  diceBorderLineStyle?: BorderLineStyle;
   diceFontWeight?: FontWeightOption;
+  diceAlign?: TextAlignOption;
 };
 
 export type GlobalStyleConfig = {
   pageBgColor: string;
   containerWidth: number;
+  messageGap: number;
   titleColor: string;
   titleSize: number;
   titleAlign: 'left' | 'center';
@@ -80,6 +92,7 @@ export function defaultGlobalStyle(): GlobalStyleConfig {
   return {
     pageBgColor: '#121212',
     containerWidth: 960,
+    messageGap: 0,
     titleColor: '#EEEEEE',
     titleSize: 24,
     titleAlign: 'left',
@@ -112,6 +125,16 @@ const VALID_BORDER_STYLES = new Set<PanelBorderStyle>([
 ]);
 const VALID_FONT_WEIGHTS = new Set<FontWeightOption>(['normal', 'bold']);
 const VALID_FONT_STYLES = new Set<FontStyleOption>(['normal', 'italic']);
+const VALID_BORDER_LINE_STYLES = new Set<BorderLineStyle>(['solid', 'dashed', 'dotted']);
+const VALID_TEXT_ALIGNS = new Set<TextAlignOption>(['left', 'center', 'right']);
+
+function normalizeBorderColorValue(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === 'none' || trimmed === 'speaker') return trimmed;
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed.toUpperCase();
+  return undefined;
+}
 
 export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   if (!raw || typeof raw !== 'object') return {};
@@ -136,6 +159,9 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   if (VALID_FONT_STYLES.has(raw.fontStyle)) {
     out.fontStyle = raw.fontStyle;
   }
+  if (VALID_TEXT_ALIGNS.has(raw.textAlign)) {
+    out.textAlign = raw.textAlign;
+  }
   if (
     typeof raw.speakerColor === 'string' &&
     /^#[0-9a-fA-F]{6}$/.test(raw.speakerColor)
@@ -148,14 +174,15 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   ) {
     out.panelBgColor = raw.panelBgColor.toUpperCase();
   }
-  if (
-    typeof raw.panelBorderColor === 'string' &&
-    /^#[0-9a-fA-F]{6}$/.test(raw.panelBorderColor)
-  ) {
-    out.panelBorderColor = raw.panelBorderColor.toUpperCase();
+  const panelBorderColor = normalizeBorderColorValue(raw.panelBorderColor);
+  if (panelBorderColor) {
+    out.panelBorderColor = panelBorderColor;
   }
   if (VALID_BORDER_STYLES.has(raw.panelBorderStyle)) {
     out.panelBorderStyle = raw.panelBorderStyle;
+  }
+  if (VALID_BORDER_LINE_STYLES.has(raw.panelBorderLineStyle)) {
+    out.panelBorderLineStyle = raw.panelBorderLineStyle;
   }
   if (
     typeof raw.panelRadius === 'number' &&
@@ -165,6 +192,22 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   ) {
     out.panelRadius = Math.round(raw.panelRadius);
   }
+  if (
+    typeof raw.panelPaddingY === 'number' &&
+    Number.isFinite(raw.panelPaddingY) &&
+    raw.panelPaddingY >= 0 &&
+    raw.panelPaddingY <= 48
+  ) {
+    out.panelPaddingY = Math.round(raw.panelPaddingY);
+  }
+  if (
+    typeof raw.panelPaddingX === 'number' &&
+    Number.isFinite(raw.panelPaddingX) &&
+    raw.panelPaddingX >= 0 &&
+    raw.panelPaddingX <= 64
+  ) {
+    out.panelPaddingX = Math.round(raw.panelPaddingX);
+  }
   if (typeof raw.avatarHidden === 'boolean') {
     out.avatarHidden = raw.avatarHidden;
   }
@@ -172,10 +215,14 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
     out.avatarShape = raw.avatarShape;
   }
   if (
-    typeof raw.avatarBorderColor === 'string' &&
-    /^#[0-9a-fA-F]{6}$/.test(raw.avatarBorderColor)
+    typeof raw.avatarBgColor === 'string' &&
+    /^#[0-9a-fA-F]{6}$/.test(raw.avatarBgColor)
   ) {
-    out.avatarBorderColor = raw.avatarBorderColor.toUpperCase();
+    out.avatarBgColor = raw.avatarBgColor.toUpperCase();
+  }
+  const avatarBorderColor = normalizeBorderColorValue(raw.avatarBorderColor);
+  if (avatarBorderColor) {
+    out.avatarBorderColor = avatarBorderColor;
   }
   if (
     typeof raw.avatarBorderWidth === 'number' &&
@@ -184,6 +231,9 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
     raw.avatarBorderWidth <= 10
   ) {
     out.avatarBorderWidth = Math.round(raw.avatarBorderWidth);
+  }
+  if (VALID_BORDER_LINE_STYLES.has(raw.avatarBorderLineStyle)) {
+    out.avatarBorderLineStyle = raw.avatarBorderLineStyle;
   }
   if (typeof raw.diceBgColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(raw.diceBgColor)) {
     out.diceBgColor = raw.diceBgColor.toUpperCase();
@@ -194,14 +244,21 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   ) {
     out.diceTextColor = raw.diceTextColor.toUpperCase();
   }
-  if (
-    typeof raw.diceBorderColor === 'string' &&
-    /^#[0-9a-fA-F]{6}$/.test(raw.diceBorderColor)
-  ) {
-    out.diceBorderColor = raw.diceBorderColor.toUpperCase();
+  const diceBorderColor = normalizeBorderColorValue(raw.diceBorderColor);
+  if (diceBorderColor) {
+    out.diceBorderColor = diceBorderColor;
+  }
+  if (VALID_BORDER_STYLES.has(raw.diceBorderStyle)) {
+    out.diceBorderStyle = raw.diceBorderStyle;
+  }
+  if (VALID_BORDER_LINE_STYLES.has(raw.diceBorderLineStyle)) {
+    out.diceBorderLineStyle = raw.diceBorderLineStyle;
   }
   if (VALID_FONT_WEIGHTS.has(raw.diceFontWeight)) {
     out.diceFontWeight = raw.diceFontWeight;
+  }
+  if (VALID_TEXT_ALIGNS.has(raw.diceAlign)) {
+    out.diceAlign = raw.diceAlign;
   }
   return out;
 }
@@ -230,6 +287,13 @@ export function normalizeProjectStyles(raw: any): ProjectStyles | undefined {
       g.containerWidth <= 1920
         ? Math.round(g.containerWidth)
         : defGlobal.containerWidth,
+    messageGap:
+      typeof g.messageGap === 'number' &&
+      Number.isFinite(g.messageGap) &&
+      g.messageGap >= 0 &&
+      g.messageGap <= 48
+        ? Math.round(g.messageGap)
+        : defGlobal.messageGap,
     titleColor:
       typeof g.titleColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(g.titleColor)
         ? g.titleColor.toUpperCase()
@@ -497,12 +561,23 @@ export function unlinkStyleUsageFromProject(
   };
 }
 
+function resolveBorderColor(
+  raw: string | undefined,
+  fallback: string,
+  speakerColor?: string,
+): string | undefined {
+  if (raw === 'none') return undefined;
+  if (raw === 'speaker') return speakerColor || fallback;
+  return raw || fallback;
+}
+
 /**
  * MessageStyleProps를 화면/미리보기 렌더링용 인라인 스타일 묶음으로 변환합니다.
  */
 export function buildMessageStyleObjects(
   props: MessageStyleProps,
   dividerColor = '#262626',
+  speakerColor?: string,
 ): {
   panelStyle: Record<string, string | number | undefined>;
   avatarStyle: Record<string, string | number | undefined>;
@@ -511,29 +586,45 @@ export function buildMessageStyleObjects(
   textStyle: Record<string, string | number | undefined>;
   diceStyle: Record<string, string | number | undefined>;
 } {
+  const effectiveSpeakerColor = props.speakerColor || speakerColor;
   const panelStyle: Record<string, string | number | undefined> = {};
   if (props.panelBgColor) {
     panelStyle.backgroundColor = props.panelBgColor;
   }
-  const bColor = props.panelBorderColor || dividerColor;
-  if (props.panelBorderStyle === 'none') {
+  const panelLineStyle = props.panelBorderLineStyle || 'solid';
+  const bColor = resolveBorderColor(props.panelBorderColor, dividerColor, effectiveSpeakerColor);
+  if (props.panelBorderStyle === 'none' || props.panelBorderColor === 'none') {
     panelStyle.border = 'none';
     panelStyle.borderBottom = 'none';
   } else if (props.panelBorderStyle === 'box') {
-    panelStyle.border = `1px solid ${bColor}`;
+    if (bColor) panelStyle.border = `1px ${panelLineStyle} ${bColor}`;
   } else if (props.panelBorderStyle === 'left-accent') {
-    panelStyle.borderLeft = `4px solid ${props.panelBorderColor || '#6CD4BC'}`;
-    if (props.panelBorderColor) {
-      panelStyle.borderBottom = `1px solid ${dividerColor}`;
+    const accentColor =
+      props.panelBorderColor && props.panelBorderColor !== 'none'
+        ? (bColor ?? '#6CD4BC')
+        : '#6CD4BC';
+    panelStyle.borderLeft = `4px ${panelLineStyle} ${accentColor}`;
+    if (props.panelBorderColor && props.panelBorderColor !== 'none') {
+      panelStyle.borderBottom = `1px ${panelLineStyle} ${dividerColor}`;
     }
-  } else if (props.panelBorderStyle === 'bottom' || props.panelBorderColor) {
-    panelStyle.borderBottom = `1px solid ${bColor}`;
+  } else if (
+    props.panelBorderStyle === 'bottom' ||
+    props.panelBorderColor ||
+    props.panelBorderLineStyle
+  ) {
+    if (bColor) panelStyle.borderBottom = `1px ${panelLineStyle} ${bColor}`;
   }
   if (props.panelRadius !== undefined) {
     panelStyle.borderRadius = `${props.panelRadius}px`;
   }
+  if (props.panelPaddingY !== undefined || props.panelPaddingX !== undefined) {
+    panelStyle.padding = `${props.panelPaddingY ?? 16}px ${props.panelPaddingX ?? 0}px`;
+  }
 
   const avatarStyle: Record<string, string | number | undefined> = {};
+  if (props.avatarBgColor) {
+    avatarStyle.backgroundColor = props.avatarBgColor;
+  }
   if (props.avatarShape === 'square') {
     avatarStyle.borderRadius = '0px';
     avatarStyle.clipPath = 'none';
@@ -547,15 +638,20 @@ export function buildMessageStyleObjects(
     avatarStyle.borderRadius = '0px';
     avatarStyle.clipPath = 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
   }
-  if (props.avatarBorderWidth !== undefined) {
-    if (props.avatarBorderWidth > 0) {
-      avatarStyle.border = `${props.avatarBorderWidth}px solid ${props.avatarBorderColor || '#888888'}`;
-      avatarStyle.boxSizing = 'border-box';
-    } else {
-      avatarStyle.border = 'none';
-    }
-  } else if (props.avatarBorderColor) {
-    avatarStyle.border = `2px solid ${props.avatarBorderColor}`;
+  const avatarLineStyle = props.avatarBorderLineStyle || 'solid';
+  const avBorderColor = resolveBorderColor(
+    props.avatarBorderColor,
+    '#888888',
+    effectiveSpeakerColor,
+  );
+  if (props.avatarBorderColor === 'none' || props.avatarBorderWidth === 0) {
+    avatarStyle.border = 'none';
+  } else if (
+    (props.avatarBorderWidth !== undefined && props.avatarBorderWidth > 0) ||
+    (props.avatarBorderColor && props.avatarBorderColor !== 'none')
+  ) {
+    const width = props.avatarBorderWidth ?? 2;
+    avatarStyle.border = `${width}px ${avatarLineStyle} ${avBorderColor ?? '#888888'}`;
     avatarStyle.boxSizing = 'border-box';
   }
 
@@ -565,27 +661,52 @@ export function buildMessageStyleObjects(
   if (props.textColor) textStyle.color = props.textColor;
   if (props.fontWeight) textStyle.fontWeight = props.fontWeight;
   if (props.fontStyle) textStyle.fontStyle = props.fontStyle;
+  if (props.textAlign) textStyle.textAlign = props.textAlign;
 
   const diceStyle: Record<string, string | number | undefined> = {};
+  const hasDiceBox = Boolean(
+    props.diceBgColor ||
+      (props.diceBorderStyle && props.diceBorderStyle !== 'none') ||
+      (props.diceBorderColor && props.diceBorderColor !== 'none'),
+  );
   if (props.diceBgColor) {
     diceStyle.backgroundColor = props.diceBgColor;
-    diceStyle.padding = '3px 8px';
-    diceStyle.borderRadius = '4px';
-    diceStyle.display = 'inline-block';
-    diceStyle.marginTop = '4px';
   }
   if (props.diceTextColor) {
     diceStyle.color = props.diceTextColor;
   }
-  if (props.diceBorderColor) {
-    diceStyle.border = `1px solid ${props.diceBorderColor}`;
+  const diceLineStyle = props.diceBorderLineStyle || 'solid';
+  const dBorderColor = resolveBorderColor(
+    props.diceBorderColor,
+    '#48BFA4',
+    effectiveSpeakerColor,
+  );
+  if (props.diceBorderStyle === 'none' || props.diceBorderColor === 'none') {
+    diceStyle.border = 'none';
+    diceStyle.borderLeft = 'none';
+    diceStyle.borderBottom = 'none';
+  } else if (props.diceBorderStyle === 'left-accent') {
+    diceStyle.borderLeft = `2px ${diceLineStyle} ${dBorderColor ?? '#48BFA4'}`;
+  } else if (props.diceBorderStyle === 'bottom') {
+    diceStyle.borderBottom = `1px ${diceLineStyle} ${dBorderColor ?? '#48BFA4'}`;
+  } else if (
+    props.diceBorderStyle === 'box' ||
+    (props.diceBorderColor && props.diceBorderColor !== 'none')
+  ) {
+    diceStyle.border = `1px ${diceLineStyle} ${dBorderColor ?? '#48BFA4'}`;
+  }
+  if (hasDiceBox) {
     diceStyle.padding = '3px 8px';
-    diceStyle.borderRadius = '4px';
-    diceStyle.display = 'inline-block';
+    diceStyle.borderRadius =
+      props.diceBorderStyle === 'left-accent' ? '0 4px 4px 0' : '4px';
+    diceStyle.display = props.diceAlign ? 'block' : 'inline-block';
     diceStyle.marginTop = '4px';
   }
   if (props.diceFontWeight) {
     diceStyle.fontWeight = props.diceFontWeight;
+  }
+  if (props.diceAlign) {
+    diceStyle.textAlign = props.diceAlign;
   }
 
   return {

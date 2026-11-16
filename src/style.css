@@ -3468,13 +3468,13 @@ dialog::backdrop {
   border-bottom-right-radius: 0;
 }
 
-.style-drag-handle {
+/* .style-drag-handle {
   cursor: grab;
   color: var(--text-muted);
   font-size: 14px;
   padding: 2px 4px;
   user-select: none;
-}
+} */
 
 .style-card-toggle {
   display: inline-flex;
@@ -3546,6 +3546,21 @@ dialog::backdrop {
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+
+.style-card-collapsed-preview {
+  padding: 10px 14px;
+}
+
+.style-global-preview-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.style-border-color-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .style-card-body {
@@ -3708,6 +3723,9 @@ dialog::backdrop {
 }
 
 .style-sample-preview {
+  position: sticky;
+  top: -24px;
+  z-index: 2;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 12px 16px;
@@ -3748,8 +3766,8 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
+  /* background: var(--bg-elevated); */
+  /* border: 1px solid var(--border-default); */
   font-weight: 700;
   font-size: 14px;
   color: var(--text-primary);
@@ -3821,6 +3839,9 @@ dialog::backdrop {
 }
 
 .log-scroll.is-styled .log-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--styled-message-gap, 0px);
   max-width: var(--styled-container-width, 960px);
   padding: 0 12px 24px;
 }
@@ -3835,7 +3856,7 @@ dialog::backdrop {
   grid-template-columns: 40px minmax(0, 1fr);
   column-gap: 12px;
   gap: 12px;
-  padding: 16px 0;
+  /* padding: 16px 0; */
   border-radius: 0;
   border-bottom: 1px solid var(--styled-divider-color, #262626);
 }
@@ -3878,6 +3899,10 @@ dialog::backdrop {
   width: 40px;
   height: 40px;
   border-radius: 0;
+}
+
+.log-scroll.is-styled .log-message:not(.editing) .avatar img {
+  background: transparent;
 }
 
 .log-scroll.is-styled .log-message:not(.editing) .avatar-placeholder {

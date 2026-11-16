@@ -10,6 +10,7 @@ import { notifyError } from './Toast';
 import {
   addFilterToStyleCard,
   type AvatarShape,
+  type BorderLineStyle,
   buildMessageStyleObjects,
   collectStyleCardUsages,
   createStyleCard,
@@ -29,6 +30,7 @@ import {
   resolveSystemBaseStyle,
   type StyleCard,
   type StyleUsageItem,
+  type TextAlignOption,
   unlinkStyleUsageFromProject,
 } from './styles';
 
@@ -39,13 +41,15 @@ function OptionalColorField({
   value,
   onChange,
   defaultPickColor = '#6CD4BC',
-  placeholderText = '지정 안 함 (기존 유지)',
+  placeholderText = '지정 안 함',
+  scope = 'card',
 }: {
   label: string;
   value?: string;
   onChange: (next?: string) => void;
   defaultPickColor?: string;
   placeholderText?: string;
+  scope?: 'global' | 'card';
 }) {
   const active = Boolean(value);
   return (
@@ -56,10 +60,10 @@ function OptionalColorField({
           <button
             type="button"
             className="ghost compact-btn style-unset-btn"
-            title="속성 지정 해제 (상위 스타일 유지)"
+            title={scope === 'global' ? '기본값으로 되돌리기' : '속성 지정 해제 (상위 유지)'}
             onClick={() => onChange(undefined)}
           >
-            해제
+            {scope === 'global' ? '기본값' : '해제'}
           </button>
         ) : (
           <button
@@ -80,6 +84,61 @@ function OptionalColorField({
       ) : (
         <div className="style-unset-placeholder">{placeholderText}</div>
       )}
+    </div>
+  );
+}
+
+function BorderColorField({
+  label,
+  value,
+  onChange,
+  defaultPickColor = '#46586E',
+  unsetLabel,
+  allowSpeaker = true,
+}: {
+  label: string;
+  value?: string;
+  onChange: (next?: string) => void;
+  defaultPickColor?: string;
+  unsetLabel: string;
+  allowSpeaker?: boolean;
+}) {
+  const mode =
+    value === undefined
+      ? ''
+      : value === 'none'
+        ? 'none'
+        : value === 'speaker'
+          ? 'speaker'
+          : 'custom';
+  return (
+    <div className="style-prop-field">
+      <span className="field-label">{label}</span>
+      <div className="style-border-color-control">
+        <select
+          aria-label={`${label} 방식`}
+          value={mode}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === '') onChange(undefined);
+            else if (next === 'none') onChange('none');
+            else if (next === 'speaker') onChange('speaker');
+            else onChange(mode === 'custom' && value ? value : defaultPickColor);
+          }}
+        >
+          <option value="">{unsetLabel}</option>
+          <option value="none">없음</option>
+          {allowSpeaker && <option value="speaker">화자 색 따라가기</option>}
+          <option value="custom">직접 지정</option>
+        </select>
+        {mode === 'custom' && (
+          <ColorInput
+            title={label}
+            value={value ?? defaultPickColor}
+            onChange={(next) => onChange(next || defaultPickColor)}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -137,16 +196,23 @@ function SampleMessagePreview({
     ? resolveSystemBaseStyle(globalStyle)
     : (globalStyle.messageDefaults ?? {});
   const effectiveProps = mergeMessageStyleProps(baseProps, styleProps);
-  const styled = buildMessageStyleObjects(effectiveProps, globalStyle.dividerColor);
-  const spkColor = styled.speakerColor || sampleBlock?.color || '#6CD4BC';
+  const rawSpeakerColor = sampleBlock?.color || '#6CD4BC';
+  const styled = buildMessageStyleObjects(
+    effectiveProps,
+    globalStyle.dividerColor,
+    isSampleSystem ? undefined : rawSpeakerColor,
+  );
+  const spkColor = styled.speakerColor || rawSpeakerColor;
   const speakerName = sampleBlock?.speaker || '제타';
   const messageText =
     sampleBlock?.text || '"문을 조심스럽게 열고 안쪽의 기척을 살핍니다."';
   const hasDiceEdit = Boolean(
     effectiveProps.diceBgColor ||
     effectiveProps.diceTextColor ||
+    effectiveProps.diceBorderStyle ||
     effectiveProps.diceBorderColor ||
-    effectiveProps.diceFontWeight,
+    effectiveProps.diceFontWeight ||
+    effectiveProps.diceAlign,
   );
   const diceText =
     sampleBlock?.diceResult ||
@@ -162,7 +228,9 @@ function SampleMessagePreview({
       className="style-sample-preview"
       style={{
         backgroundColor: globalStyle.pageBgColor,
-        color: effectiveProps.textColor || (isSampleSystem ? globalStyle.systemTextColor : '#EEEEEE'),
+        color:
+          effectiveProps.textColor ||
+          (isSampleSystem ? globalStyle.systemTextColor : '#EEEEEE'),
         fontFamily:
           effectiveProps.fontFamily ||
           globalStyle.messageDefaults?.fontFamily ||
@@ -176,9 +244,10 @@ function SampleMessagePreview({
           borderBottom: `1px solid ${globalStyle.dividerColor}`,
           ...(isSampleSystem ? { paddingLeft: `${systemIndent}px` } : {}),
           ...styled.panelStyle,
-          ...(styled.panelStyle.backgroundColor ||
-          effectiveProps.panelBorderStyle === 'box' ||
-          effectiveProps.panelBorderStyle === 'left-accent'
+          ...(!styled.panelStyle.padding &&
+            (styled.panelStyle.backgroundColor ||
+              effectiveProps.panelBorderStyle === 'box' ||
+              effectiveProps.panelBorderStyle === 'left-accent')
             ? { padding: '12px 14px' }
             : {}),
         }}
@@ -215,7 +284,9 @@ function SampleMessagePreview({
             <div
               className="style-sample-dice"
               style={{
-                fontSize: effectiveProps.fontSize ? `${effectiveProps.fontSize}px` : '16px',
+                fontSize: effectiveProps.fontSize
+                  ? `${effectiveProps.fontSize}px`
+                  : '16px',
                 ...styled.diceStyle,
               }}
             >
@@ -238,6 +309,7 @@ function GlobalStylePreview({
   const normalStyled = buildMessageStyleObjects(
     globalStyle.messageDefaults ?? {},
     globalStyle.dividerColor,
+    '#6CD4BC',
   );
   const sysEffective = resolveSystemBaseStyle(globalStyle);
   const sysStyled = buildMessageStyleObjects(sysEffective, globalStyle.dividerColor);
@@ -252,9 +324,6 @@ function GlobalStylePreview({
         fontFamily: globalStyle.messageDefaults.fontFamily || 'system-ui, sans-serif',
       }}
     >
-      <div className="style-sample-caption">
-        문서 · 일반 메시지 · 시스템 메시지 미리보기 (최대 폭 {globalStyle.containerWidth}px)
-      </div>
       <div
         className="style-sample-title"
         style={{
@@ -266,92 +335,99 @@ function GlobalStylePreview({
         {projectTitle || '로그 제목 미리보기'}
       </div>
 
-      {/* 일반 메시지 샘플 */}
       <div
-        className={`style-sample-message ${normalStyled.avatarHidden ? 'no-avatar' : ''}`.trim()}
-        style={{
-          borderBottom: `1px solid ${globalStyle.dividerColor}`,
-          ...normalStyled.panelStyle,
-          ...(normalStyled.panelStyle.backgroundColor ||
-          globalStyle.messageDefaults.panelBorderStyle === 'box' ||
-          globalStyle.messageDefaults.panelBorderStyle === 'left-accent'
-            ? { padding: '12px 14px' }
-            : {}),
-        }}
+        className="style-global-preview-list"
+        style={{ gap: `${globalStyle.messageGap ?? 0}px` }}
       >
-        {!normalStyled.avatarHidden && (
-          <SampleAvatar
-            speaker="제타"
-            avatarStyle={normalStyled.avatarStyle}
-            borderColor={normalStyled.speakerColor || '#6CD4BC'}
-          />
-        )}
-        <div className="style-sample-body">
-          <div className="style-sample-header">
-            <span
-              className="style-sample-speaker"
-              style={{ color: normalStyled.speakerColor || '#6CD4BC' }}
+        {/* 일반 메시지 샘플 */}
+        <div
+          className={`style-sample-message ${normalStyled.avatarHidden ? 'no-avatar' : ''}`.trim()}
+          style={{
+            borderBottom: `1px solid ${globalStyle.dividerColor}`,
+            ...normalStyled.panelStyle,
+            ...(!normalStyled.panelStyle.padding &&
+              (normalStyled.panelStyle.backgroundColor ||
+                globalStyle.messageDefaults.panelBorderStyle === 'box' ||
+                globalStyle.messageDefaults.panelBorderStyle === 'left-accent')
+              ? { padding: '12px 14px' }
+              : {}),
+          }}
+        >
+          {!normalStyled.avatarHidden && (
+            <SampleAvatar
+              speaker="제타"
+              avatarStyle={normalStyled.avatarStyle}
+              borderColor={normalStyled.speakerColor || '#6CD4BC'}
+            />
+          )}
+          <div className="style-sample-body">
+            <div className="style-sample-header">
+              <span
+                className="style-sample-speaker"
+                style={{ color: normalStyled.speakerColor || '#6CD4BC' }}
+              >
+                제타
+              </span>
+              <span className="style-sample-meta" style={{ color: globalStyle.metaColor }}>
+                오후 09:15 [메인]
+              </span>
+            </div>
+            <div
+              className="style-sample-text"
+              style={{
+                fontSize: globalStyle.messageDefaults.fontSize
+                  ? `${globalStyle.messageDefaults.fontSize}px`
+                  : '16px',
+                ...normalStyled.textStyle,
+              }}
             >
-              제타
-            </span>
-            <span className="style-sample-meta" style={{ color: globalStyle.metaColor }}>
-              오후 09:15 [메인]
-            </span>
-          </div>
-          <div
-            className="style-sample-text"
-            style={{
-              fontSize: globalStyle.messageDefaults.fontSize
-                ? `${globalStyle.messageDefaults.fontSize}px`
-                : '16px',
-              ...normalStyled.textStyle,
-            }}
-          >
-            &quot;문을 조심스럽게 열고 안쪽의 기척을 살핍니다.&quot;
-          </div>
-          <div
-            className="style-sample-dice"
-            style={{
-              fontSize: globalStyle.messageDefaults.fontSize
-                ? `${globalStyle.messageDefaults.fontSize}px`
-                : '16px',
-              ...normalStyled.diceStyle,
-            }}
-          >
-            1D100&lt;=65 듣기 ＞ 23 ＞ 성공
+              &quot;문을 조심스럽게 열고 안쪽의 기척을 살핍니다.&quot;
+            </div>
+            <div
+              className="style-sample-dice"
+              style={{
+                fontSize: globalStyle.messageDefaults.fontSize
+                  ? `${globalStyle.messageDefaults.fontSize}px`
+                  : '16px',
+                ...normalStyled.diceStyle,
+              }}
+            >
+              1D100&lt;=65 듣기 ＞ 23 ＞ 성공
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 시스템 메시지 샘플 */}
-      <div
-        className="style-sample-message is-system"
-        style={{
-          paddingLeft: `${systemIndent}px`,
-          borderBottom: `1px solid ${globalStyle.dividerColor}`,
-          color: sysEffective.textColor || globalStyle.systemTextColor,
-          ...sysStyled.panelStyle,
-          ...(sysStyled.panelStyle.backgroundColor ||
-          sysEffective.panelBorderStyle === 'box' ||
-          sysEffective.panelBorderStyle === 'left-accent'
-            ? { padding: '12px 14px' }
-            : {}),
-        }}
-      >
-        <div className="style-sample-body">
-          <div className="style-sample-header">
-            <span className="style-sample-meta" style={{ color: globalStyle.metaColor }}>
-              [메인]
-            </span>
-          </div>
-          <div
-            className="style-sample-text"
-            style={{
-              fontSize: sysEffective.fontSize ? `${sysEffective.fontSize}px` : '16px',
-              ...sysStyled.textStyle,
-            }}
-          >
-            전투 라운드가 시작되었습니다.
+        {/* 시스템 메시지 샘플 */}
+        <div
+          className="style-sample-message is-system"
+          style={{
+            paddingLeft: `${systemIndent}px`,
+            borderBottom: `1px solid ${globalStyle.dividerColor}`,
+            color: sysEffective.textColor || globalStyle.systemTextColor,
+            ...sysStyled.panelStyle,
+            ...(!sysStyled.panelStyle.padding &&
+              (sysStyled.panelStyle.backgroundColor ||
+                sysEffective.panelBorderStyle === 'box' ||
+                sysEffective.panelBorderStyle === 'left-accent')
+              ? { padding: '12px 14px' }
+              : {}),
+          }}
+        >
+          <div className="style-sample-body">
+            <div className="style-sample-header">
+              <span className="style-sample-meta" style={{ color: globalStyle.metaColor }}>
+                [메인]
+              </span>
+            </div>
+            <div
+              className="style-sample-text"
+              style={{
+                fontSize: sysEffective.fontSize ? `${sysEffective.fontSize}px` : '16px',
+                ...sysStyled.textStyle,
+              }}
+            >
+              전투 라운드가 시작되었습니다.
+            </div>
           </div>
         </div>
       </div>
@@ -363,12 +439,17 @@ function MessageStylePropsEditor({
   props,
   onChange,
   variant = 'normal',
+  scope = 'card',
 }: {
   props: MessageStyleProps;
   onChange: (next: MessageStyleProps) => void;
   variant?: 'normal' | 'system';
+  scope?: 'global' | 'card';
 }) {
   const isSystem = variant === 'system';
+  const isGlobal = scope === 'global';
+  const inheritLabel = '지정 안 함';
+
   const update = (patch: Partial<MessageStyleProps>) => {
     const next: MessageStyleProps = { ...props, ...patch };
     for (const [k, v] of Object.entries(next)) {
@@ -390,9 +471,9 @@ function MessageStylePropsEditor({
               value={props.fontFamily ?? ''}
               onChange={(e) => update({ fontFamily: e.target.value || undefined })}
             >
-              {FONT_FAMILY_PRESETS.map((opt) => (
+              {FONT_FAMILY_PRESETS.map((opt, idx) => (
                 <option key={opt.label} value={opt.value}>
-                  {opt.label}
+                  {idx === 0 && isGlobal ? '기본값 (시스템 UI)' : opt.label}
                 </option>
               ))}
             </select>
@@ -404,7 +485,7 @@ function MessageStylePropsEditor({
               type="number"
               min={10}
               max={36}
-              placeholder="지정 안 함 (기본 16)"
+              placeholder={isGlobal ? '기본값 (16)' : inheritLabel}
               value={props.fontSize ?? ''}
               onChange={(e) =>
                 update({
@@ -424,7 +505,7 @@ function MessageStylePropsEditor({
                 })
               }
             >
-              <option value="">지정 안 함</option>
+              <option value="">{isGlobal ? '기본값 (보통)' : inheritLabel}</option>
               <option value="normal">보통 (Normal)</option>
               <option value="bold">굵게 (Bold)</option>
             </select>
@@ -440,17 +521,43 @@ function MessageStylePropsEditor({
                 })
               }
             >
-              <option value="">지정 안 함</option>
+              <option value="">{isGlobal ? '기본값 (보통)' : inheritLabel}</option>
               <option value="normal">보통 (Normal)</option>
               <option value="italic">기울임 (Italic)</option>
+            </select>
+          </label>
+
+          <label className="style-prop-field">
+            <span className="field-label">대사 정렬</span>
+            <select
+              value={props.textAlign ?? ''}
+              onChange={(e) =>
+                update({
+                  textAlign: (e.target.value as TextAlignOption) || undefined,
+                })
+              }
+            >
+              <option value="">{isGlobal ? '기본값 (왼쪽)' : inheritLabel}</option>
+              <option value="left">왼쪽</option>
+              <option value="center">가운데</option>
+              <option value="right">오른쪽</option>
             </select>
           </label>
 
           <OptionalColorField
             label={isSystem ? '시스템 글자색' : '본문 글자색'}
             value={props.textColor}
+            scope={scope}
             defaultPickColor={isSystem ? '#888888' : '#EEEEEE'}
-            placeholderText={isSystem ? '지정 안 함 (기본 #888888)' : '지정 안 함 (기존 유지)'}
+            placeholderText={
+              isSystem
+                ? isGlobal
+                  ? '기본값 (#888888)'
+                  : inheritLabel
+                : isGlobal
+                  ? '기본값 (#EEEEEE)'
+                  : inheritLabel
+            }
             onChange={(textColor) => update({ textColor })}
           />
 
@@ -458,7 +565,9 @@ function MessageStylePropsEditor({
             <OptionalColorField
               label="화자 이름색 덮어쓰기"
               value={props.speakerColor}
+              scope={scope}
               defaultPickColor="#6CD4BC"
+              placeholderText="화자 고유 색 유지 (기본)"
               onChange={(speakerColor) => update({ speakerColor })}
             />
           )}
@@ -466,12 +575,14 @@ function MessageStylePropsEditor({
       </div>
 
       <div className="style-props-group">
-        <h4>메시지 패널 · 테두리</h4>
+        <h4>메시지 패널 · 여백 · 테두리</h4>
         <div className="style-props-grid">
           <OptionalColorField
             label="패널 배경색"
             value={props.panelBgColor}
+            scope={scope}
             defaultPickColor="#1D2530"
+            placeholderText={isGlobal ? '기본값 (투명)' : inheritLabel}
             onChange={(panelBgColor) => update({ panelBgColor })}
           />
 
@@ -485,18 +596,37 @@ function MessageStylePropsEditor({
                 })
               }
             >
-              <option value="">지정 안 함</option>
-              <option value="bottom">하단 구분선 (기본)</option>
+              <option value="">{isGlobal ? '기본값 (하단 구분선)' : inheritLabel}</option>
+              <option value="bottom">하단 구분선</option>
               <option value="box">전체 박스 테두리</option>
               <option value="left-accent">좌측 강조선 (4px)</option>
               <option value="none">테두리 없음</option>
             </select>
           </label>
 
-          <OptionalColorField
+          <label className="style-prop-field">
+            <span className="field-label">패널 테두리 선 모양</span>
+            <select
+              value={props.panelBorderLineStyle ?? ''}
+              onChange={(e) =>
+                update({
+                  panelBorderLineStyle: (e.target.value as BorderLineStyle) || undefined,
+                })
+              }
+            >
+              <option value="">{isGlobal ? '기본값 (실선)' : inheritLabel}</option>
+              <option value="solid">실선 (Solid)</option>
+              <option value="dashed">파선 (Dashed)</option>
+              <option value="dotted">점선 (Dotted)</option>
+            </select>
+          </label>
+
+          <BorderColorField
             label="패널 테두리색"
             value={props.panelBorderColor}
             defaultPickColor="#46586E"
+            unsetLabel={isGlobal ? '기본값 (구분선 색)' : inheritLabel}
+            allowSpeaker={!isSystem}
             onChange={(panelBorderColor) => update({ panelBorderColor })}
           />
 
@@ -506,11 +636,43 @@ function MessageStylePropsEditor({
               type="number"
               min={0}
               max={28}
-              placeholder="지정 안 함"
+              placeholder={isGlobal ? '기본값 (0)' : inheritLabel}
               value={props.panelRadius ?? ''}
               onChange={(e) =>
                 update({
                   panelRadius: e.target.value !== '' ? Number(e.target.value) : undefined,
+                })
+              }
+            />
+          </label>
+
+          <label className="style-prop-field">
+            <span className="field-label">상하 여백 (Padding Y, px)</span>
+            <input
+              type="number"
+              min={0}
+              max={48}
+              placeholder={isGlobal ? '기본값 (16)' : inheritLabel}
+              value={props.panelPaddingY ?? ''}
+              onChange={(e) =>
+                update({
+                  panelPaddingY: e.target.value !== '' ? Number(e.target.value) : undefined,
+                })
+              }
+            />
+          </label>
+
+          <label className="style-prop-field">
+            <span className="field-label">좌우 여백 (Padding X, px)</span>
+            <input
+              type="number"
+              min={0}
+              max={64}
+              placeholder={isGlobal ? '기본값 (0)' : inheritLabel}
+              value={props.panelPaddingX ?? ''}
+              onChange={(e) =>
+                update({
+                  panelPaddingX: e.target.value !== '' ? Number(e.target.value) : undefined,
                 })
               }
             />
@@ -523,21 +685,30 @@ function MessageStylePropsEditor({
           <div className="style-group-header">
             <h4>아바타 · 인장 틀</h4>
             <div className="style-avatar-visibility" role="group" aria-label="아바타 표시 여부">
+              {!isGlobal && (
+                <button
+                  type="button"
+                  className={`compact-btn ${props.avatarHidden === undefined ? 'is-active' : 'ghost'}`}
+                  title="상위 스타일 설정 유지"
+                  onClick={() => update({ avatarHidden: undefined })}
+                >
+                  유지
+                </button>
+              )}
               <button
                 type="button"
-                className={`compact-btn ${props.avatarHidden === undefined ? 'is-active' : 'ghost'}`}
-                title="상위 스타일 설정 유지"
-                onClick={() => update({ avatarHidden: undefined })}
+                className={`compact-btn ${isGlobal
+                  ? !props.avatarHidden
+                    ? 'is-active'
+                    : 'ghost'
+                  : props.avatarHidden === false
+                    ? 'is-active'
+                    : 'ghost'
+                  }`}
+                title="아바타 표시"
+                onClick={() => update({ avatarHidden: isGlobal ? undefined : false })}
               >
-                유지
-              </button>
-              <button
-                type="button"
-                className={`compact-btn ${props.avatarHidden === false ? 'is-active' : 'ghost'}`}
-                title="아바타를 항상 표시"
-                onClick={() => update({ avatarHidden: false })}
-              >
-                표시
+                {isGlobal ? '표시 (기본)' : '표시'}
               </button>
               <button
                 type="button"
@@ -567,13 +738,22 @@ function MessageStylePropsEditor({
                   })
                 }
               >
-                <option value="">지정 안 함 (사각형)</option>
+                <option value="">{isGlobal ? '기본값 (사각형)' : inheritLabel}</option>
                 <option value="square">사각형 (Square)</option>
                 <option value="rounded">둥근 사각형 (Rounded)</option>
                 <option value="circle">원형 (Circle)</option>
                 <option value="diamond">마름모 (Diamond)</option>
               </select>
             </label>
+
+            <OptionalColorField
+              label="아바타 틀 배경색"
+              value={props.avatarBgColor}
+              scope={scope}
+              defaultPickColor="#1D2530"
+              placeholderText={isGlobal ? '기본값 (투명)' : inheritLabel}
+              onChange={(avatarBgColor) => update({ avatarBgColor })}
+            />
 
             <label className="style-prop-field">
               <span className="field-label">인장 테두리 두께 (px)</span>
@@ -582,7 +762,7 @@ function MessageStylePropsEditor({
                 disabled={Boolean(props.avatarHidden)}
                 min={0}
                 max={8}
-                placeholder="지정 안 함"
+                placeholder={isGlobal ? '기본값 (0)' : inheritLabel}
                 value={props.avatarBorderWidth ?? ''}
                 onChange={(e) =>
                   update({
@@ -593,10 +773,30 @@ function MessageStylePropsEditor({
               />
             </label>
 
-            <OptionalColorField
+            <label className="style-prop-field">
+              <span className="field-label">인장 테두리 선 모양</span>
+              <select
+                disabled={Boolean(props.avatarHidden)}
+                value={props.avatarBorderLineStyle ?? ''}
+                onChange={(e) =>
+                  update({
+                    avatarBorderLineStyle:
+                      (e.target.value as BorderLineStyle) || undefined,
+                  })
+                }
+              >
+                <option value="">{isGlobal ? '기본값 (실선)' : inheritLabel}</option>
+                <option value="solid">실선 (Solid)</option>
+                <option value="dashed">파선 (Dashed)</option>
+                <option value="dotted">점선 (Dotted)</option>
+              </select>
+            </label>
+
+            <BorderColorField
               label="인장 테두리색"
               value={props.avatarBorderColor}
               defaultPickColor="#6CD4BC"
+              unsetLabel={isGlobal ? '기본값 (없음)' : inheritLabel}
               onChange={(avatarBorderColor) => update({ avatarBorderColor })}
             />
           </div>
@@ -609,21 +809,62 @@ function MessageStylePropsEditor({
           <OptionalColorField
             label="판정 배경색"
             value={props.diceBgColor}
+            scope={scope}
             defaultPickColor="#172A28"
+            placeholderText={isGlobal ? '기본값 (투명)' : inheritLabel}
             onChange={(diceBgColor) => update({ diceBgColor })}
           />
 
           <OptionalColorField
             label="판정 글자색"
             value={props.diceTextColor}
+            scope={scope}
             defaultPickColor="#6CD4BC"
+            placeholderText="대사 글자색 따름 (기본)"
             onChange={(diceTextColor) => update({ diceTextColor })}
           />
 
-          <OptionalColorField
+          <label className="style-prop-field">
+            <span className="field-label">판정 테두리 형태</span>
+            <select
+              value={props.diceBorderStyle ?? ''}
+              onChange={(e) =>
+                update({
+                  diceBorderStyle: (e.target.value as PanelBorderStyle) || undefined,
+                })
+              }
+            >
+              <option value="">{isGlobal ? '기본값 (없음)' : inheritLabel}</option>
+              <option value="none">테두리 없음</option>
+              <option value="box">전체 박스 테두리</option>
+              <option value="left-accent">좌측 강조선 (2px)</option>
+              <option value="bottom">하단 선</option>
+            </select>
+          </label>
+
+          <label className="style-prop-field">
+            <span className="field-label">판정 테두리 선 모양</span>
+            <select
+              value={props.diceBorderLineStyle ?? ''}
+              onChange={(e) =>
+                update({
+                  diceBorderLineStyle: (e.target.value as BorderLineStyle) || undefined,
+                })
+              }
+            >
+              <option value="">{isGlobal ? '기본값 (실선)' : inheritLabel}</option>
+              <option value="solid">실선 (Solid)</option>
+              <option value="dashed">파선 (Dashed)</option>
+              <option value="dotted">점선 (Dotted)</option>
+            </select>
+          </label>
+
+          <BorderColorField
             label="판정 테두리색"
             value={props.diceBorderColor}
             defaultPickColor="#48BFA4"
+            unsetLabel={isGlobal ? '기본값 (없음)' : inheritLabel}
+            allowSpeaker={!isSystem}
             onChange={(diceBorderColor) => update({ diceBorderColor })}
           />
 
@@ -637,9 +878,26 @@ function MessageStylePropsEditor({
                 })
               }
             >
-              <option value="">지정 안 함</option>
+              <option value="">{isGlobal ? '기본값 (보통)' : inheritLabel}</option>
               <option value="normal">보통 (Normal)</option>
               <option value="bold">굵게 (Bold)</option>
+            </select>
+          </label>
+
+          <label className="style-prop-field">
+            <span className="field-label">판정 정렬</span>
+            <select
+              value={props.diceAlign ?? ''}
+              onChange={(e) =>
+                update({
+                  diceAlign: (e.target.value as TextAlignOption) || undefined,
+                })
+              }
+            >
+              <option value="">{isGlobal ? '기본값 (왼쪽)' : inheritLabel}</option>
+              <option value="left">왼쪽</option>
+              <option value="center">가운데</option>
+              <option value="right">오른쪽</option>
             </select>
           </label>
         </div>
@@ -685,7 +943,7 @@ function StyleCardFilterAdder({
           characters={project.characters ?? []}
           channels={channels}
           scenes={project.scenes ?? []}
-          onActivate={() => {}}
+          onActivate={() => { }}
           onChangeQuery={(nextQuery) => setFilterInput(nextQuery)}
         />
       </div>
@@ -727,7 +985,6 @@ export function StylePanel({
     setDirty(false);
   }
 
-  // 실행 취소/불러오기 등으로 편집 대상 카드가 사라지면 닫기
   useEffect(() => {
     if (
       editingId &&
@@ -738,7 +995,6 @@ export function StylePanel({
     }
   }, [editingId, styles.cards]);
 
-  // 편집 중 Esc 키로 편집 취소
   useEffect(() => {
     if (!editingId) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -861,16 +1117,20 @@ export function StylePanel({
   };
 
   const handleDeleteCard = (cardId: string, cardName: string) => {
-    if (!confirm(`'${cardName || '이름 없는 스타일'}' 스타일을 삭제할까요? 연결된 필터·캐릭터·메시지에서 모두 해제됩니다.`)) {
+    if (
+      !confirm(
+        `'${cardName || '이름 없는 스타일'}' 스타일을 삭제할까요? 연결된 필터·캐릭터·메시지에서 모두 해제됩니다.`,
+      )
+    ) {
       return;
     }
     commit(removeStyleCardFromProject(p, cardId));
     cancelEdit();
   };
 
-  // 저장된 카드별 매칭 메시지 수
-  const matchCountByCardId = useMemo(() => {
-    const map = new Map<string, number>();
+  // 저장된 카드별 매칭 메시지 수 및 첫 샘플 메시지
+  const matchInfoByCardId = useMemo(() => {
+    const map = new Map<string, { count: number; sampleBlock?: Block }>();
     for (const card of styles.cards) {
       const singleResolver = createStyleResolver(
         {
@@ -882,19 +1142,24 @@ export function StylePanel({
         p.blocks,
       );
       let count = 0;
+      let sampleBlock: Block | undefined;
       for (const b of p.blocks) {
-        if (singleResolver(b).fontWeight === 'bold') count++;
+        if (singleResolver(b).fontWeight === 'bold') {
+          count++;
+          if (!sampleBlock) sampleBlock = b;
+        }
       }
-      map.set(card.id, count);
+      map.set(card.id, { count, sampleBlock });
     }
     return map;
   }, [styles, p.characters, p.scenes, p.blocks]);
 
-  // 편집 중인 카드 초안의 매칭 정보 (일치 수 및 첫 샘플 메시지)
+  // 편집 중인 카드 초안의 매칭 정보
   const draftMatchInfo = useMemo(() => {
     if (!cardDraft) return { count: 0, sampleBlock: undefined as Block | undefined };
     const effectiveProject: Project = pendingUnlinkUsages.reduce(
-      (acc, u) => (u.kind === 'filter' ? acc : unlinkStyleUsageFromProject(acc, cardDraft.id, u)),
+      (acc, u) =>
+        u.kind === 'filter' ? acc : unlinkStyleUsageFromProject(acc, cardDraft.id, u),
       p,
     );
     const singleResolver = createStyleResolver(
@@ -940,10 +1205,7 @@ export function StylePanel({
         <section
           className={`style-card global-style-card ${isGlobalOpen ? 'is-open' : ''}`}
         >
-          <div
-            className="style-card-header"
-            onDoubleClick={() => startEditGlobal()}
-          >
+          <div className="style-card-header" onDoubleClick={() => startEditGlobal()}>
             <button
               type="button"
               className="style-card-toggle"
@@ -961,13 +1223,15 @@ export function StylePanel({
             </div>
           </div>
 
+          {!isGlobalOpen && (
+            <div className="style-card-collapsed-preview">
+              <GlobalStylePreview globalStyle={styles.global} projectTitle={p.title} />
+            </div>
+          )}
+
           {isGlobalOpen && globalDraft && (
             <div className="style-card-body">
-              {/* 미리보기 */}
-              <GlobalStylePreview
-                globalStyle={globalDraft}
-                projectTitle={p.title}
-              />
+              <GlobalStylePreview globalStyle={globalDraft} projectTitle={p.title} />
 
               {/* 1) 문서 페이지 영역 스타일 */}
               <div className="style-props-group">
@@ -995,6 +1259,23 @@ export function StylePanel({
                       onChange={(e) =>
                         changeGlobalDraft({
                           containerWidth: Number(e.target.value) || 960,
+                        })
+                      }
+                    />
+                  </label>
+
+                  <label className="style-prop-field">
+                    <span className="field-label">메시지 간 간격 (gap, px)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={48}
+                      step={1}
+                      value={globalDraft.messageGap ?? 0}
+                      onChange={(e) =>
+                        changeGlobalDraft({
+                          messageGap:
+                            e.target.value !== '' ? Number(e.target.value) : 0,
                         })
                       }
                     />
@@ -1067,6 +1348,7 @@ export function StylePanel({
               <div className="style-global-subsection">
                 <h3 className="style-subsection-title">전역 메시지 스타일</h3>
                 <MessageStylePropsEditor
+                  scope="global"
                   props={globalDraft.messageDefaults}
                   onChange={(messageDefaults) => changeGlobalDraft({ messageDefaults })}
                 />
@@ -1076,6 +1358,7 @@ export function StylePanel({
               <div className="style-global-subsection">
                 <h3 className="style-subsection-title">시스템 메시지 스타일</h3>
                 <MessageStylePropsEditor
+                  scope="global"
                   variant="system"
                   props={globalDraft.systemDefaults}
                   onChange={(systemDefaults) =>
@@ -1137,22 +1420,26 @@ export function StylePanel({
               const rawUsages = collectStyleCardUsages(activeCard, p);
               const usages = isOpen
                 ? rawUsages.filter(
-                    (u) =>
-                      !pendingUnlinkUsages.some(
-                        (removed) =>
-                          removed.kind === u.kind &&
-                          ((u.kind === 'character' &&
-                            removed.kind === 'character' &&
-                            removed.characterId === u.characterId) ||
-                            (u.kind === 'message' &&
-                              removed.kind === 'message' &&
-                              removed.messageId === u.messageId)),
-                      ),
-                  )
+                  (u) =>
+                    !pendingUnlinkUsages.some(
+                      (removed) =>
+                        removed.kind === u.kind &&
+                        ((u.kind === 'character' &&
+                          removed.kind === 'character' &&
+                          removed.characterId === u.characterId) ||
+                          (u.kind === 'message' &&
+                            removed.kind === 'message' &&
+                            removed.messageId === u.messageId)),
+                    ),
+                )
                 : rawUsages;
+              const savedMatch = matchInfoByCardId.get(card.id);
               const matchCount = isOpen
                 ? draftMatchInfo.count
-                : (matchCountByCardId.get(card.id) ?? 0);
+                : (savedMatch?.count ?? 0);
+              const previewSampleBlock = isOpen
+                ? draftMatchInfo.sampleBlock
+                : savedMatch?.sampleBlock;
               const dropClass =
                 dragOver && dragOver.index === idx
                   ? dragOver.after
@@ -1215,7 +1502,7 @@ export function StylePanel({
                     className="style-card-header"
                     onDoubleClick={() => startEditCard(card)}
                   >
-                    {!isOpen && (
+                    {/* {!isOpen && (
                       <span
                         className="style-drag-handle"
                         title="드래그하여 스타일 우선순위 변경 (아래쪽이 우선)"
@@ -1223,7 +1510,7 @@ export function StylePanel({
                       >
                         ⋮⋮
                       </span>
-                    )}
+                    )} */}
                     <button
                       type="button"
                       className="style-card-toggle"
@@ -1285,7 +1572,6 @@ export function StylePanel({
 
                     <span className="count-pill">{matchCount}개 일치</span>
 
-                    {/* 헤더 사용처 요약 칩 (접혀있을 때는 읽기 전용, 펼쳐 편집 중일 때만 X 해제 가능) */}
                     <div className="style-header-usages" aria-label="스타일 사용처 목록">
                       {usages.length === 0 ? (
                         <span className="muted-note">연결된 사용처 없음</span>
@@ -1387,18 +1673,24 @@ export function StylePanel({
                     </div>
                   </div>
 
+                  {/* 접힌 상태에서도 샘플 메시지 미리보기 표시 */}
+                  {!isOpen && (
+                    <div className="style-card-collapsed-preview">
+                      <SampleMessagePreview
+                        globalStyle={styles.global}
+                        styleProps={card.props}
+                        sampleBlock={previewSampleBlock}
+                      />
+                    </div>
+                  )}
+
                   {isOpen && cardDraft && (
                     <div className="style-card-body">
                       {/* 1) 미리보기 (상단 바 바로 아래) */}
                       <SampleMessagePreview
                         globalStyle={styles.global}
                         styleProps={cardDraft.props}
-                        sampleBlock={draftMatchInfo.sampleBlock}
-                        caption={
-                          draftMatchInfo.sampleBlock
-                            ? '미리보기 (일치하는 첫 번째 메시지 · 저장 전)'
-                            : '샘플 메시지 미리보기 (저장 전)'
-                        }
+                        sampleBlock={previewSampleBlock}
                       />
 
                       {/* 2) 적용 필터 (합연산 · OR) */}
@@ -1410,7 +1702,15 @@ export function StylePanel({
                             적용됩니다.
                           </small>
                         </div>
-
+                        <StyleCardFilterAdder
+                          project={p}
+                          channels={channels}
+                          onAddFilter={(rawFilter) =>
+                            changeCardDraft((prev) =>
+                              addFilterToStyleCard(prev, rawFilter),
+                            )
+                          }
+                        />
                         <div className="style-usages-box">
                           {usages.length === 0 ? (
                             <span className="muted-note">
@@ -1454,20 +1754,11 @@ export function StylePanel({
                             ))
                           )}
                         </div>
-
-                        <StyleCardFilterAdder
-                          project={p}
-                          channels={channels}
-                          onAddFilter={(rawFilter) =>
-                            changeCardDraft((prev) =>
-                              addFilterToStyleCard(prev, rawFilter),
-                            )
-                          }
-                        />
                       </div>
 
                       {/* 3) 글씨, 메시지, 아바타(사용 안함 포함), 주사위 판정 */}
                       <MessageStylePropsEditor
+                        scope="card"
                         props={cardDraft.props}
                         onChange={(nextProps) =>
                           changeCardDraft((prev) => ({

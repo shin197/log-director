@@ -1225,6 +1225,7 @@ function App() {
                     ? ({
                         '--styled-page-bg': editorGlobalStyle.pageBgColor,
                         '--styled-container-width': `${editorGlobalStyle.containerWidth}px`,
+                        '--styled-message-gap': `${editorGlobalStyle.messageGap ?? 0}px`,
                         '--styled-meta-color': editorGlobalStyle.metaColor,
                         '--styled-divider-color': editorGlobalStyle.dividerColor,
                         '--styled-system-color':

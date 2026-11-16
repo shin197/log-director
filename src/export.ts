@@ -287,12 +287,24 @@ export function exportLog(
       const source =
         b.sourceIndex === undefined ? {} : (fileOriginals[b.sourceIndex] ?? {});
 
+      const linkedChar =
+        b.sourceType === 'system' || !b.characterId
+          ? undefined
+          : charMap.get(b.characterId);
+      const rawColor = (linkedChar?.color || b.color || '').trim();
+      const color = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : '#888888';
+
       const msgProps = resolveStyle(b);
-      const styled = buildMessageStyleObjects(msgProps, globalStyle.dividerColor);
+      const styled = buildMessageStyleObjects(
+        msgProps,
+        globalStyle.dividerColor,
+        b.sourceType === 'system' ? undefined : color,
+      );
       if (
-        styled.panelStyle.backgroundColor ||
-        msgProps.panelBorderStyle === 'box' ||
-        msgProps.panelBorderStyle === 'left-accent'
+        !styled.panelStyle.padding &&
+        (styled.panelStyle.backgroundColor ||
+          msgProps.panelBorderStyle === 'box' ||
+          msgProps.panelBorderStyle === 'left-accent')
       ) {
         styled.panelStyle.padding = '12px 14px';
         styled.panelStyle.margin = '4px 0';
@@ -317,9 +329,6 @@ export function exportLog(
       const normCh = settings.showChannel && b.channel ? b.channel : '';
       const dataCh = normCh ? ` data-channel="${escape(toChannelCode(normCh))}"` : '';
       const time = displayTime(b.timestamp, settings);
-      const linkedChar = b.characterId ? charMap.get(b.characterId) : undefined;
-      const rawColor = (linkedChar?.color || b.color || '').trim();
-      const color = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : '#888888';
       const speakerStyle = styled.speakerColor
         ? `--speaker-color:${color};color:${styled.speakerColor}`
         : `--speaker-color:${color}`;
@@ -352,7 +361,11 @@ export function exportLog(
   const bodyFont = globalStyle.messageDefaults.fontFamily || 'system-ui';
   const systemColor = globalStyle.systemDefaults?.textColor || globalStyle.systemTextColor;
   const systemIndent = globalStyle.messageDefaults.avatarHidden ? 0 : 52;
+  const listGapCss =
+    globalStyle.messageGap > 0
+      ? `display:flex;flex-direction:column;gap:${globalStyle.messageGap}px;`
+      : '';
   const titleStyle = `.log-title,h1{font-size:${globalStyle.titleSize}px;margin:24px 0;color:${globalStyle.titleColor};text-align:${globalStyle.titleAlign}}`;
 
-  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(p.title)}</title><style>:root{color-scheme:dark;color:${bodyColor};background:${pageBg}}*{box-sizing:border-box}body{min-width:280px;margin:0;background:${pageBg};color:${bodyColor};font-family:${bodyFont}}.message-list{width:100%;max-width:${globalStyle.containerWidth}px;margin:0 auto;padding:0 24px 48px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.no-avatar{grid-template-columns:minmax(0,1fr);column-gap:0}.message.system{display:block;padding-left:${systemIndent}px;color:${systemColor}}.avatar,.avatar-spacer{width:40px;height:40px}.avatar{display:block;background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.edited,.channel-name{color:${globalStyle.metaColor};font-size:12px}.message-text,.roll-result{font-size:${globalStyle.messageDefaults.fontSize ?? 16}px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.roll-result{display:block}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(p.title)}</title><style>:root{color-scheme:dark;color:${bodyColor};background:${pageBg}}*{box-sizing:border-box}body{min-width:280px;margin:0;background:${pageBg};color:${bodyColor};font-family:${bodyFont}}.message-list{${listGapCss}width:100%;max-width:${globalStyle.containerWidth}px;margin:0 auto;padding:0 24px 48px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.no-avatar{grid-template-columns:minmax(0,1fr);column-gap:0}.message.system{display:block;padding-left:${systemIndent}px;color:${systemColor}}.avatar,.avatar-spacer{width:40px;height:40px}.avatar{display:block;background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.edited,.channel-name{color:${globalStyle.metaColor};font-size:12px}.message-text,.roll-result{font-size:${globalStyle.messageDefaults.fontSize ?? 16}px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.roll-result{display:block}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
 }
