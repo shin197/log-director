@@ -27,6 +27,31 @@ const escape = (s: string) =>
 
 const md = (s: string) => s.replace(/([\\`*_{}\[\]<>#!|])/g, '\\$1');
 
+export function getRollResultClass(
+  diceResult?: string,
+  sourceRoll?: unknown,
+): string {
+  const trimmed = diceResult?.trim() ?? '';
+  if (!trimmed) return '';
+
+  if (sourceRoll && typeof sourceRoll === 'object') {
+    const roll = sourceRoll as Record<string, unknown>;
+    const sourceResult =
+      typeof roll.result === 'string' ? roll.result.trim() : '';
+    if (!sourceResult || sourceResult === trimmed) {
+      const classes: string[] = [];
+      if (roll.success) classes.push('success');
+      if (roll.critical) classes.push('critical');
+      if (roll.failure) classes.push('failure');
+      if (roll.fumble) classes.push('fumble');
+      if (classes.length > 0) {
+        return classes.join(' ');
+      }
+    }
+  }
+  return '';
+}
+
 export function exportLog(
   p: Project,
   format: ExportFormat,
@@ -35,6 +60,7 @@ export function exportLog(
   const settings = { ...defaultDisplay, ...p.display };
   const showSystemChannel = options?.showSystemChannel ?? true;
   const encodeBase64 = options?.encodeBase64 ?? false;
+  const charMap = new Map((p.characters ?? []).map((c) => [c.id, c]));
 
   let targetBlocks = p.blocks;
   if (options?.query?.trim()) {
@@ -58,17 +84,17 @@ export function exportLog(
     return raw;
   };
 
-  if (format === 'json') {
-    const parsedOriginals: Record<string, unknown>[][] = (p.original ?? []).map(
-      (orig) => {
-        try {
-          return JSON.parse(orig.raw.replace(/^\uFEFF/, '')).messages ?? [];
-        } catch {
-          return [];
-        }
-      },
-    );
+  const parsedOriginals: Record<string, unknown>[][] = (p.original ?? []).map(
+    (orig) => {
+      try {
+        return JSON.parse(orig.raw.replace(/^\uFEFF/, '')).messages ?? [];
+      } catch {
+        return [];
+      }
+    },
+  );
 
+  if (format === 'json') {
     const images: Record<string, string> = {};
     const dataUriToKey = new Map<string, string>();
     const getOrCreateImageKey = (dataUri: string, preferredKey?: string): string => {
@@ -127,8 +153,9 @@ export function exportLog(
         delete m.iconUrl;
         delete m.iconImage;
       } else {
+        const linkedChar = b.characterId ? charMap.get(b.characterId) : undefined;
         m.speaker = b.speaker;
-        m.color = b.color ?? '';
+        m.color = b.color || linkedChar?.color || '';
         const icon = resolveIcon(b.iconUrl);
         if (/^data:image\//i.test(icon)) {
           const preferred =
@@ -200,9 +227,9 @@ export function exportLog(
             const textLines = b.text ? b.text.split('\n').map(md) : [''];
             const diceLines = b.diceResult
               ? b.diceResult
-                  .split('\n')
-                  .filter(Boolean)
-                  .map((d) => `\`${d}\``)
+                .split('\n')
+                .filter(Boolean)
+                .map((d) => `\`${d}\``)
               : [];
             const allLines = [...textLines, ...diceLines];
             return allLines
@@ -214,10 +241,10 @@ export function exportLog(
           const chPart = settings.showChannel && b.channel ? ` *[${md(b.channel)}]*` : '';
           const dicePart = b.diceResult
             ? b.diceResult
-                .split('\n')
-                .filter(Boolean)
-                .map((d) => `\`${d}\``)
-                .join('\n')
+              .split('\n')
+              .filter(Boolean)
+              .map((d) => `\`${d}\``)
+              .join('\n')
             : '';
           const body = [b.text ? md(b.text) : '', dicePart].filter(Boolean).join('\n');
           return `**${md(b.speaker ?? '')}**${timePart}${chPart} :\n${body}`;
@@ -249,8 +276,17 @@ export function exportLog(
   const toChannelCode = (ch: string) =>
     ch === '메인' ? 'main' : ch === '잡담' ? 'other' : ch;
 
+  const buildRollElement = (diceResult?: string, diceAttr?: string) => {
+    if (!diceResult) return '';
+    return `<span class="roll-result"${diceAttr ? ` style="${escape(diceAttr)}"` : ''}>${escape(diceResult)}</span>`;
+  };
+
   const messages = targetBlocks
     .map((b) => {
+      const fileOriginals = parsedOriginals[b.sourceFileIndex ?? 0] ?? [];
+      const source =
+        b.sourceIndex === undefined ? {} : (fileOriginals[b.sourceIndex] ?? {});
+
       const msgProps = resolveStyle(b);
       const styled = buildMessageStyleObjects(msgProps, globalStyle.dividerColor);
       if (
@@ -270,16 +306,20 @@ export function exportLog(
         const sysCh =
           settings.showChannel && showSystemChannel && b.channel ? b.channel : '';
         const dataCh = sysCh ? ` data-channel="${escape(toChannelCode(sysCh))}"` : '';
-        const chSpan = sysCh
-          ? `<span class="channel-name">[${escape(sysCh)}]</span>\n`
+        const headerEl = sysCh
+          ? `<div class="message-header"><span class="channel-name">[${escape(sysCh)}]</span></div>`
           : '';
-        const text = `<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${chSpan}${escape(b.text)}</div>${b.diceResult ? `<span class="roll-result"${diceAttr ? ` style="${escape(diceAttr)}"` : ''}>${escape(b.diceResult)}</span>` : ''}`;
-        return `<article class="message system"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${text}</article>`;
+        const textEl = `<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${escape(b.text)}</div>`;
+        const diceEl = buildRollElement(b.diceResult, diceAttr);
+        return `<article class="message system"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${headerEl}${textEl}${diceEl}</article>`;
       }
+
       const normCh = settings.showChannel && b.channel ? b.channel : '';
       const dataCh = normCh ? ` data-channel="${escape(toChannelCode(normCh))}"` : '';
       const time = displayTime(b.timestamp, settings);
-      const color = /^#[0-9a-f]{3,8}$/i.test(b.color ?? '') ? b.color! : '#eee';
+      const linkedChar = b.characterId ? charMap.get(b.characterId) : undefined;
+      const rawColor = (linkedChar?.color || b.color || '').trim();
+      const color = /^#[0-9a-f]{3,8}$/i.test(rawColor) ? rawColor : '#888888';
       const speakerStyle = styled.speakerColor
         ? `--speaker-color:${color};color:${styled.speakerColor}`
         : `--speaker-color:${color}`;
@@ -287,8 +327,15 @@ export function exportLog(
       const avatarEl = avatarClass
         ? `<span class="avatar ${avatarClass}"${avatarAttr ? ` style="${escape(avatarAttr)}"` : ''} aria-hidden="true"></span>`
         : '<span class="avatar-spacer" aria-hidden="true"></span>';
-      const headerEl = `<div class="message-header"><span class="speaker" style="${speakerStyle}">${escape(b.speaker ?? '')}</span>${time ? ` <time class="timestamp">${escape(time)}</time>` : ''}${normCh ? ` <span class="channel-name">[${escape(normCh)}]</span>` : ''}</div>`;
-      const contentEl = `<div class="message-content">${headerEl}<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${escape(b.text)}</div>${b.diceResult ? `<span class="roll-result"${diceAttr ? ` style="${escape(diceAttr)}"` : ''}>${escape(b.diceResult)}</span>` : ''}</div>`;
+      const timeDatetime =
+        typeof source.createdAt === 'number'
+          ? ` datetime="${new Date(source.createdAt).toISOString()}"`
+          : '';
+      const timeEl = time ? `<time class="timestamp"${timeDatetime}>${escape(time)}</time>` : '';
+      const chEl = normCh ? `<span class="channel-name">[${escape(normCh)}]</span>` : '';
+      const headerEl = `<div class="message-header"><span class="speaker" style="${speakerStyle}">${escape(b.speaker ?? '')}</span>${timeEl}${chEl}</div>`;
+      const diceEl = buildRollElement(b.diceResult, diceAttr);
+      const contentEl = `<div class="message-content">${headerEl}<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${escape(b.text)}</div>${diceEl}</div>`;
       return `<article class="message"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${avatarEl}${contentEl}</article>`;
     })
     .join('\n');
@@ -302,5 +349,5 @@ export function exportLog(
   const bodyFont = globalStyle.messageDefaults.fontFamily || 'system-ui';
   const titleStyle = `.log-title,h1{font-size:${globalStyle.titleSize}px;margin:24px 0;color:${globalStyle.titleColor};text-align:${globalStyle.titleAlign}}`;
 
-  return `<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(p.title)}</title><style>body{background:${pageBg};color:${bodyColor};font-family:${bodyFont};margin:0}.message-list{max-width:${globalStyle.containerWidth}px;margin:auto;padding:24px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.system,.system{display:block;padding-left:52px;color:${globalStyle.systemTextColor}}.avatar,.avatar-spacer{width:40px;height:40px;display:block}.avatar{background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{font-size:14px;margin-bottom:5px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.channel-name,.message-header span{font-size:12px;color:${globalStyle.metaColor}}.message-text,.roll-result{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:${globalStyle.messageDefaults.fontSize ?? 16}px}.roll-result{display:block;color:${globalStyle.metaColor}}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(p.title)}</title><style>:root{color-scheme:dark;color:${bodyColor};background:${pageBg}}*{box-sizing:border-box}body{min-width:280px;margin:0;background:${pageBg};color:${bodyColor};font-family:${bodyFont}}.message-list{width:100%;max-width:${globalStyle.containerWidth}px;margin:0 auto;padding:0 24px 48px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.system{display:block;padding-left:52px;color:${globalStyle.systemTextColor}}.avatar,.avatar-spacer{width:40px;height:40px}.avatar{display:block;background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.edited,.channel-name{color:${globalStyle.metaColor};font-size:12px}.message-text,.roll-result{font-size:${globalStyle.messageDefaults.fontSize ?? 16}px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.roll-result{display:block}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
 }

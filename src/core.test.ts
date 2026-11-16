@@ -13,6 +13,13 @@ import {
   unlinkStyleUsageFromProject,
 } from './styles.ts';
 import {
+  formatColorCodeForInput,
+  getContrastTextColor,
+  normalizeColorCodeInput,
+  resolvePickerColor,
+  toStoredColorValue,
+} from './color.ts';
+import {
   compileQuery,
   formatChipDisplay,
   formatChipToken,
@@ -1007,7 +1014,7 @@ function createMockIndexedDB() {
             },
           };
         },
-        close: () => {},
+        close: () => { },
       };
       req.result = db;
       queueMicrotask(() => {
@@ -1578,7 +1585,7 @@ test('불러오기 매니저: 파일 순서 이동, 이어붙이기(Append/Inser
   // 시간순 정렬 (Interleave) 모드 및 타임스탬프 미기재 메시지 순서 보존 확인
   assert.ok(
     (parseLogTimestamp('2026. 10. 20. 오후 08:03:00') ?? 0) >
-      (parseLogTimestamp('2026. 10. 20. 오후 08:00:00') ?? 0),
+    (parseLogTimestamp('2026. 10. 20. 오후 08:00:00') ?? 0),
   );
   const rawSide = JSON.stringify({
     messages: [
@@ -1785,4 +1792,35 @@ test('스타일 시스템: 합연산 필터, 속성별 계층 충돌 해결(하�
   assert.ok(exportedHtml.includes('background:#101520'));
   assert.ok(exportedHtml.includes('background-color:#334455'));
   assert.ok(exportedHtml.includes('color:#00FF88'));
+});
+
+test('컬러 입력 유틸: # 자동 제거(직접 입력·붙여넣기), 저장값 변환, 대비 글자색 계산', () => {
+  // # 직접 입력 및 클립보드 붙여넣기 시 #·공백 자동 제거, 대문자 변환 및 6자리 유지
+  assert.equal(normalizeColorCodeInput('#123456'), '123456');
+  assert.equal(normalizeColorCodeInput(' #aBcDeF '), 'ABCDEF');
+  assert.equal(normalizeColorCodeInput('12#3456'), '123456');
+  assert.equal(normalizeColorCodeInput('###'), '');
+  assert.equal(normalizeColorCodeInput('#12345678'), '123456');
+  assert.equal(normalizeColorCodeInput('abcdef'), 'ABCDEF');
+
+  // 표시용/저장용 변환 (모두 대문자)
+  assert.equal(formatColorCodeForInput('#6cd4bc'), '6CD4BC');
+  assert.equal(formatColorCodeForInput(''), '');
+  assert.equal(toStoredColorValue('#ff00aa'), '#FF00AA');
+  assert.equal(toStoredColorValue('ff00aa'), '#FF00AA');
+  assert.equal(toStoredColorValue('#'), '');
+
+  // 피커 색상 폴백 (유효하면 대문자 반환)
+  assert.equal(resolvePickerColor('#123abc'), '#123ABC');
+  assert.equal(resolvePickerColor('#123'), '#888888');
+  assert.equal(resolvePickerColor(''), '#888888');
+
+  // 배경색 명도에 따른 # 글자색(흰색/검은색) 결정
+  assert.equal(getContrastTextColor('#000000'), '#ffffff');
+  assert.equal(getContrastTextColor('#161c24'), '#ffffff');
+  assert.equal(getContrastTextColor('#0000ff'), '#ffffff');
+  assert.equal(getContrastTextColor('#ffffff'), '#000000');
+  assert.equal(getContrastTextColor('#6cd4bc'), '#000000');
+  assert.equal(getContrastTextColor('#ffff00'), '#000000');
+  assert.equal(getContrastTextColor('#888888'), '#000000');
 });

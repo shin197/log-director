@@ -6,7 +6,8 @@ import { moveCharacter, updateCharacter } from './characters';
 import { parseClipboardCharacter, imageUrl } from './clipboardCharacter';
 import { isSafeImageUrl } from './importFormats';
 import { type ImagePool, internImageUrl, resolveImageUrl } from './imagePool';
-import { CharacterCard } from './CharacterCard';
+import { CharacterAvatar } from './CharacterCard';
+import { ColorInput } from './ColorInput';
 
 type FaceDraft = { name: string; iconUrl: string; originalUrl: string };
 type Draft = Omit<Character, 'faces'> & { faces: FaceDraft[] };
@@ -19,19 +20,25 @@ function makeDraft(c: Character): Draft {
 }
 
 export function CharacterPanel({
+  open = true,
+  onToggleOpen,
   project: p,
   commit,
 }: {
+  open?: boolean;
+  onToggleOpen?: () => void;
   project: Project;
   commit: (p: Project) => void;
 }) {
   const characters = p.characters ?? [];
   const [active, setActive] = useState(characters[0]?.id ?? '');
-  const c = characters.find((x) => x.id === active) ?? characters[0];
-  const [draft, setDraft] = useState<Draft | null>(c ? makeDraft(c) : null),
-    [dirty, setDirty] = useState(false),
-    [adding, setAdding] = useState(false),
-    [link, setLink] = useState(true);
+  const [editingCharId, setEditingCharId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const editingChar = characters.find((x) => x.id === editingCharId) ?? null;
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [link, setLink] = useState(true);
   const [editingFaceIndex, setEditingFaceIndex] = useState<number | null>(null);
   const [faceImageDraft, setFaceImageDraft] = useState('');
   const [dragFaceIndex, setDragFaceIndex] = useState<number | null>(null);
@@ -44,14 +51,23 @@ export function CharacterPanel({
     index: number;
     after: boolean;
   } | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const faceDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    setDraft(c ? makeDraft(c) : null);
+    if (!editingChar) {
+      setDraft(null);
+      setDirty(false);
+      setEditingFaceIndex(null);
+      setEditingName(false);
+      return;
+    }
+    setDraft(makeDraft(editingChar));
     setDirty(false);
     setEditingFaceIndex(null);
-  }, [c]);
+    setEditingName(false);
+  }, [editingChar]);
 
   useEffect(() => {
     if (adding) dialog.current?.showModal();
@@ -64,6 +80,41 @@ export function CharacterPanel({
   function change(next: Draft) {
     setDraft(next);
     setDirty(true);
+  }
+
+  function cancelEdit() {
+    setEditingCharId(null);
+    setEditingName(false);
+    setEditingFaceIndex(null);
+    setDirty(false);
+  }
+
+  useEffect(() => {
+    if (!editingCharId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.isComposing) return;
+      if (document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      cancelEdit();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editingCharId]);
+
+  function startEditCharacter(target: Character) {
+    if (editingCharId === target.id) {
+      if (dirty && !confirm('저장하지 않은 변경을 버리고 편집을 닫을까요?')) return;
+      setEditingCharId(null);
+      setEditingName(false);
+      return;
+    }
+    if (dirty && !confirm('저장하지 않은 변경을 버리고 이동할까요?')) return;
+    setActive(target.id);
+    setEditingCharId(target.id);
+    setDraft(makeDraft(target));
+    setDirty(false);
+    setEditingFaceIndex(null);
+    setEditingName(false);
   }
 
   function save() {
@@ -109,6 +160,8 @@ export function CharacterPanel({
         ),
       });
       setDirty(false);
+      setEditingName(false);
+      setEditingCharId(null);
     } catch (e) {
       notifyError(e);
     }
@@ -127,47 +180,96 @@ export function CharacterPanel({
       ),
     });
     setActive(next.id);
+    setEditingCharId(next.id);
     setAdding(false);
   }
 
-  const linkedCount = draft
-    ? p.blocks.filter((b) => b.characterId === draft.id).length
-    : 0;
+  if (!open) {
+    return (
+      <aside
+        className="character-sidebar is-collapsed"
+        aria-label="캐릭터 사이드바 (접힘)"
+      >
+        <button
+          type="button"
+          className="character-sidebar-expand-btn"
+          title="캐릭터 바 열기"
+          aria-label="캐릭터 바 열기"
+          onClick={onToggleOpen}
+        >
+          <span className="character-collapse-icon">👤</span>
+        </button>
+      </aside>
+    );
+  }
 
   return (
-    <section className="character-workspace">
-      <div className="character-panel">
-        <aside className="character-sidebar">
-          <div className="character-sidebar-head">
-            <span>캐릭터 {characters.length}</span>
+    <aside className="character-sidebar" aria-label="캐릭터 관리 바">
+      <div className="character-sidebar-head">
+        <div className="character-sidebar-title">
+          {onToggleOpen && (
             <button
               type="button"
-              className="primary compact-btn"
-              onClick={() => {
-                if (dirty && !confirm('저장하지 않은 변경을 버리고 추가할까요?')) return;
-                setAdding(true);
-              }}
+              className="ghost icon-btn character-collapse-btn"
+              title="캐릭터 바 접기"
+              aria-label="캐릭터 바 접기"
+              onClick={onToggleOpen}
             >
-              ＋ 추가
+              ◂
             </button>
-          </div>
-          <nav aria-label="캐릭터 목록">
-            {characters.map((x, i) => {
-              const count = p.blocks.filter((b) => b.characterId === x.id).length;
-              const dropClass =
-                dragOverChar?.index === i
-                  ? dragOverChar.after
-                    ? 'drop-after'
-                    : 'drop-before'
-                  : '';
-              return (
-                <button
-                  type="button"
-                  key={x.id}
-                  className={dropClass || undefined}
-                  aria-pressed={c?.id === x.id}
-                  draggable
+          )}
+          <span>👤 캐릭터 {characters.length}명</span>
+        </div>
+        <button
+          type="button"
+          className="primary compact-btn"
+          onClick={() => {
+            if (dirty && !confirm('저장하지 않은 변경을 버리고 추가할까요?')) return;
+            setAdding(true);
+          }}
+        >
+          ＋ 추가
+        </button>
+      </div>
+
+      <nav className="character-sidebar-list" aria-label="캐릭터 목록">
+        <div className="character-sidebar-list-inner">
+          {characters.map((x, i) => {
+            const count = p.blocks.filter((b) => b.characterId === x.id).length;
+            const isEditing = editingCharId === x.id;
+            const isSelected = active === x.id;
+            const activeDraft = isEditing && draft?.id === x.id ? draft : null;
+            const displayIcon =
+              (activeDraft
+                ? activeDraft.iconUrl || activeDraft.faces[0]?.iconUrl
+                : x.iconUrl || x.faces[0]?.iconUrl) || '';
+            const displayName = activeDraft ? activeDraft.name : x.name;
+            const displayColor = activeDraft ? activeDraft.color : x.color;
+            const dropClass =
+              dragOverChar?.index === i
+                ? dragOverChar.after
+                  ? 'drop-after'
+                  : 'drop-before'
+                : '';
+
+            return (
+              <div
+                key={x.id}
+                className={`char-sidebar-item ${isEditing ? 'is-editing' : ''} ${isSelected ? 'is-selected' : ''} ${dropClass}`.trim()}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="char-sidebar-card"
+                  aria-pressed={isSelected}
+                  aria-expanded={isEditing}
+                  title={isEditing ? undefined : '더블클릭하여 캐릭터 편집'}
+                  draggable={!isEditing}
                   onDragStart={(e) => {
+                    if (isEditing) {
+                      e.preventDefault();
+                      return;
+                    }
                     setDragCharIndex(i);
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('text/plain', x.id);
@@ -203,331 +305,350 @@ export function CharacterPanel({
                     setDragOverChar(null);
                   }}
                   onClick={() => {
-                    if (x.id === c?.id) return;
-                    if (dirty && !confirm('저장하지 않은 변경을 버리고 이동할까요?'))
-                      return;
                     setActive(x.id);
                   }}
+                  onDoubleClick={() => {
+                    startEditCharacter(x);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      startEditCharacter(x);
+                    }
+                  }}
                 >
-                  <CharacterCard
-                    name={x.name}
-                    iconUrl={x.iconUrl || x.faces[0]?.iconUrl || ''}
-                    color={x.color}
-                  />
-                  <span className="count-pill">{count}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <section className="character-editor">
-          <div className="character-toolbar">
-            <div className="character-toolbar-title">
-              {draft && (
-                <>
-                  <span
-                    className="color-dot"
-                    style={{ background: draft.color || '#888' }}
-                  />
-                  <strong>{draft.name || '이름 없음'}</strong>
-                  <span className="count-pill" title={`ID: ${draft.id}`}>
-                    메시지 {linkedCount}
-                  </span>
-                  {dirty && <span className="dirty-badge">미저장</span>}
-                </>
-              )}
-            </div>
-            <div className="character-toolbar-actions">
-              <button
-                type="button"
-                disabled={!c || c.id === SYSTEM_CHARACTER_ID}
-                className="danger ghost"
-                onClick={() => {
-                  if (
-                    c &&
-                    c.id !== SYSTEM_CHARACTER_ID &&
-                    confirm(
-                      '캐릭터를 삭제할까요? 연결된 메시지의 이름·이미지는 보존됩니다.',
-                    )
-                  ) {
-                    commit({
-                      ...p,
-                      characters: characters.filter((x) => x.id !== c.id),
-                      blocks: p.blocks.map((b) =>
-                        b.characterId === c.id ? { ...b, characterId: null } : b,
-                      ),
-                    });
-                  }
-                }}
-              >
-                삭제
-              </button>
-              <button
-                type="button"
-                className="primary"
-                disabled={!draft || draft.id === SYSTEM_CHARACTER_ID}
-                onClick={save}
-              >
-                저장
-              </button>
-            </div>
-          </div>
-
-          <div className="character-detail">
-            {draft?.id === SYSTEM_CHARACTER_ID ? (
-              <div className="system-info-card">
-                <h2>시스템 캐릭터</h2>
-                <p>
-                  고정 시스템 캐릭터입니다. 캐릭터 이름과 이미지 없이 시스템 전용 형식으로
-                  출력되며, 이름·색상·표정 편집 및 삭제가 제한됩니다.
-                </p>
-              </div>
-            ) : draft ? (
-              <div className="character-detail-inner">
-                <div className="char-meta-grid">
-                  <div className="field-inline">
-                    <span className="field-label">이름</span>
-                    <input
-                      aria-label="캐릭터 이름"
-                      placeholder="캐릭터 이름"
-                      value={draft.name}
-                      onChange={(e) => change({ ...draft, name: e.target.value })}
+                  <span className="char-nav-main">
+                    <CharacterAvatar
+                      url={displayIcon}
+                      fallback={displayName}
+                      color={displayColor}
                     />
-                  </div>
-                  <div className="field-inline">
-                    <span className="field-label">색상</span>
-                    <div className="color-input-group">
-                      <input
-                        type="color"
-                        aria-label="색상 선택"
-                        value={
-                          /^#[0-9a-fA-F]{6}$/.test(draft.color) ? draft.color : '#888888'
-                        }
-                        onChange={(e) => change({ ...draft, color: e.target.value })}
-                      />
-                      <input
-                        aria-label="색상 (#RRGGBB)"
-                        placeholder="#RRGGBB"
-                        value={draft.color}
-                        onChange={(e) => change({ ...draft, color: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="faces-heading">
-                  <h2>표정 ({draft.faces.length})</h2>
-                  <div className="faces-heading-actions">
-                    {/* <label
-                      className="button compact-btn"
-                      title="사진 파일을 선택해 새 표정으로 바로 등록"
-                    >
-                      ＋ 업로드
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon"
-                        multiple
-                        hidden
-                        onChange={(e) => {
-                          const files = e.target.files ? Array.from(e.target.files) : [];
-                          if (!files.length) return;
-                          Promise.all(
-                            files.map(
-                              (file) =>
-                                new Promise<FaceDraft>((resolve) => {
-                                  const reader = new FileReader();
-                                  reader.onload = () => {
-                                    const baseName = file.name
-                                      .replace(/\.[^/.]+$/, '')
-                                      .trim();
-                                    resolve({
-                                      name: baseName,
-                                      iconUrl:
-                                        typeof reader.result === 'string'
-                                          ? reader.result
-                                          : '',
-                                      originalUrl: '',
-                                    });
-                                  };
-                                  reader.readAsDataURL(file);
-                                }),
-                            ),
-                          ).then((newFaces) => {
-                            const valid = newFaces.filter((x) => x.iconUrl);
-                            if (!valid.length) return;
-                            const nextFaces = [...draft.faces, ...valid];
-                            change({
-                              ...draft,
-                              faces: nextFaces,
-                              iconUrl: draft.iconUrl || valid[0]?.iconUrl || '',
-                            });
-                          });
-                          e.target.value = '';
-                        }}
-                      />
-                    </label> */}
-                    <button
-                      type="button"
-                      className="compact-btn"
-                      onClick={() =>
-                        change({
-                          ...draft,
-                          faces: [
-                            ...draft.faces,
-                            { name: '', iconUrl: '', originalUrl: '' },
-                          ],
-                        })
-                      }
-                    >
-                      ＋ 표정 추가
-                    </button>
-                  </div>
-                </div>
-
-                <div className="expression-list">
-                  {draft.faces.map((f, i) => {
-                    const isDefault = draft.iconUrl
-                      ? draft.iconUrl === f.iconUrl
-                      : i === 0;
-                    const dropClass =
-                      dragOverFace?.index === i
-                        ? dragOverFace.after
-                          ? 'drop-after'
-                          : 'drop-before'
-                        : '';
-                    return (
-                      <div
-                        className={`expression-row ${isDefault ? 'default-face' : ''} ${dropClass}`.trim()}
-                        key={i}
-                        draggable
-                        onDragStart={(e) => {
-                          if ((e.target as HTMLElement).closest('input,button')) {
-                            e.preventDefault();
-                            return;
-                          }
-                          setDragFaceIndex(i);
-                          e.dataTransfer.effectAllowed = 'move';
-                          e.dataTransfer.setData('text/plain', String(i));
-                        }}
-                        onDragOver={(e) => {
-                          if (dragFaceIndex === null || dragFaceIndex === i) return;
-                          e.preventDefault();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const after = e.clientY >= rect.top + rect.height / 2;
-                          setDragOverFace({ index: i, after });
-                        }}
-                        onDragLeave={() => {
-                          if (dragOverFace?.index === i) setDragOverFace(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          if (dragFaceIndex === null || dragFaceIndex === i) {
-                            setDragFaceIndex(null);
-                            setDragOverFace(null);
-                            return;
-                          }
-                          const nextFaces = [...draft.faces];
-                          const [moved] = nextFaces.splice(dragFaceIndex, 1);
-                          let insertAt = dragOverFace?.after ? i + 1 : i;
-                          if (dragFaceIndex < insertAt) insertAt -= 1;
-                          nextFaces.splice(insertAt, 0, moved);
-                          change({ ...draft, faces: nextFaces });
-                          setDragFaceIndex(null);
-                          setDragOverFace(null);
-                        }}
-                        onDragEnd={() => {
-                          setDragFaceIndex(null);
-                          setDragOverFace(null);
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="face-image-btn"
-                          title="표정 이미지 업로드 또는 URL/base64 입력"
-                          aria-label={`${f.name || `표정 ${i + 1}`} 이미지 설정`}
-                          onClick={() => {
-                            setFaceImageDraft(resolveImageUrl(f.iconUrl, p.images));
-                            setEditingFaceIndex(i);
-                          }}
-                        >
-                          {isSafeImageUrl(resolveImageUrl(f.iconUrl, p.images)) ? (
-                            <img
-                              className="char-avatar-img"
-                              src={resolveImageUrl(f.iconUrl, p.images)}
-                              alt=""
-                              width="44"
-                              height="44"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <span className="face-upload-placeholder">
-                              <UploadIcon />
-                            </span>
-                          )}
-                        </button>
+                    {isEditing && activeDraft && x.id !== SYSTEM_CHARACTER_ID ? (
+                      editingName ? (
                         <input
-                          className="face-name-input"
-                          aria-label="표정 이름"
-                          placeholder="표정 이름"
-                          value={f.name}
+                          ref={nameInputRef}
+                          className="char-inline-name-input"
+                          aria-label="캐릭터 이름"
+                          placeholder="캐릭터 이름"
+                          value={activeDraft.name}
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
                           onChange={(e) =>
-                            change({
-                              ...draft,
-                              faces: draft.faces.map((x, j) =>
-                                i === j ? { ...x, name: e.target.value } : x,
-                              ),
-                            })
+                            change({ ...activeDraft, name: e.target.value })
                           }
+                          onBlur={() => setEditingName(false)}
+                          onKeyDown={(e) => {
+                            if (e.nativeEvent.isComposing) return;
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditingName(false);
+                            }
+                          }}
                         />
-                        <div className="expression-row-actions">
+                      ) : (
+                        <strong
+                          className="char-editable-name"
+                          style={{ color: displayColor || undefined }}
+                          title="클릭하여 이름 편집"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingName(true);
+                            requestAnimationFrame(() => {
+                              nameInputRef.current?.focus();
+                              nameInputRef.current?.select();
+                            });
+                          }}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
+                          {activeDraft.name || '이름 없음'}
+                        </strong>
+                      )
+                    ) : (
+                      <strong style={{ color: displayColor || undefined }}>
+                        {displayName}
+                      </strong>
+                    )}
+                  </span>
+
+                  {!isEditing && <span className="count-pill">{count}건</span>}
+                </div>
+
+                {isEditing && (
+                  <div className="char-sidebar-detail">
+                    {x.id === SYSTEM_CHARACTER_ID ? (
+                      <>
+                        <p className="muted-note char-system-note">
+                          고정 시스템 캐릭터입니다. 캐릭터 이름과 이미지 없이 시스템 전용
+                          형식으로 출력되며, 이름·색상·표정 편집 및 삭제가 제한됩니다.
+                        </p>
+                        <div
+                          className="char-detail-actions"
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            className="compact-btn"
-                            disabled={!f.iconUrl}
-                            aria-pressed={isDefault}
-                            title="기본 표정으로 지정"
-                            onClick={() => change({ ...draft, iconUrl: f.iconUrl })}
+                            className="ghost compact-btn"
+                            title="닫기 (Esc)"
+                            onClick={cancelEdit}
                           >
-                            {isDefault ? '★ 기본' : '기본 지정'}
+                            닫기
                           </button>
+                        </div>
+                      </>
+                    ) : activeDraft ? (
+                      <>
+                        <div className="char-detail-meta-row">
+                          <div className="field-inline">
+                            <span className="field-label">색상</span>
+                            <ColorInput
+                              title="캐릭터 색상"
+                              value={activeDraft.color}
+                              onChange={(nextColor) =>
+                                change({ ...activeDraft, color: nextColor })
+                              }
+                            />
+                          </div>
+                          <div className="char-detail-badges">
+                            {/* <span className="count-pill" title={`ID: ${activeDraft.id}`}>
+                              메시지 {count}
+                            </span> */}
+                            {dirty && <span className="dirty-badge">미저장</span>}
+                          </div>
+                        </div>
+
+                        <div className="faces-heading">
+                          <h2>표정 ({activeDraft.faces.length})</h2>
+                          <div className="faces-heading-actions">
+                            <button
+                              type="button"
+                              className="compact-btn"
+                              onClick={() =>
+                                change({
+                                  ...activeDraft,
+                                  faces: [
+                                    ...activeDraft.faces,
+                                    { name: '', iconUrl: '', originalUrl: '' },
+                                  ],
+                                })
+                              }
+                            >
+                              ＋ 추가
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="expression-list">
+                          {activeDraft.faces.map((f, faceIdx) => {
+                            const isDefault = activeDraft.iconUrl
+                              ? activeDraft.iconUrl === f.iconUrl
+                              : faceIdx === 0;
+                            const faceDropClass =
+                              dragOverFace?.index === faceIdx
+                                ? dragOverFace.after
+                                  ? 'drop-after'
+                                  : 'drop-before'
+                                : '';
+                            return (
+                              <div
+                                className={`expression-row ${isDefault ? 'default-face' : ''} ${faceDropClass}`.trim()}
+                                key={faceIdx}
+                                draggable
+                                onDragStart={(e) => {
+                                  if ((e.target as HTMLElement).closest('input,button')) {
+                                    e.preventDefault();
+                                    return;
+                                  }
+                                  setDragFaceIndex(faceIdx);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  e.dataTransfer.setData('text/plain', String(faceIdx));
+                                }}
+                                onDragOver={(e) => {
+                                  if (dragFaceIndex === null || dragFaceIndex === faceIdx)
+                                    return;
+                                  e.preventDefault();
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const after = e.clientY >= rect.top + rect.height / 2;
+                                  setDragOverFace({ index: faceIdx, after });
+                                }}
+                                onDragLeave={() => {
+                                  if (dragOverFace?.index === faceIdx)
+                                    setDragOverFace(null);
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  if (
+                                    dragFaceIndex === null ||
+                                    dragFaceIndex === faceIdx
+                                  ) {
+                                    setDragFaceIndex(null);
+                                    setDragOverFace(null);
+                                    return;
+                                  }
+                                  const nextFaces = [...activeDraft.faces];
+                                  const [moved] = nextFaces.splice(dragFaceIndex, 1);
+                                  let insertAt = dragOverFace?.after
+                                    ? faceIdx + 1
+                                    : faceIdx;
+                                  if (dragFaceIndex < insertAt) insertAt -= 1;
+                                  nextFaces.splice(insertAt, 0, moved);
+                                  change({ ...activeDraft, faces: nextFaces });
+                                  setDragFaceIndex(null);
+                                  setDragOverFace(null);
+                                }}
+                                onDragEnd={() => {
+                                  setDragFaceIndex(null);
+                                  setDragOverFace(null);
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  className="face-image-btn"
+                                  title="표정 이미지 업로드 또는 URL/base64 입력"
+                                  aria-label={`${f.name || `표정 ${faceIdx + 1}`} 이미지 설정`}
+                                  onClick={() => {
+                                    setFaceImageDraft(
+                                      resolveImageUrl(f.iconUrl, p.images),
+                                    );
+                                    setEditingFaceIndex(faceIdx);
+                                  }}
+                                >
+                                  {isSafeImageUrl(
+                                    resolveImageUrl(f.iconUrl, p.images),
+                                  ) ? (
+                                    <img
+                                      className="char-avatar-img"
+                                      src={resolveImageUrl(f.iconUrl, p.images)}
+                                      alt=""
+                                      width="36"
+                                      height="36"
+                                      loading="lazy"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  ) : (
+                                    <span className="face-upload-placeholder">
+                                      <UploadIcon />
+                                    </span>
+                                  )}
+                                </button>
+                                <input
+                                  className="face-name-input"
+                                  aria-label="표정 이름"
+                                  placeholder="표정 이름"
+                                  value={f.name}
+                                  onChange={(e) =>
+                                    change({
+                                      ...activeDraft,
+                                      faces: activeDraft.faces.map((item, j) =>
+                                        faceIdx === j
+                                          ? { ...item, name: e.target.value }
+                                          : item,
+                                      ),
+                                    })
+                                  }
+                                />
+                                <div className="expression-row-actions">
+                                  <button
+                                    type="button"
+                                    className="compact-btn"
+                                    disabled={!f.iconUrl}
+                                    aria-pressed={isDefault}
+                                    title="기본 표정으로 지정"
+                                    onClick={() =>
+                                      change({ ...activeDraft, iconUrl: f.iconUrl })
+                                    }
+                                  >
+                                    {isDefault ? '기본' : '★'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="compact-btn danger ghost"
+                                    title="표정 삭제 (기존 메시지 이미지는 유지)"
+                                    onClick={() => {
+                                      const faces = activeDraft.faces.filter(
+                                        (_, j) => j !== faceIdx,
+                                      );
+                                      change({
+                                        ...activeDraft,
+                                        faces,
+                                        iconUrl: isDefault
+                                          ? faces[0]?.iconUrl || ''
+                                          : activeDraft.iconUrl,
+                                      });
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {!activeDraft.faces.length && (
+                            <div className="empty-inline">
+                              등록된 표정이 없습니다. ‘＋ 표정 추가’로 추가하세요.
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          className="char-detail-actions"
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            className="compact-btn danger ghost"
-                            title="표정 삭제 (기존 메시지 이미지는 유지)"
+                            className="danger ghost compact-btn"
+                            title="캐릭터 삭제"
                             onClick={() => {
-                              const faces = draft.faces.filter((_, j) => j !== i);
-                              change({
-                                ...draft,
-                                faces,
-                                iconUrl: isDefault
-                                  ? faces[0]?.iconUrl || ''
-                                  : draft.iconUrl,
-                              });
+                              if (
+                                confirm(
+                                  '캐릭터를 삭제할까요? 연결된 메시지의 이름·이미지는 보존됩니다.',
+                                )
+                              ) {
+                                commit({
+                                  ...p,
+                                  characters: characters.filter(
+                                    (item) => item.id !== x.id,
+                                  ),
+                                  blocks: p.blocks.map((b) =>
+                                    b.characterId === x.id
+                                      ? { ...b, characterId: null }
+                                      : b,
+                                  ),
+                                });
+                                setEditingCharId(null);
+                              }
                             }}
                           >
                             삭제
                           </button>
+                          <button
+                            type="button"
+                            className="ghost compact-btn"
+                            title="편집 취소 (Esc)"
+                            onClick={cancelEdit}
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            className="primary compact-btn"
+                            onClick={save}
+                          >
+                            저장
+                          </button>
                         </div>
-                      </div>
-                    );
-                  })}
-                  {!draft.faces.length && (
-                    <div className="empty-inline">
-                      등록된 표정이 없습니다. ‘＋ 표정 추가’로 추가하세요.
-                    </div>
-                  )}
-                </div>
+                      </>
+                    ) : null}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="empty">
-                <p>캐릭터를 추가하거나 로그를 불러오세요.</p>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+            );
+          })}
+        </div>
+      </nav>
 
       {adding && (
         <dialog
@@ -601,6 +722,7 @@ export function CharacterPanel({
           </form>
         </dialog>
       )}
+
       {editingFaceIndex !== null && draft && (
         <dialog
           ref={faceDialogRef}
@@ -720,7 +842,7 @@ export function CharacterPanel({
           </form>
         </dialog>
       )}
-    </section>
+    </aside>
   );
 }
 

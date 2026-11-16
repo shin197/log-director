@@ -14,6 +14,7 @@ import { resolveImageUrl } from './imagePool';
 import { useImagePool } from './ImagePoolContext';
 import { BookmarkRibbon } from './BookmarkRibbon';
 import { buildMessageStyleObjects, type MessageStyleProps } from './styles';
+import { ColorInput } from './ColorInput';
 
 export type BulkEditContext = {
   count: number;
@@ -362,24 +363,12 @@ export function MessageBlock({
               )}
 
               {isCustomSpeaker && (
-                <div className="color-input-group editor-color-group" title="화자 색상">
-                  <input
-                    type="color"
-                    aria-label="색상 선택"
-                    value={
-                      /^#[0-9a-fA-F]{6}$/.test(customColorValue)
-                        ? customColorValue
-                        : '#888888'
-                    }
-                    onChange={(e) => setCustomColor(e.target.value)}
-                  />
-                  <input
-                    aria-label="색상 (#RRGGBB)"
-                    placeholder="#RRGGBB"
-                    value={customColorValue}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                  />
-                </div>
+                <ColorInput
+                  className="editor-color-group"
+                  title="화자 색상"
+                  value={customColorValue}
+                  onChange={setCustomColor}
+                />
               )}
 
               <ChannelPicker

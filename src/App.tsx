@@ -59,6 +59,7 @@ import './workspace-layout.css';
 
 function App() {
   const [tab, setTab] = useState('로그');
+  const [charBarOpen, setCharBarOpen] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [p, setP] = useState<Project>(blank);
   const [past, setPast] = useState<Project[]>([]);
@@ -721,7 +722,7 @@ function App() {
         <div className="header-left">
           <span className="brand-mark">LOG DIRECTOR</span>
           <nav className="top-tabs" aria-label="작업 화면 전환">
-            {['로그', '캐릭터', '스타일', '설정'].map((name) => (
+            {['로그', '스타일', '설정'].map((name) => (
               <button
                 type="button"
                 key={name}
@@ -877,7 +878,6 @@ function App() {
         />
       )}
       {helpOpen && <HelpSheet context={helpContext} onClose={() => setHelpOpen(false)} />}
-      {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
       {tab === '스타일' && <StylePanel project={p} commit={commit} />}
       {tab === '설정' && (
         <div className="settings-scroll">
@@ -1070,7 +1070,7 @@ function App() {
                 onClick={startBulkEdit}
                 title="선택한 여러 메시지 일괄 편집 (Ctrl+Shift+Enter)"
               >
-                일괄 편집
+                편집
               </button>
               <button
                 type="button"
@@ -1102,7 +1102,7 @@ function App() {
                 }
                 title="일괄 치환 열기/닫기 (Ctrl+H)"
               >
-                일괄 치환
+                치환
               </button>
               <button
                 type="button"
@@ -1201,6 +1201,13 @@ function App() {
           )}
 
           <div className="log-editor-body">
+            <CharacterPanel
+              open={charBarOpen}
+              onToggleOpen={() => setCharBarOpen((v) => !v)}
+              project={p}
+              commit={commit}
+            />
+
             <div className="log-main-content">
               <div className="log-scroll">
                 <div className="log-list">
