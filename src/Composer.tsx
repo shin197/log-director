@@ -8,6 +8,8 @@ import { handleWrapKeyDown } from './textEdit';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { CharacterCard } from './CharacterCard';
 import { ColorInput } from './ColorInput';
+import { resolveImageUrl } from './imagePool';
+import { useImagePool } from './ImagePoolContext';
 
 export type EyedropPayload = {
   speaker: string;
@@ -41,8 +43,11 @@ export function Composer({
     [text, setText] = useState(''),
     [open, setOpen] = useState(false),
     [index, setIndex] = useState(0),
-    [collapsed, setCollapsed] = useState(false);
+    [collapsed, setCollapsed] = useState(false),
+    [urlOpen, setUrlOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const images = useImagePool();
 
   useEffect(() => {
     if (!focusRequest) return;
@@ -60,6 +65,7 @@ export function Composer({
     setColor(eyedrop.color ?? '');
     setChannel(eyedrop.channel);
     setOpen(false);
+    setUrlOpen(false);
     setCollapsed(false);
   }, [eyedrop]);
 
@@ -74,6 +80,7 @@ export function Composer({
     setIcon(c.iconUrl || c.faces[0]?.iconUrl || '');
     setColor(c.id === SYSTEM_CHARACTER_ID ? '' : c.color || '');
     setOpen(false);
+    setUrlOpen(false);
   }
 
   function submit() {
@@ -84,7 +91,7 @@ export function Composer({
       speaker: name,
       sourceType: 'normal',
       characterId: null,
-      iconUrl: '',
+      iconUrl: icon,
       text,
       diceResult: '',
       timestamp: '',
@@ -92,7 +99,7 @@ export function Composer({
     };
     if (c) {
       b = inheritCharacter(b, c);
-      if (c.id === id && b.sourceType !== 'system') b.iconUrl = icon;
+      if ((c.id === id || icon) && b.sourceType !== 'system') b.iconUrl = icon;
     } else if (color) {
       b.color = color;
     }
@@ -126,7 +133,18 @@ export function Composer({
               <FacePicker
                 character={character}
                 value={icon}
-                onChange={setIcon}
+                onChange={(nextIcon) => {
+                  setIcon(nextIcon);
+                  setUrlOpen(false);
+                }}
+                onRequestCustomUrl={() => {
+                  setUrlOpen(true);
+                  requestAnimationFrame(() => {
+                    urlInputRef.current?.focus();
+                    urlInputRef.current?.select();
+                  });
+                }}
+                disabled={disabled}
                 imageButton
                 fallbackText={(name || '?').slice(0, 1)}
               />
@@ -139,6 +157,7 @@ export function Composer({
                 onFocus={() => setOpen(true)}
                 onBlur={() => setOpen(false)}
                 onChange={(e) => {
+                  if (id !== null) setUrlOpen(false);
                   setName(e.target.value);
                   setId(null);
                   setIcon('');
@@ -207,6 +226,24 @@ export function Composer({
             ×
           </button>
         </div>
+        {urlOpen && character?.id !== SYSTEM_CHARACTER_ID && (
+          <input
+            ref={urlInputRef}
+            className="composer-url-input"
+            type="url"
+            aria-label="표정 이미지 URL"
+            placeholder="표정 이미지 URL (https://…)"
+            disabled={disabled}
+            value={resolveImageUrl(icon, images)}
+            onChange={(e) => setIcon(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                setUrlOpen(false);
+              }
+            }}
+          />
+        )}
         <div className="composer-bottom">
           <textarea
             ref={textareaRef}

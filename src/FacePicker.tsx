@@ -9,12 +9,16 @@ export function FacePicker({
   character,
   value,
   onChange,
+  onRequestCustomUrl,
+  disabled: disabledProp = false,
   imageButton = false,
   fallbackText,
 }: {
   character?: Character;
   value: string;
   onChange: (url: string) => void;
+  onRequestCustomUrl?: () => void;
+  disabled?: boolean;
   imageButton?: boolean;
   fallbackText?: string;
 }) {
@@ -22,7 +26,8 @@ export function FacePicker({
   const root = useRef<HTMLDivElement>(null);
   const images = useImagePool();
   const resolvedValue = resolveImageUrl(value, images);
-  const disabled = !character || character.id === SYSTEM_CHARACTER_ID;
+  const isSystemChar = character?.id === SYSTEM_CHARACTER_ID;
+  const disabled = disabledProp || isSystemChar || (!character && !onRequestCustomUrl);
 
   useEffect(() => {
     const close = (e: PointerEvent) => {
@@ -61,7 +66,7 @@ export function FacePicker({
       </button>
       {open && !disabled && (
         <div className="face-options">
-          {character.faces.length ? (
+          {character && character.faces.length ? (
             character.faces.map((face, i) => (
               <button
                 type="button"
@@ -77,7 +82,21 @@ export function FacePicker({
               </button>
             ))
           ) : (
-            <p className="empty-faces">등록된 표정이 없습니다.</p>
+            <p className="empty-faces">
+              {character ? '등록된 표정이 없습니다.' : '사용자 지정 화자'}
+            </p>
+          )}
+          {onRequestCustomUrl && (
+            <button
+              type="button"
+              className="face-option-custom"
+              onClick={() => {
+                onRequestCustomUrl();
+                setOpen(false);
+              }}
+            >
+              URL 직접 입력...
+            </button>
           )}
         </div>
       )}

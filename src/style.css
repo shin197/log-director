@@ -1159,7 +1159,7 @@ code {
 .style-picker-popover {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
+  right: 0;
   min-width: 220px;
   max-width: 300px;
   max-height: 260px;
@@ -1454,12 +1454,12 @@ code {
 /* Channel Picker */
 .channel-picker {
   position: relative;
-  min-width: 108px;
-}
-
-.channel-picker.is-compact {
   min-width: 86px;
 }
+
+/* .channel-picker.is-compact {
+  min-width: 86px;
+} */
 
 .channel-trigger {
   width: 100%;
@@ -1585,6 +1585,14 @@ code {
   height: 36px;
   border-radius: var(--radius-md);
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composer-avatar .face-btn-avatar {
+  width: 32px;
+  height: 32px;
 }
 
 .face-btn-avatar img {
@@ -1637,6 +1645,15 @@ code {
   color: var(--accent);
 }
 
+.face-options .face-option-custom {
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+  padding-top: 7px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
 .face-options img {
   width: 34px;
   height: 34px;
@@ -1678,6 +1695,10 @@ code {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+}
+
+.composer-url-input {
+  width: 100%;
 }
 
 .composer-bottom {

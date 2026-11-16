@@ -107,6 +107,7 @@ export function MessageBlock({
   const [dice, setDice] = useState(!!b.diceResult);
   const [over, setOver] = useState('');
   const stylePopoverRef = useRef<HTMLDivElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   const images = useImagePool();
 
   const isBulk = !!bulkContext;
@@ -188,7 +189,7 @@ export function MessageBlock({
   const isCustomSpeaker = isBulk
     ? bulkContext.state.speakerAction
       ? bulkContext.state.speakerAction.type === 'unlink' ||
-        bulkContext.state.speakerAction.type === 'custom'
+      bulkContext.state.speakerAction.type === 'custom'
       : !bulkContext.mixedSpeakers && !isSystem && !b.characterId
     : !isSystem && !draft.characterId;
   const customColorValue = isBulk
@@ -220,26 +221,26 @@ export function MessageBlock({
   const resolvedVisualStyle =
     !isEditing && styleProps
       ? buildMessageStyleObjects(
-          styleProps,
-          dividerColor,
-          isSystem ? undefined : b.color || '#888888',
-        )
+        styleProps,
+        dividerColor,
+        isSystem ? undefined : b.color || '#888888',
+      )
       : null;
   const hideAvatar = Boolean(resolvedVisualStyle?.avatarHidden);
   const rawPanelStyle = resolvedVisualStyle
     ? (() => {
-        const s = { ...resolvedVisualStyle.panelStyle };
-        if (
-          !s.padding &&
-          (s.backgroundColor ||
-            styleProps?.panelBorderStyle === 'box' ||
-            styleProps?.panelBorderStyle === 'left-accent')
-        ) {
-          s.padding = '12px 14px';
-          s.margin = '4px 0';
-        }
-        return s;
-      })()
+      const s = { ...resolvedVisualStyle.panelStyle };
+      if (
+        !s.padding &&
+        (s.backgroundColor ||
+          styleProps?.panelBorderStyle === 'box' ||
+          styleProps?.panelBorderStyle === 'left-accent')
+      ) {
+        s.padding = '12px 14px';
+        s.margin = '4px 0';
+      }
+      return s;
+    })()
     : undefined;
   const articlePanelStyle = rawPanelStyle
     ? selected || bulkTarget || cut
@@ -347,24 +348,33 @@ export function MessageBlock({
           style={
             resolvedVisualStyle?.avatarStyle.width
               ? {
-                  width: resolvedVisualStyle.avatarStyle.width,
-                  height: resolvedVisualStyle.avatarStyle.height,
-                }
+                width: resolvedVisualStyle.avatarStyle.width,
+                height: resolvedVisualStyle.avatarStyle.height,
+              }
               : undefined
           }
         >
-          {isEditing && faceCharacter ? (
+          {isEditing && canEditFace ? (
             <FacePicker
               character={faceCharacter}
               value={activeBlock.iconUrl ?? ''}
               onChange={(iconUrl) => {
+                setOptions(false);
                 if (bulkContext) {
                   bulkContext.onChangeState((prev) => ({ ...prev, iconUrl }));
                 } else {
                   setDraft({ ...draft, iconUrl });
                 }
               }}
+              onRequestCustomUrl={() => {
+                setOptions(true);
+                requestAnimationFrame(() => {
+                  urlInputRef.current?.focus();
+                  urlInputRef.current?.select();
+                });
+              }}
               imageButton
+              fallbackText={(activeBlock.speaker || '?').slice(0, 1)}
             />
           ) : activeBlock.iconUrl &&
             isSafeImageUrl(resolveImageUrl(activeBlock.iconUrl, images)) ? (
@@ -398,34 +408,45 @@ export function MessageBlock({
                   draft={activeBlock}
                   characters={characters}
                   mixed={bulkContext.mixedSpeakers && !bulkContext.state.speakerAction}
-                  onPickCharacter={(character) =>
+                  onPickCharacter={(character) => {
+                    setOptions(false);
                     bulkContext.onChangeState((prev) => ({
                       ...prev,
                       speakerAction: { type: 'character', character },
                       color: undefined,
                       iconUrl: undefined,
-                    }))
-                  }
-                  onUnlink={() =>
+                    }));
+                  }}
+                  onUnlink={() => {
+                    setOptions(false);
                     bulkContext.onChangeState((prev) => ({
                       ...prev,
                       speakerAction: { type: 'unlink' },
                       iconUrl: undefined,
-                    }))
-                  }
-                  onCustomSpeaker={(speaker) =>
+                    }));
+                  }}
+                  onCustomSpeaker={(speaker) => {
+                    setOptions(false);
                     bulkContext.onChangeState((prev) => ({
                       ...prev,
                       speakerAction: { type: 'custom', speaker },
                       iconUrl: undefined,
-                    }))
-                  }
+                    }));
+                  }}
                 />
               ) : (
                 <SpeakerPicker
                   draft={draft}
                   characters={characters}
-                  onChange={setDraft}
+                  onChange={(nextDraft) => {
+                    if (
+                      nextDraft.characterId !== draft.characterId ||
+                      nextDraft.sourceType !== draft.sourceType
+                    ) {
+                      setOptions(false);
+                    }
+                    setDraft(nextDraft);
+                  }}
                 />
               )}
 
@@ -547,43 +568,24 @@ export function MessageBlock({
                 </button>
               )}
 
-              {!isSystem && (
-                <button
-                  type="button"
-                  className="compact-btn"
-                  disabled={!canEditFace}
-                  aria-label="표정 URL 직접 입력"
-                  aria-expanded={options}
-                  title={
-                    canEditFace
-                      ? '표정 이미지 URL'
-                      : '선택된 메시지의 캐릭터가 모두 같을 때 표정을 일괄 변경할 수 있습니다'
-                  }
-                  onClick={() => setOptions(!options)}
-                >
-                  URL
-                </button>
-              )}
-
               <div className="style-picker-popover-wrap" ref={stylePopoverRef}>
                 <button
                   type="button"
-                  className={`compact-btn${
-                    isBulk
+                  className={`compact-btn${isBulk
                       ? styleCards.some(
-                          (c) =>
-                            getBulkStyleCheckboxState(
-                              c.id,
-                              bulkContext.targetBlocks,
-                              bulkContext.state.styleOps,
-                            ) !== 'unchecked',
-                        )
+                        (c) =>
+                          getBulkStyleCheckboxState(
+                            c.id,
+                            bulkContext.targetBlocks,
+                            bulkContext.state.styleOps,
+                          ) !== 'unchecked',
+                      )
                         ? ' is-has-styles'
                         : ''
                       : (draft.styleIds?.length ?? 0) > 0
                         ? ' is-has-styles'
                         : ''
-                  }`}
+                    }`}
                   aria-expanded={styleMenuOpen}
                   aria-haspopup="dialog"
                   title="개별 메시지에 스타일 카드 적용"
@@ -637,10 +639,10 @@ export function MessageBlock({
                         {styleCards.map((card) => {
                           const triState = isBulk
                             ? getBulkStyleCheckboxState(
-                                card.id,
-                                bulkContext.targetBlocks,
-                                bulkContext.state.styleOps,
-                              )
+                              card.id,
+                              bulkContext.targetBlocks,
+                              bulkContext.state.styleOps,
+                            )
                             : draft.styleIds?.includes(card.id)
                               ? 'checked'
                               : 'unchecked';
@@ -705,6 +707,7 @@ export function MessageBlock({
 
             {options && canEditFace && !isSystem && (
               <input
+                ref={urlInputRef}
                 className="editor-url-input"
                 type="url"
                 aria-label="표정 이미지 URL"
@@ -721,6 +724,12 @@ export function MessageBlock({
                     bulkContext.onChangeState((prev) => ({ ...prev, iconUrl: val }));
                   } else {
                     setDraft({ ...draft, iconUrl: val });
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    setOptions(false);
                   }
                 }}
               />
