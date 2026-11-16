@@ -3570,6 +3570,13 @@ dialog::backdrop {
   gap: 16px;
 }
 
+.style-card-preview-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
 .style-global-subsection {
   display: flex;
   flex-direction: column;
@@ -3856,7 +3863,7 @@ dialog::backdrop {
   grid-template-columns: 40px minmax(0, 1fr);
   column-gap: 12px;
   gap: 12px;
-  /* padding: 16px 0; */
+  padding: 16px 0;
   border-radius: 0;
   border-bottom: 1px solid var(--styled-divider-color, #262626);
 }

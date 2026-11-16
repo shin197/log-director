@@ -1253,9 +1253,10 @@ export function StylePanel({
 
           {isGlobalOpen && globalDraft && (
             <div className="style-card-body">
-              <GlobalStylePreview globalStyle={globalDraft} projectTitle={p.title} />
+              <div className="style-card-preview-scope">
+                <GlobalStylePreview globalStyle={globalDraft} projectTitle={p.title} />
 
-              {/* 1) 문서 페이지 영역 스타일 */}
+                {/* 1) 문서 페이지 영역 스타일 */}
               <div className="style-props-group">
                 <h4>문서 페이지 영역 스타일</h4>
                 <div className="style-props-grid">
@@ -1390,6 +1391,7 @@ export function StylePanel({
                     })
                   }
                 />
+              </div>
               </div>
 
               {/* 하단 Sticky 액션 바 */}
@@ -1708,12 +1710,13 @@ export function StylePanel({
 
                   {isOpen && cardDraft && (
                     <div className="style-card-body">
-                      {/* 1) 미리보기 (상단 바 바로 아래) */}
-                      <SampleMessagePreview
-                        globalStyle={styles.global}
-                        styleProps={cardDraft.props}
-                        sampleBlock={previewSampleBlock}
-                      />
+                      <div className="style-card-preview-scope">
+                        {/* 1) 미리보기 (상단 바 바로 아래) */}
+                        <SampleMessagePreview
+                          globalStyle={styles.global}
+                          styleProps={cardDraft.props}
+                          sampleBlock={previewSampleBlock}
+                        />
 
                       {/* 2) 적용 필터 (합연산 · OR) */}
                       <div className="style-props-group">
@@ -1789,6 +1792,7 @@ export function StylePanel({
                           }))
                         }
                       />
+                      </div>
 
                       {/* 4) 하단 Sticky 액션 바 ([삭제] [취소] [저장]) */}
                       <div className="style-detail-actions">
