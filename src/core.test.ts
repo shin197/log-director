@@ -1794,6 +1794,92 @@ test('스타일 시스템: 합연산 필터, 속성별 계층 충돌 해결(하�
   assert.ok(exportedHtml.includes('color:#00FF88'));
 });
 
+test('스타일 확장: 전역 시스템 메시지 스타일, 아바타 사용 안함(avatarHidden) 및 HTML 내보내기', () => {
+  const baseProj = blank();
+  const cAlpha = {
+    id: 'c-alpha',
+    name: '알파',
+    color: '#6CD4BC',
+    iconUrl: 'https://example.com/alpha.png',
+    faces: [],
+  };
+  const blocks = [
+    {
+      id: 'n1',
+      characterId: 'c-alpha',
+      speaker: '알파',
+      text: '일반 대사',
+      diceResult: '',
+      channel: '메인',
+      sourceType: 'normal',
+    },
+    {
+      id: 'n2',
+      characterId: 'c-alpha',
+      speaker: '알파',
+      text: '나레이션 대사',
+      diceResult: '',
+      channel: '나레이션',
+      sourceType: 'normal',
+    },
+    {
+      id: 's1',
+      characterId: 'builtin:system',
+      text: '시스템 안내',
+      diceResult: '',
+      channel: '메인',
+      sourceType: 'system',
+    },
+  ];
+
+  const styles = defaultProjectStyles();
+  styles.global.messageDefaults = { textColor: '#EEEEEE', panelBgColor: '#1A1A1A' };
+  styles.global.systemDefaults = {
+    textColor: '#AABBCC',
+    fontStyle: 'italic',
+    panelBgColor: '#222630',
+  };
+  styles.cards = [
+    createStyleCard({
+      id: 'card-narration',
+      name: '나레이션(아바타 숨김)',
+      filters: ['in:나레이션'],
+      props: { avatarHidden: true },
+    }),
+  ];
+
+  const proj = {
+    ...baseProj,
+    characters: [...(baseProj.characters ?? []), cAlpha],
+    blocks,
+    styles,
+  };
+
+  const resolve = createStyleResolver(proj.styles, proj.characters, [], proj.blocks);
+  // 시스템 메시지는 전역 일반 패널색(#1A1A1A)이나 일반 대사색을 덮어쓰지 않고 systemDefaults를 따름
+  const sysStyle = resolve(blocks[2]);
+  assert.equal(sysStyle.textColor, '#AABBCC');
+  assert.equal(sysStyle.fontStyle, 'italic');
+  assert.equal(sysStyle.panelBgColor, '#222630');
+
+  // 아바타 숨김 카드 매칭 확인
+  assert.equal(resolve(blocks[0]).avatarHidden, undefined);
+  assert.equal(resolve(blocks[1]).avatarHidden, true);
+
+  // HTML 내보내기에서 no-avatar 클래스 및 아바타 생략 + 시스템 스타일 확인
+  const html = exportLog(proj, 'html');
+  assert.ok(html.includes('<article class="message" data-channel="main"'));
+  assert.ok(html.includes('<article class="message no-avatar" data-channel="나레이션"'));
+  assert.ok(html.includes('color:#AABBCC'));
+  assert.ok(html.includes('background-color:#222630'));
+
+  // 저장·재열기 시 systemDefaults와 avatarHidden 보존 확인
+  const roundtrip = parse(JSON.stringify(proj), 'extended-styles.project.json');
+  assert.equal(roundtrip.styles?.global.systemDefaults.textColor, '#AABBCC');
+  assert.equal(roundtrip.styles?.global.systemDefaults.fontStyle, 'italic');
+  assert.equal(roundtrip.styles?.cards[0].props.avatarHidden, true);
+});
+
 test('컬러 입력 유틸: # 자동 제거(직접 입력·붙여넣기), 저장값 변환, 대비 글자색 계산', () => {
   // # 직접 입력 및 클립보드 붙여넣기 시 #·공백 자동 제거, 대문자 변환 및 6자리 유지
   assert.equal(normalizeColorCodeInput('#123456'), '123456');

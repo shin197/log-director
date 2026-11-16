@@ -323,10 +323,12 @@ export function exportLog(
       const speakerStyle = styled.speakerColor
         ? `--speaker-color:${color};color:${styled.speakerColor}`
         : `--speaker-color:${color}`;
-      const avatarClass = getAvatarClass(resolveIcon(b.iconUrl));
-      const avatarEl = avatarClass
-        ? `<span class="avatar ${avatarClass}"${avatarAttr ? ` style="${escape(avatarAttr)}"` : ''} aria-hidden="true"></span>`
-        : '<span class="avatar-spacer" aria-hidden="true"></span>';
+      const avatarClass = styled.avatarHidden ? '' : getAvatarClass(resolveIcon(b.iconUrl));
+      const avatarEl = styled.avatarHidden
+        ? ''
+        : avatarClass
+          ? `<span class="avatar ${avatarClass}"${avatarAttr ? ` style="${escape(avatarAttr)}"` : ''} aria-hidden="true"></span>`
+          : '<span class="avatar-spacer" aria-hidden="true"></span>';
       const timeDatetime =
         typeof source.createdAt === 'number'
           ? ` datetime="${new Date(source.createdAt).toISOString()}"`
@@ -336,7 +338,8 @@ export function exportLog(
       const headerEl = `<div class="message-header"><span class="speaker" style="${speakerStyle}">${escape(b.speaker ?? '')}</span>${timeEl}${chEl}</div>`;
       const diceEl = buildRollElement(b.diceResult, diceAttr);
       const contentEl = `<div class="message-content">${headerEl}<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${escape(b.text)}</div>${diceEl}</div>`;
-      return `<article class="message"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${avatarEl}${contentEl}</article>`;
+      const noAvatarClass = styled.avatarHidden ? ' no-avatar' : '';
+      return `<article class="message${noAvatarClass}"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${avatarEl}${contentEl}</article>`;
     })
     .join('\n');
 
@@ -347,7 +350,9 @@ export function exportLog(
   const pageBg = globalStyle.pageBgColor;
   const bodyColor = globalStyle.messageDefaults.textColor ?? '#eee';
   const bodyFont = globalStyle.messageDefaults.fontFamily || 'system-ui';
+  const systemColor = globalStyle.systemDefaults?.textColor || globalStyle.systemTextColor;
+  const systemIndent = globalStyle.messageDefaults.avatarHidden ? 0 : 52;
   const titleStyle = `.log-title,h1{font-size:${globalStyle.titleSize}px;margin:24px 0;color:${globalStyle.titleColor};text-align:${globalStyle.titleAlign}}`;
 
-  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(p.title)}</title><style>:root{color-scheme:dark;color:${bodyColor};background:${pageBg}}*{box-sizing:border-box}body{min-width:280px;margin:0;background:${pageBg};color:${bodyColor};font-family:${bodyFont}}.message-list{width:100%;max-width:${globalStyle.containerWidth}px;margin:0 auto;padding:0 24px 48px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.system{display:block;padding-left:52px;color:${globalStyle.systemTextColor}}.avatar,.avatar-spacer{width:40px;height:40px}.avatar{display:block;background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.edited,.channel-name{color:${globalStyle.metaColor};font-size:12px}.message-text,.roll-result{font-size:${globalStyle.messageDefaults.fontSize ?? 16}px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.roll-result{display:block}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escape(p.title)}</title><style>:root{color-scheme:dark;color:${bodyColor};background:${pageBg}}*{box-sizing:border-box}body{min-width:280px;margin:0;background:${pageBg};color:${bodyColor};font-family:${bodyFont}}.message-list{width:100%;max-width:${globalStyle.containerWidth}px;margin:0 auto;padding:0 24px 48px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.no-avatar{grid-template-columns:minmax(0,1fr);column-gap:0}.message.system{display:block;padding-left:${systemIndent}px;color:${systemColor}}.avatar,.avatar-spacer{width:40px;height:40px}.avatar{display:block;background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.edited,.channel-name{color:${globalStyle.metaColor};font-size:12px}.message-text,.roll-result{font-size:${globalStyle.messageDefaults.fontSize ?? 16}px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.roll-result{display:block}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
 }

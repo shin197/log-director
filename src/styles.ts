@@ -22,6 +22,7 @@ export type MessageStyleProps = {
   panelBorderColor?: string;
   panelBorderStyle?: PanelBorderStyle;
   panelRadius?: number;
+  avatarHidden?: boolean;
   avatarShape?: AvatarShape;
   avatarBorderColor?: string;
   avatarBorderWidth?: number;
@@ -41,6 +42,7 @@ export type GlobalStyleConfig = {
   dividerColor: string;
   systemTextColor: string;
   messageDefaults: MessageStyleProps;
+  systemDefaults: MessageStyleProps;
 };
 
 export type StyleCard = {
@@ -85,6 +87,7 @@ export function defaultGlobalStyle(): GlobalStyleConfig {
     dividerColor: '#262626',
     systemTextColor: '#888888',
     messageDefaults: {},
+    systemDefaults: {},
   };
 }
 
@@ -162,6 +165,9 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
   ) {
     out.panelRadius = Math.round(raw.panelRadius);
   }
+  if (typeof raw.avatarHidden === 'boolean') {
+    out.avatarHidden = raw.avatarHidden;
+  }
   if (VALID_AVATAR_SHAPES.has(raw.avatarShape)) {
     out.avatarShape = raw.avatarShape;
   }
@@ -204,6 +210,14 @@ export function normalizeProjectStyles(raw: any): ProjectStyles | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const defGlobal = defaultGlobalStyle();
   const g = raw.global && typeof raw.global === 'object' ? raw.global : {};
+  const rawSystemTextColor =
+    typeof g.systemTextColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(g.systemTextColor)
+      ? g.systemTextColor.toUpperCase()
+      : defGlobal.systemTextColor;
+  const systemDefaults = normalizeMessageStyleProps(g.systemDefaults);
+  if (!systemDefaults.textColor && rawSystemTextColor !== defGlobal.systemTextColor) {
+    systemDefaults.textColor = rawSystemTextColor;
+  }
   const global: GlobalStyleConfig = {
     pageBgColor:
       typeof g.pageBgColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(g.pageBgColor)
@@ -236,11 +250,9 @@ export function normalizeProjectStyles(raw: any): ProjectStyles | undefined {
       typeof g.dividerColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(g.dividerColor)
         ? g.dividerColor.toUpperCase()
         : defGlobal.dividerColor,
-    systemTextColor:
-      typeof g.systemTextColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(g.systemTextColor)
-        ? g.systemTextColor.toUpperCase()
-        : defGlobal.systemTextColor,
+    systemTextColor: systemDefaults.textColor ?? rawSystemTextColor,
     messageDefaults: normalizeMessageStyleProps(g.messageDefaults),
+    systemDefaults,
   };
 
   const cards: StyleCard[] = Array.isArray(raw.cards)
@@ -494,6 +506,7 @@ export function buildMessageStyleObjects(
 ): {
   panelStyle: Record<string, string | number | undefined>;
   avatarStyle: Record<string, string | number | undefined>;
+  avatarHidden: boolean;
   speakerColor?: string;
   textStyle: Record<string, string | number | undefined>;
   diceStyle: Record<string, string | number | undefined>;
@@ -578,6 +591,7 @@ export function buildMessageStyleObjects(
   return {
     panelStyle,
     avatarStyle,
+    avatarHidden: Boolean(props.avatarHidden),
     speakerColor: props.speakerColor,
     textStyle,
     diceStyle,
@@ -616,7 +630,26 @@ export function mergeMessageStyleProps(
 }
 
 /**
+ * 전역 설정으로부터 시스템 메시지의 기본 스타일을 조합합니다.
+ * 일반 메시지의 글꼴·크기는 상속하되, 패널·아바타·일반 대사 색상은 분리하고
+ * 시스템 메시지 전용 스타일(`systemDefaults`)을 최우선으로 적용합니다.
+ */
+export function resolveSystemBaseStyle(global: GlobalStyleConfig): MessageStyleProps {
+  const msg = global.messageDefaults ?? {};
+  const sys = global.systemDefaults ?? {};
+  return mergeMessageStyleProps(
+    {
+      fontFamily: msg.fontFamily,
+      fontSize: msg.fontSize,
+      textColor: global.systemTextColor,
+    },
+    sys,
+  );
+}
+
+/**
  * 프로젝트의 전역 스타일과 스타일 카드 목록을 기반으로 각 메시지의 최종 스타일을 계산하는 리졸버를 생성합니다.
+ * - 일반 메시지는 `global.messageDefaults`, 시스템 메시지는 `global.systemDefaults`를 기본층으로 사용합니다.
  * - 카드 내부 필터들은 합연산(OR, 합집합)으로 동작합니다.
  * - 여러 스타일 카드가 동시에 일치하면 같은 속성끼리만 충돌하며, 목록 아래에 있는 스타일 카드가 우선합니다.
  * - 지정하지 않은 속성은 이전(상위) 스타일 결과를 그대로 유지합니다.
@@ -630,7 +663,8 @@ export function createStyleResolver(
   if (!styles) {
     return () => ({});
   }
-  const baseDefaults = styles.global.messageDefaults ?? {};
+  const normalDefaults = styles.global.messageDefaults ?? {};
+  const systemDefaults = resolveSystemBaseStyle(styles.global);
   const charMap = new Map(characters.map((c) => [c.id, c]));
 
   const compiledCards = styles.cards.map((card) => {
@@ -663,7 +697,8 @@ export function createStyleResolver(
   });
 
   return (block: Block): MessageStyleProps => {
-    let resolved: MessageStyleProps = { ...baseDefaults };
+    let resolved: MessageStyleProps =
+      block.sourceType === 'system' ? { ...systemDefaults } : { ...normalDefaults };
     for (const item of compiledCards) {
       if (item.matches(block)) {
         resolved = mergeMessageStyleProps(resolved, item.card.props);

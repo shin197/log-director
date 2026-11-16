@@ -185,11 +185,12 @@ export function MessageBlock({
   const dropClass = pasteIndicator ? `drop-${pasteIndicator}` : over;
   const resolvedVisualStyle =
     !isEditing && styleProps ? buildMessageStyleObjects(styleProps, dividerColor) : null;
+  const hideAvatar = Boolean(resolvedVisualStyle?.avatarHidden);
 
   return (
     <article
       data-message-id={b.id}
-      className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${searchMatch ? 'search-match' : ''} ${dropClass}`}
+      className={`log-message ${isSystem ? 'system' : ''} ${hideAvatar ? 'no-avatar' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${searchMatch ? 'search-match' : ''} ${dropClass}`}
       style={
         !selected && !bulkTarget && !cut && resolvedVisualStyle
           ? resolvedVisualStyle.panelStyle
@@ -284,7 +285,7 @@ export function MessageBlock({
           </button>
         </div>
       )}
-      {!isSystem && (
+      {!isSystem && !hideAvatar && (
         <div className="avatar">
           {isEditing && faceCharacter ? (
             <FacePicker
@@ -627,7 +628,7 @@ export function MessageBlock({
                     color:
                       resolvedVisualStyle?.speakerColor ||
                       b.color ||
-                      'var(--text-primary)',
+                      (resolvedVisualStyle ? '#888888' : 'var(--text-primary)'),
                   }}
                 >
                   {b.speaker}

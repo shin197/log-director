@@ -8,7 +8,7 @@ import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
 import { StylePanel } from './StylePanel';
-import { createStyleResolver } from './styles';
+import { createStyleResolver, defaultGlobalStyle } from './styles';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { createImportedLogItem, type ImportedLogItem } from './importManager';
@@ -185,10 +185,19 @@ function App() {
     }
   }, [query, p.characters, p.scenes, p.blocks]);
 
+  const applyStylesInEditor = Boolean(p.display?.applyStylesInEditor);
+  const editorGlobalStyle = useMemo(
+    () => (applyStylesInEditor ? (p.styles?.global ?? defaultGlobalStyle()) : null),
+    [applyStylesInEditor, p.styles?.global],
+  );
   const editorStyleResolver = useMemo(() => {
-    if (!p.display?.applyStylesInEditor) return null;
-    return createStyleResolver(p.styles, p.characters ?? [], p.scenes ?? [], p.blocks);
-  }, [p.display?.applyStylesInEditor, p.styles, p.characters, p.scenes, p.blocks]);
+    if (!applyStylesInEditor) return null;
+    const effectiveStyles = p.styles ?? {
+      global: defaultGlobalStyle(),
+      cards: [],
+    };
+    return createStyleResolver(effectiveStyles, p.characters ?? [], p.scenes ?? [], p.blocks);
+  }, [applyStylesInEditor, p.styles, p.characters, p.scenes, p.blocks]);
 
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
@@ -1209,8 +1218,45 @@ function App() {
             />
 
             <div className="log-main-content">
-              <div className="log-scroll">
+              <div
+                className={applyStylesInEditor ? 'log-scroll is-styled' : 'log-scroll'}
+                style={
+                  editorGlobalStyle
+                    ? ({
+                        '--styled-page-bg': editorGlobalStyle.pageBgColor,
+                        '--styled-container-width': `${editorGlobalStyle.containerWidth}px`,
+                        '--styled-meta-color': editorGlobalStyle.metaColor,
+                        '--styled-divider-color': editorGlobalStyle.dividerColor,
+                        '--styled-system-color':
+                          editorGlobalStyle.systemDefaults?.textColor ||
+                          editorGlobalStyle.systemTextColor,
+                        '--styled-system-indent': editorGlobalStyle.messageDefaults
+                          ?.avatarHidden
+                          ? '0px'
+                          : '52px',
+                        '--styled-font-family':
+                          editorGlobalStyle.messageDefaults?.fontFamily ||
+                          'system-ui, sans-serif',
+                        '--styled-font-size': `${editorGlobalStyle.messageDefaults?.fontSize ?? 16}px`,
+                        '--styled-text-color':
+                          editorGlobalStyle.messageDefaults?.textColor || '#eeeeee',
+                      } as React.CSSProperties)
+                    : undefined
+                }
+              >
                 <div className="log-list">
+                  {applyStylesInEditor && editorGlobalStyle && current === 0 && p.title && (
+                    <h1
+                      className="styled-log-title"
+                      style={{
+                        color: editorGlobalStyle.titleColor,
+                        fontSize: `${editorGlobalStyle.titleSize}px`,
+                        textAlign: editorGlobalStyle.titleAlign,
+                      }}
+                    >
+                      {p.title}
+                    </h1>
+                  )}
                   {!visible.length && (
                     <div className="empty">
                       <h2>
