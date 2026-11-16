@@ -2,6 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse, replaceBlocks } from './core.ts';
 import {
+  addFilterToStyleCard,
+  collectStyleCardUsages,
+  createStyleCard,
+  createStyleResolver,
+  defaultProjectStyles,
+  duplicateStyleCard,
+  moveStyleCard,
+  removeStyleCardFromProject,
+  unlinkStyleUsageFromProject,
+} from './styles.ts';
+import {
   compileQuery,
   formatChipDisplay,
   formatChipToken,
@@ -1631,4 +1642,147 @@ test('내부 이미지 풀: oversized_json 중복 제거 직렬화, 미사용 �
     blocks: [],
   });
   assert.equal(pruned.images, undefined);
+});
+
+test('스타일 시스템: 합연산 필터, 속성별 계층 충돌 해결(하단 우선), 사용처 해제·복제·삭제 및 HTML 출력', () => {
+  const baseProj = blank();
+  const cZeta = {
+    id: 'c-zeta',
+    name: '제타',
+    color: '#6CD4BC',
+    iconUrl: 'https://example.com/zeta.png',
+    faces: [],
+    styleIds: ['s-char'],
+  };
+  const blocks = [
+    {
+      id: 'b1',
+      characterId: 'c-zeta',
+      speaker: '제타',
+      text: '성공적인 공격!',
+      diceResult: '1D100<=50 ＞ 12 ＞ 성공',
+      channel: '메인',
+      sourceType: 'normal',
+    },
+    {
+      id: 'b2',
+      characterId: null,
+      speaker: '알파',
+      text: '귓속말 대화',
+      diceResult: '',
+      channel: '잡담',
+      sourceType: 'normal',
+      styleIds: ['s-char'],
+    },
+    {
+      id: 'b3',
+      characterId: null,
+      speaker: '베타',
+      text: '일반 대사',
+      diceResult: '1D100<=50 ＞ 99 ＞ 실패',
+      channel: '메인',
+      sourceType: 'normal',
+    },
+  ];
+
+  // 카드 1 (상단): from:제타 또는 in:잡담 (합연산 OR) -> 글씨체 serif, 패널색 #112233, 인장 원형
+  let card1 = createStyleCard({
+    id: 's-char',
+    name: '제타 & 잡담 스타일',
+    filters: ['from:제타'],
+    props: {
+      fontFamily: 'serif',
+      panelBgColor: '#112233',
+      avatarShape: 'circle',
+    },
+  });
+  card1 = addFilterToStyleCard(card1, 'in:잡담');
+  assert.deepEqual(card1.filters, ['from:제타', 'in:잡담']);
+
+  // 카드 2 (하단 - 우선도 높음): dice:성공 -> 패널색 #334455(충돌 시 하단 우선!), 주사위 글자색 #00FF88
+  // 글씨체와 인장 모양은 지정하지 않았으므로 카드 1의 결과가 유지되어야 함
+  const card2 = createStyleCard({
+    id: 's-dice',
+    name: '성공 판정 강조',
+    filters: ['dice:성공'],
+    props: {
+      panelBgColor: '#334455',
+      diceTextColor: '#00FF88',
+      diceFontWeight: 'bold',
+    },
+  });
+
+  const styles = defaultProjectStyles();
+  styles.global.pageBgColor = '#101520';
+  styles.global.messageDefaults = { fontSize: 17 };
+  styles.cards = [card1, card2];
+
+  const proj = {
+    ...baseProj,
+    characters: [...(baseProj.characters ?? []), cZeta],
+    blocks,
+    styles,
+  };
+
+  const resolve = createStyleResolver(proj.styles, proj.characters, [], proj.blocks);
+
+  // b1(제타 + 성공 판정): 카드 1과 카드 2가 동시에 적용됨
+  // - fontSize: 전역 기본값 17 유지
+  // - fontFamily, avatarShape: 카드 1 유지 ('serif', 'circle')
+  // - panelBgColor: 같은 속성 충돌 -> 아래쪽인 카드 2('#334455')가 우선 적용
+  // - diceTextColor: 카드 2('#00FF88') 적용
+  const r1 = resolve(blocks[0]);
+  assert.equal(r1.fontSize, 17);
+  assert.equal(r1.fontFamily, 'serif');
+  assert.equal(r1.avatarShape, 'circle');
+  assert.equal(r1.panelBgColor, '#334455');
+  assert.equal(r1.diceTextColor, '#00FF88');
+
+  // b2(잡담 채널): 카드 1의 두 번째 필터('in:잡담') 합연산으로 카드 1 적용
+  const r2 = resolve(blocks[1]);
+  assert.equal(r2.panelBgColor, '#112233');
+  assert.equal(r2.diceTextColor, undefined);
+
+  // 드래그 순서 변경: 카드 1을 카드 2 아래로 이동하면 카드 1의 panelBgColor('#112233')가 우선함
+  const movedCards = moveStyleCard(styles.cards, 0, 1, true);
+  assert.deepEqual(
+    movedCards.map((c) => c.id),
+    ['s-dice', 's-char'],
+  );
+  const resolveAfterMove = createStyleResolver(
+    { ...styles, cards: movedCards },
+    proj.characters,
+    [],
+    proj.blocks,
+  );
+  assert.equal(resolveAfterMove(blocks[0]).panelBgColor, '#112233');
+
+  // 스타일 카드 복제 검증
+  const duplicated = duplicateStyleCard(styles, 's-char');
+  assert.equal(duplicated.cards.length, 3);
+  assert.notEqual(duplicated.cards[1].id, 's-char');
+  assert.deepEqual(duplicated.cards[1].filters, ['from:제타', 'in:잡담']);
+
+  // 사용처(필터·캐릭터·메시지) 조회 및 개별 해제(X 버튼)
+  const usages = collectStyleCardUsages(card1, proj);
+  assert.equal(usages.length, 4); // 필터 2개 + 캐릭터 1개 + 메시지 1개
+  const afterUnlinkFilter = unlinkStyleUsageFromProject(proj, 's-char', usages[0]);
+  assert.deepEqual(afterUnlinkFilter.styles?.cards[0].filters, ['in:잡담']);
+
+  // 스타일 삭제 시 연결된 필터·캐릭터·메시지 참조가 모두 해제됨
+  const afterDelete = removeStyleCardFromProject(proj, 's-char');
+  assert.equal(afterDelete.styles?.cards.length, 1);
+  assert.equal(
+    afterDelete.characters?.find((c) => c.id === 'c-zeta')?.styleIds,
+    undefined,
+  );
+  assert.equal(afterDelete.blocks.find((b) => b.id === 'b2')?.styleIds, undefined);
+
+  // 프로젝트 JSON 왕복 및 HTML 내보내기 스타일 반영 확인
+  const roundtripProj = parse(JSON.stringify(proj), 'styled.project.json');
+  assert.equal(roundtripProj.styles?.cards.length, 2);
+  const exportedHtml = exportLog(roundtripProj, 'html');
+  assert.ok(exportedHtml.includes('background:#101520'));
+  assert.ok(exportedHtml.includes('background-color:#334455'));
+  assert.ok(exportedHtml.includes('color:#00FF88'));
 });

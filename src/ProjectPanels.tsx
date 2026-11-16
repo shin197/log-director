@@ -34,6 +34,14 @@ export function SettingsPanel({
           />
           <span>타임스탬프 표시</span>
         </label>
+        <label className="check-field">
+          <input
+            type="checkbox"
+            checked={Boolean(settings.applyStylesInEditor)}
+            onChange={(e) => update({ applyStylesInEditor: e.target.checked })}
+          />
+          <span>로그 편집 화면에 스타일 적용</span>
+        </label>
       </div>
 
       <div className="settings-row">

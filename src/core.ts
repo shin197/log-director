@@ -13,12 +13,14 @@ import {
   normalizeProjectImagePool,
 } from './imagePool.ts';
 import type { DisplaySettings } from './presentation';
+import { normalizeProjectStyles, type ProjectStyles } from './styles.ts';
 export type Character = {
   id: string;
   name: string;
   iconUrl: string;
   color: string;
   faces: { name: string; iconUrl: string }[];
+  styleIds?: string[];
 };
 export type Block = {
   characterId?: string | null;
@@ -33,6 +35,7 @@ export type Block = {
   timestamp?: string;
   channel?: string;
   sourceType?: string;
+  styleIds?: string[];
 };
 export type Scene = {
   id: string;
@@ -52,6 +55,7 @@ export type Project = {
   blocks: Block[];
   characters?: Character[];
   scenes?: Scene[];
+  styles?: ProjectStyles;
   display?: DisplaySettings;
   expressions?: { speaker: string; iconUrl: string; name: string }[];
 };
@@ -93,6 +97,9 @@ export function validateLogStudioProject(d: any): Project {
   const migrated = migrateCharacters(d);
   if (Array.isArray(d.scenes)) {
     migrated.scenes = normalizeScenes(d.scenes, migrated.blocks);
+  }
+  if (d.styles && typeof d.styles === 'object') {
+    migrated.styles = normalizeProjectStyles(d.styles);
   }
   return normalizeProjectImagePool(migrated);
 }

@@ -13,6 +13,7 @@ import { isSafeImageUrl } from './importFormats';
 import { resolveImageUrl } from './imagePool';
 import { useImagePool } from './ImagePoolContext';
 import { BookmarkRibbon } from './BookmarkRibbon';
+import { buildMessageStyleObjects, type MessageStyleProps } from './styles';
 
 export type BulkEditContext = {
   count: number;
@@ -49,6 +50,8 @@ export function MessageBlock({
   bulkDisabled = false,
   bulkContext,
   searchMatch = false,
+  styleProps,
+  dividerColor,
   toggle,
   save,
   remove,
@@ -60,6 +63,8 @@ export function MessageBlock({
 }: {
   block: Block;
   searchMatch?: boolean;
+  styleProps?: MessageStyleProps;
+  dividerColor?: string;
   onJump?: () => void;
   onEyedrop?: () => void;
   scene?: Scene;
@@ -177,11 +182,18 @@ export function MessageBlock({
   };
 
   const dropClass = pasteIndicator ? `drop-${pasteIndicator}` : over;
+  const resolvedVisualStyle =
+    !isEditing && styleProps ? buildMessageStyleObjects(styleProps, dividerColor) : null;
 
   return (
     <article
       data-message-id={b.id}
       className={`log-message ${isSystem ? 'system' : ''} ${selected ? 'selected' : ''} ${scene ? 'has-scene' : ''} ${cut ? 'is-cut' : ''} ${isEditing ? 'editing' : ''} ${isBulk ? 'bulk-rep' : ''} ${bulkTarget ? 'bulk-target' : ''} ${onJump ? 'has-jump' : ''} ${searchMatch ? 'search-match' : ''} ${dropClass}`}
+      style={
+        !selected && !bulkTarget && !cut && resolvedVisualStyle
+          ? resolvedVisualStyle.panelStyle
+          : undefined
+      }
       draggable={!isEditing && !bulkDisabled && !cutMode}
       onDragStart={(e) => {
         if (bulkDisabled || cutMode) return;
@@ -294,11 +306,15 @@ export function MessageBlock({
               alt=""
               loading="lazy"
               referrerPolicy="no-referrer"
+              style={resolvedVisualStyle?.avatarStyle}
             />
           ) : (
             <span
               className="avatar-placeholder"
-              style={{ borderColor: activeBlock.color || undefined }}
+              style={{
+                borderColor: activeBlock.color || undefined,
+                ...resolvedVisualStyle?.avatarStyle,
+              }}
             >
               {(activeBlock.speaker || '?').slice(0, 1)}
             </span>
@@ -617,7 +633,14 @@ export function MessageBlock({
           <div className="message-read">
             <div className="message-header">
               {!isSystem && (
-                <strong style={{ color: b.color || 'var(--text-primary)' }}>
+                <strong
+                  style={{
+                    color:
+                      resolvedVisualStyle?.speakerColor ||
+                      b.color ||
+                      'var(--text-primary)',
+                  }}
+                >
                   {b.speaker}
                 </strong>
               )}
@@ -627,7 +650,7 @@ export function MessageBlock({
               )}
               {timeText && <time>{timeText}</time>}
             </div>
-            <div className="message-text">
+            <div className="message-text" style={resolvedVisualStyle?.textStyle}>
               {b.text ||
                 (!b.diceResult ? (
                   <span className="empty-placeholder">빈 메시지 · 더블클릭하여 작성</span>
@@ -635,7 +658,11 @@ export function MessageBlock({
                   ''
                 ))}
             </div>
-            {b.diceResult && <div className="roll-result">{b.diceResult}</div>}
+            {b.diceResult && (
+              <div className="roll-result" style={resolvedVisualStyle?.diceStyle}>
+                {b.diceResult}
+              </div>
+            )}
           </div>
         )}
       </div>

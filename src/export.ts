@@ -2,6 +2,12 @@ import { defaultDisplay, displayTime } from './presentation.ts';
 import { isSafeImageUrl } from './importFormats.ts';
 import { hashDataUri, resolveImageUrl } from './imagePool.ts';
 import { compileQuery, sanitizeLiveQuery } from './query.ts';
+import {
+  buildMessageStyleObjects,
+  createStyleResolver,
+  defaultGlobalStyle,
+  styleObjectToCssString,
+} from './styles.ts';
 import type { Project, Block } from './core';
 
 export type ExportFormat = 'html' | 'txt' | 'json' | 'md';
@@ -232,11 +238,34 @@ export function exportLog(
     return `avatar-image-${idx}`;
   };
 
+  const globalStyle = p.styles?.global ?? defaultGlobalStyle();
+  const resolveStyle = createStyleResolver(
+    p.styles,
+    p.characters ?? [],
+    p.scenes ?? [],
+    p.blocks,
+  );
+
   const toChannelCode = (ch: string) =>
     ch === '메인' ? 'main' : ch === '잡담' ? 'other' : ch;
 
   const messages = targetBlocks
     .map((b) => {
+      const msgProps = resolveStyle(b);
+      const styled = buildMessageStyleObjects(msgProps, globalStyle.dividerColor);
+      if (
+        styled.panelStyle.backgroundColor ||
+        msgProps.panelBorderStyle === 'box' ||
+        msgProps.panelBorderStyle === 'left-accent'
+      ) {
+        styled.panelStyle.padding = '12px 14px';
+        styled.panelStyle.margin = '4px 0';
+      }
+      const panelAttr = styleObjectToCssString(styled.panelStyle);
+      const textAttr = styleObjectToCssString(styled.textStyle);
+      const diceAttr = styleObjectToCssString(styled.diceStyle);
+      const avatarAttr = styleObjectToCssString(styled.avatarStyle);
+
       if (b.sourceType === 'system') {
         const sysCh =
           settings.showChannel && showSystemChannel && b.channel ? b.channel : '';
@@ -244,20 +273,23 @@ export function exportLog(
         const chSpan = sysCh
           ? `<span class="channel-name">[${escape(sysCh)}]</span>\n`
           : '';
-        const text = `<div class="message-text">${chSpan}${escape(b.text)}</div>${b.diceResult ? `<span class="roll-result">${escape(b.diceResult)}</span>` : ''}`;
-        return `<article class="message system"${dataCh}>${text}</article>`;
+        const text = `<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${chSpan}${escape(b.text)}</div>${b.diceResult ? `<span class="roll-result"${diceAttr ? ` style="${escape(diceAttr)}"` : ''}>${escape(b.diceResult)}</span>` : ''}`;
+        return `<article class="message system"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${text}</article>`;
       }
       const normCh = settings.showChannel && b.channel ? b.channel : '';
       const dataCh = normCh ? ` data-channel="${escape(toChannelCode(normCh))}"` : '';
       const time = displayTime(b.timestamp, settings);
       const color = /^#[0-9a-f]{3,8}$/i.test(b.color ?? '') ? b.color! : '#eee';
+      const speakerStyle = styled.speakerColor
+        ? `--speaker-color:${color};color:${styled.speakerColor}`
+        : `--speaker-color:${color}`;
       const avatarClass = getAvatarClass(resolveIcon(b.iconUrl));
       const avatarEl = avatarClass
-        ? `<span class="avatar ${avatarClass}" aria-hidden="true"></span>`
+        ? `<span class="avatar ${avatarClass}"${avatarAttr ? ` style="${escape(avatarAttr)}"` : ''} aria-hidden="true"></span>`
         : '<span class="avatar-spacer" aria-hidden="true"></span>';
-      const headerEl = `<div class="message-header"><span class="speaker" style="--speaker-color:${color}">${escape(b.speaker ?? '')}</span>${time ? ` <time class="timestamp">${escape(time)}</time>` : ''}${normCh ? ` <span class="channel-name">[${escape(normCh)}]</span>` : ''}</div>`;
-      const contentEl = `<div class="message-content">${headerEl}<div class="message-text">${escape(b.text)}</div>${b.diceResult ? `<span class="roll-result">${escape(b.diceResult)}</span>` : ''}</div>`;
-      return `<article class="message"${dataCh}>${avatarEl}${contentEl}</article>`;
+      const headerEl = `<div class="message-header"><span class="speaker" style="${speakerStyle}">${escape(b.speaker ?? '')}</span>${time ? ` <time class="timestamp">${escape(time)}</time>` : ''}${normCh ? ` <span class="channel-name">[${escape(normCh)}]</span>` : ''}</div>`;
+      const contentEl = `<div class="message-content">${headerEl}<div class="message-text"${textAttr ? ` style="${escape(textAttr)}"` : ''}>${escape(b.text)}</div>${b.diceResult ? `<span class="roll-result"${diceAttr ? ` style="${escape(diceAttr)}"` : ''}>${escape(b.diceResult)}</span>` : ''}</div>`;
+      return `<article class="message"${dataCh}${panelAttr ? ` style="${escape(panelAttr)}"` : ''}>${avatarEl}${contentEl}</article>`;
     })
     .join('\n');
 
@@ -265,5 +297,10 @@ export function exportLog(
     .map(([url, idx]) => `.avatar-image-${idx}{background-image:url("${escape(url)}")}`)
     .join('');
 
-  return `<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(p.title)}</title><style>body{background:#121212;color:#eee;font-family:system-ui;margin:0}.message-list{max-width:960px;margin:auto;padding:24px}.log-title,h1{font-size:24px;margin:24px 0}.message{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;padding:16px 0;border-bottom:1px solid #262626}.message.system,.system{display:block;padding-left:52px;color:#888}.avatar,.avatar-spacer{width:40px;height:40px;display:block}.avatar{background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{font-size:14px;margin-bottom:5px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.channel-name,.message-header span{font-size:12px;color:#888}.message-text,.roll-result{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:16px}.roll-result{display:block;color:#888}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
+  const pageBg = globalStyle.pageBgColor;
+  const bodyColor = globalStyle.messageDefaults.textColor ?? '#eee';
+  const bodyFont = globalStyle.messageDefaults.fontFamily || 'system-ui';
+  const titleStyle = `.log-title,h1{font-size:${globalStyle.titleSize}px;margin:24px 0;color:${globalStyle.titleColor};text-align:${globalStyle.titleAlign}}`;
+
+  return `<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(p.title)}</title><style>body{background:${pageBg};color:${bodyColor};font-family:${bodyFont};margin:0}.message-list{max-width:${globalStyle.containerWidth}px;margin:auto;padding:24px}${titleStyle}.message{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;padding:16px 0;border-bottom:1px solid ${globalStyle.dividerColor}}.message.system,.system{display:block;padding-left:52px;color:${globalStyle.systemTextColor}}.avatar,.avatar-spacer{width:40px;height:40px;display:block}.avatar{background-repeat:no-repeat;background-size:100% 100%}${avatarCss}.message-header{font-size:14px;margin-bottom:5px}.speaker{color:var(--speaker-color);font-size:14px;font-weight:bold}.timestamp,.channel-name,.message-header span{font-size:12px;color:${globalStyle.metaColor}}.message-text,.roll-result{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:${globalStyle.messageDefaults.fontSize ?? 16}px}.roll-result{display:block;color:${globalStyle.metaColor}}</style></head><body><main class="message-list"><h1 class="log-title">${escape(p.title)}</h1>${messages}</main></body></html>`;
 }

@@ -7,6 +7,8 @@ import { Composer, type EyedropPayload } from './Composer';
 import { mergeConsecutive, PAGE_SIZE } from './logOperations';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
+import { StylePanel } from './StylePanel';
+import { createStyleResolver } from './styles';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { createImportedLogItem, type ImportedLogItem } from './importManager';
@@ -181,6 +183,11 @@ function App() {
       return null;
     }
   }, [query, p.characters, p.scenes, p.blocks]);
+
+  const editorStyleResolver = useMemo(() => {
+    if (!p.display?.applyStylesInEditor) return null;
+    return createStyleResolver(p.styles, p.characters ?? [], p.scenes ?? [], p.blocks);
+  }, [p.display?.applyStylesInEditor, p.styles, p.characters, p.scenes, p.blocks]);
 
   const visible = p.blocks.filter(predicate);
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
@@ -714,7 +721,7 @@ function App() {
         <div className="header-left">
           <span className="brand-mark">LOG DIRECTOR</span>
           <nav className="top-tabs" aria-label="작업 화면 전환">
-            {['로그', '캐릭터', '설정'].map((name) => (
+            {['로그', '캐릭터', '스타일', '설정'].map((name) => (
               <button
                 type="button"
                 key={name}
@@ -871,6 +878,7 @@ function App() {
       )}
       {helpOpen && <HelpSheet context={helpContext} onClose={() => setHelpOpen(false)} />}
       {tab === '캐릭터' && <CharacterPanel project={p} commit={commit} />}
+      {tab === '스타일' && <StylePanel project={p} commit={commit} />}
       {tab === '설정' && (
         <div className="settings-scroll">
           <div className="settings-container">
@@ -1281,6 +1289,12 @@ function App() {
                               : undefined
                           }
                           searchMatch={Boolean(searchMatchPredicate?.(b))}
+                          styleProps={
+                            editorStyleResolver
+                              ? editorStyleResolver(displayBlock)
+                              : undefined
+                          }
+                          dividerColor={p.styles?.global.dividerColor}
                           onJump={
                             !bulkEdit && searchActive && query.trim()
                               ? () => jumpToMessage(b.id)

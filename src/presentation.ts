@@ -2,11 +2,13 @@ export type DisplaySettings = {
   showChannel: boolean;
   showTimestamp: boolean;
   timestampFormat: string;
+  applyStylesInEditor?: boolean;
 };
 export const defaultDisplay: DisplaySettings = {
   showChannel: true,
   showTimestamp: true,
   timestampFormat: 'original',
+  applyStylesInEditor: false,
 };
 export function displayTime(raw: string | undefined, settings: DisplaySettings): string {
   if (!settings.showTimestamp || !raw) return '';
