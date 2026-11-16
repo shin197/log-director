@@ -53,7 +53,7 @@ function OptionalColorField({
 }) {
   const active = Boolean(value);
   return (
-    <div className="style-prop-field">
+    <div className="style-prop-field is-color">
       <div className="style-prop-label-row">
         <span className="field-label">{label}</span>
         {active ? (
@@ -112,7 +112,13 @@ function BorderColorField({
           ? 'speaker'
           : 'custom';
   return (
-    <div className="style-prop-field">
+    <div
+      className={
+        mode === 'custom'
+          ? 'style-prop-field is-color is-custom-border'
+          : 'style-prop-field is-color'
+      }
+    >
       <span className="field-label">{label}</span>
       <div className="style-border-color-control">
         <select
@@ -203,9 +209,9 @@ function SampleMessagePreview({
     isSampleSystem ? undefined : rawSpeakerColor,
   );
   const spkColor = styled.speakerColor || rawSpeakerColor;
-  const speakerName = sampleBlock?.speaker || '제타';
+  const speakerName = sampleBlock?.speaker || '로그 디렉터';
   const messageText =
-    sampleBlock?.text || '"문을 조심스럽게 열고 안쪽의 기척을 살핍니다."';
+    sampleBlock?.text || '"다람쥐 헌 쳇바퀴에 타고파"';
   const hasDiceEdit = Boolean(
     effectiveProps.diceBgColor ||
     effectiveProps.diceTextColor ||
@@ -216,7 +222,7 @@ function SampleMessagePreview({
   );
   const diceText =
     sampleBlock?.diceResult ||
-    (!sampleBlock || hasDiceEdit ? '1D100<=65 듣기 ＞ 23 ＞ 성공' : '');
+    (!sampleBlock || hasDiceEdit ? '1D100<=77 듣기 ＞ 33 ＞ 성공' : '');
   const channelName = sampleBlock?.channel || '메인';
   const metaParts = [sampleBlock?.timestamp || '오후 09:15', `[${channelName}]`].filter(
     Boolean,
@@ -359,7 +365,7 @@ function GlobalStylePreview({
         >
           {!normalStyled.avatarHidden && (
             <SampleAvatar
-              speaker="제타"
+              speaker="로그 디렉터"
               avatarStyle={normalStyled.avatarStyle}
               borderColor={normalStyled.speakerColor || '#6CD4BC'}
             />
@@ -370,7 +376,7 @@ function GlobalStylePreview({
                 className="style-sample-speaker"
                 style={{ color: normalStyled.speakerColor || '#6CD4BC' }}
               >
-                제타
+                로그 디렉터
               </span>
               <span className="style-sample-meta" style={{ color: globalStyle.metaColor }}>
                 오후 09:15 [메인]
@@ -385,7 +391,7 @@ function GlobalStylePreview({
                 ...normalStyled.textStyle,
               }}
             >
-              &quot;문을 조심스럽게 열고 안쪽의 기척을 살핍니다.&quot;
+              &quot;다람쥐 헌 쳇바퀴에 타고파&quot;
             </div>
             <div
               className="style-sample-dice"
@@ -396,7 +402,7 @@ function GlobalStylePreview({
                 ...normalStyled.diceStyle,
               }}
             >
-              1D100&lt;=65 듣기 ＞ 23 ＞ 성공
+              1D100&lt;=77 듣기 ＞ 33 ＞ 성공
             </div>
           </div>
         </div>
@@ -430,7 +436,7 @@ function GlobalStylePreview({
                 ...sysStyled.textStyle,
               }}
             >
-              전투 라운드가 시작되었습니다.
+              겉표지보다 큰 몇 향수류
             </div>
           </div>
         </div>
@@ -469,8 +475,8 @@ function MessageStylePropsEditor({
       <div className="style-props-group">
         <h4>{isSystem ? '시스템 글씨 서식' : '글씨 · 화자'}</h4>
         <div className="style-props-grid">
-          <label className="style-prop-field">
-            <span className="field-label">글씨체 (Font)</span>
+          <label className="style-prop-field is-font">
+            <span className="field-label">글씨체</span>
             <select
               value={props.fontFamily ?? ''}
               onChange={(e) => update({ fontFamily: e.target.value || undefined })}
@@ -483,13 +489,13 @@ function MessageStylePropsEditor({
             </select>
           </label>
 
-          <label className="style-prop-field">
-            <span className="field-label">본문 글자 크기 (px)</span>
+          <label className="style-prop-field is-number">
+            <span className="field-label">크기 (px)</span>
             <input
               type="number"
               min={10}
               max={36}
-              placeholder={isGlobal ? '기본값 (16)' : inheritLabel}
+              placeholder={isGlobal ? '기본 16' : '유지'}
               value={props.fontSize ?? ''}
               onChange={(e) =>
                 update({
@@ -634,13 +640,13 @@ function MessageStylePropsEditor({
             onChange={(panelBorderColor) => update({ panelBorderColor })}
           />
 
-          <label className="style-prop-field">
-            <span className="field-label">패널 모서리 둥글기 (px)</span>
+          <label className="style-prop-field is-number">
+            <span className="field-label">모서리 (px)</span>
             <input
               type="number"
               min={0}
               max={28}
-              placeholder={isGlobal ? '기본값 (0)' : inheritLabel}
+              placeholder={isGlobal ? '기본 0' : '유지'}
               value={props.panelRadius ?? ''}
               onChange={(e) =>
                 update({
@@ -650,13 +656,13 @@ function MessageStylePropsEditor({
             />
           </label>
 
-          <label className="style-prop-field">
-            <span className="field-label">상하 여백 (Padding Y, px)</span>
+          <label className="style-prop-field is-number">
+            <span className="field-label">상하 여백 (px)</span>
             <input
               type="number"
               min={0}
               max={48}
-              placeholder={isGlobal ? '기본값 (16)' : inheritLabel}
+              placeholder={isGlobal ? '기본 16' : '유지'}
               value={props.panelPaddingY ?? ''}
               onChange={(e) =>
                 update({
@@ -666,13 +672,13 @@ function MessageStylePropsEditor({
             />
           </label>
 
-          <label className="style-prop-field">
-            <span className="field-label">좌우 여백 (Padding X, px)</span>
+          <label className="style-prop-field is-number">
+            <span className="field-label">좌우 여백 (px)</span>
             <input
               type="number"
               min={0}
               max={64}
-              placeholder={isGlobal ? '기본값 (0)' : inheritLabel}
+              placeholder={isGlobal ? '기본 0' : '유지'}
               value={props.panelPaddingX ?? ''}
               onChange={(e) =>
                 update({
@@ -731,14 +737,14 @@ function MessageStylePropsEditor({
           <div
             className={`style-props-grid ${props.avatarHidden ? 'is-disabled-group' : ''}`}
           >
-            <label className="style-prop-field">
-              <span className="field-label">아바타 크기 (px)</span>
+            <label className="style-prop-field is-number">
+              <span className="field-label">크기 (px)</span>
               <input
                 type="number"
                 disabled={Boolean(props.avatarHidden)}
                 min={16}
                 max={128}
-                placeholder={isGlobal ? '기본값 (40)' : inheritLabel}
+                placeholder={isGlobal ? '기본 40' : '유지'}
                 value={props.avatarSize ?? ''}
                 onChange={(e) =>
                   update({
@@ -750,7 +756,7 @@ function MessageStylePropsEditor({
             </label>
 
             <label className="style-prop-field">
-              <span className="field-label">인장 틀 모양</span>
+              <span className="field-label">틀 모양</span>
               <select
                 disabled={Boolean(props.avatarHidden)}
                 value={props.avatarShape ?? ''}
@@ -777,14 +783,14 @@ function MessageStylePropsEditor({
               onChange={(avatarBgColor) => update({ avatarBgColor })}
             />
 
-            <label className="style-prop-field">
-              <span className="field-label">인장 테두리 두께 (px)</span>
+            <label className="style-prop-field is-number">
+              <span className="field-label">테두리 (px)</span>
               <input
                 type="number"
                 disabled={Boolean(props.avatarHidden)}
                 min={0}
                 max={8}
-                placeholder={isGlobal ? '기본값 (0)' : inheritLabel}
+                placeholder={isGlobal ? '기본 0' : '유지'}
                 value={props.avatarBorderWidth ?? ''}
                 onChange={(e) =>
                   update({
@@ -1257,141 +1263,141 @@ export function StylePanel({
                 <GlobalStylePreview globalStyle={globalDraft} projectTitle={p.title} />
 
                 {/* 1) 문서 페이지 영역 스타일 */}
-              <div className="style-props-group">
-                <h4>문서 페이지 영역 스타일</h4>
-                <div className="style-props-grid">
-                  <div className="style-prop-field">
-                    <span className="field-label">문서 배경색</span>
-                    <ColorInput
-                      title="문서 배경색"
-                      value={globalDraft.pageBgColor}
-                      onChange={(pageBgColor) =>
-                        changeGlobalDraft({ pageBgColor: pageBgColor || '#121212' })
-                      }
-                    />
-                  </div>
+                <div className="style-props-group">
+                  <h4>문서 페이지 영역 스타일</h4>
+                  <div className="style-props-grid">
+                    <div className="style-prop-field is-color">
+                      <span className="field-label">문서 배경색</span>
+                      <ColorInput
+                        title="문서 배경색"
+                        value={globalDraft.pageBgColor}
+                        onChange={(pageBgColor) =>
+                          changeGlobalDraft({ pageBgColor: pageBgColor || '#121212' })
+                        }
+                      />
+                    </div>
 
-                  <label className="style-prop-field">
-                    <span className="field-label">본문 최대 폭 (px)</span>
-                    <input
-                      type="number"
-                      min={480}
-                      max={1920}
-                      step={20}
-                      value={globalDraft.containerWidth}
-                      onChange={(e) =>
-                        changeGlobalDraft({
-                          containerWidth: Number(e.target.value) || 960,
-                        })
-                      }
-                    />
-                  </label>
+                    <label className="style-prop-field is-number">
+                      <span className="field-label">최대 폭 (px)</span>
+                      <input
+                        type="number"
+                        min={480}
+                        max={1920}
+                        step={20}
+                        value={globalDraft.containerWidth}
+                        onChange={(e) =>
+                          changeGlobalDraft({
+                            containerWidth: Number(e.target.value) || 960,
+                          })
+                        }
+                      />
+                    </label>
 
-                  <label className="style-prop-field">
-                    <span className="field-label">메시지 간 간격 (gap, px)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={48}
-                      step={1}
-                      value={globalDraft.messageGap ?? 0}
-                      onChange={(e) =>
-                        changeGlobalDraft({
-                          messageGap:
-                            e.target.value !== '' ? Number(e.target.value) : 0,
-                        })
-                      }
-                    />
-                  </label>
+                    <label className="style-prop-field is-number">
+                      <span className="field-label">메시지 간격 (px)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={48}
+                        step={1}
+                        value={globalDraft.messageGap ?? 0}
+                        onChange={(e) =>
+                          changeGlobalDraft({
+                            messageGap:
+                              e.target.value !== '' ? Number(e.target.value) : 0,
+                          })
+                        }
+                      />
+                    </label>
 
-                  <div className="style-prop-field">
-                    <span className="field-label">로그 제목 색상</span>
-                    <ColorInput
-                      title="로그 제목 색상"
-                      value={globalDraft.titleColor}
-                      onChange={(titleColor) =>
-                        changeGlobalDraft({ titleColor: titleColor || '#EEEEEE' })
-                      }
-                    />
-                  </div>
+                    <div className="style-prop-field is-color">
+                      <span className="field-label">제목 색상</span>
+                      <ColorInput
+                        title="로그 제목 색상"
+                        value={globalDraft.titleColor}
+                        onChange={(titleColor) =>
+                          changeGlobalDraft({ titleColor: titleColor || '#EEEEEE' })
+                        }
+                      />
+                    </div>
 
-                  <label className="style-prop-field">
-                    <span className="field-label">로그 제목 크기 (px)</span>
-                    <input
-                      type="number"
-                      min={14}
-                      max={48}
-                      value={globalDraft.titleSize}
-                      onChange={(e) =>
-                        changeGlobalDraft({ titleSize: Number(e.target.value) || 24 })
-                      }
-                    />
-                  </label>
+                    <label className="style-prop-field is-number">
+                      <span className="field-label">제목 크기 (px)</span>
+                      <input
+                        type="number"
+                        min={14}
+                        max={48}
+                        value={globalDraft.titleSize}
+                        onChange={(e) =>
+                          changeGlobalDraft({ titleSize: Number(e.target.value) || 24 })
+                        }
+                      />
+                    </label>
 
-                  <label className="style-prop-field">
-                    <span className="field-label">로그 제목 정렬</span>
-                    <select
-                      value={globalDraft.titleAlign}
-                      onChange={(e) =>
-                        changeGlobalDraft({
-                          titleAlign: e.target.value === 'center' ? 'center' : 'left',
-                        })
-                      }
-                    >
-                      <option value="left">왼쪽 정렬</option>
-                      <option value="center">가운데 정렬</option>
-                    </select>
-                  </label>
+                    <label className="style-prop-field">
+                      <span className="field-label">제목 정렬</span>
+                      <select
+                        value={globalDraft.titleAlign}
+                        onChange={(e) =>
+                          changeGlobalDraft({
+                            titleAlign: e.target.value === 'center' ? 'center' : 'left',
+                          })
+                        }
+                      >
+                        <option value="left">왼쪽 정렬</option>
+                        <option value="center">가운데 정렬</option>
+                      </select>
+                    </label>
 
-                  <div className="style-prop-field">
-                    <span className="field-label">타임스탬프 · 채널 색상</span>
-                    <ColorInput
-                      title="타임스탬프 · 채널 색상"
-                      value={globalDraft.metaColor}
-                      onChange={(metaColor) =>
-                        changeGlobalDraft({ metaColor: metaColor || '#888888' })
-                      }
-                    />
-                  </div>
+                    <div className="style-prop-field is-color">
+                      <span className="field-label">메타 색상</span>
+                      <ColorInput
+                        title="타임스탬프 · 채널 색상"
+                        value={globalDraft.metaColor}
+                        onChange={(metaColor) =>
+                          changeGlobalDraft({ metaColor: metaColor || '#888888' })
+                        }
+                      />
+                    </div>
 
-                  <div className="style-prop-field">
-                    <span className="field-label">기본 구분선 색상</span>
-                    <ColorInput
-                      title="기본 구분선 색상"
-                      value={globalDraft.dividerColor}
-                      onChange={(dividerColor) =>
-                        changeGlobalDraft({ dividerColor: dividerColor || '#262626' })
-                      }
-                    />
+                    <div className="style-prop-field is-color">
+                      <span className="field-label">구분선 색상</span>
+                      <ColorInput
+                        title="기본 구분선 색상"
+                        value={globalDraft.dividerColor}
+                        onChange={(dividerColor) =>
+                          changeGlobalDraft({ dividerColor: dividerColor || '#262626' })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 2) 전역 메시지 스타일 */}
-              <div className="style-global-subsection">
-                <h3 className="style-subsection-title">전역 메시지 스타일</h3>
-                <MessageStylePropsEditor
-                  scope="global"
-                  props={globalDraft.messageDefaults}
-                  onChange={(messageDefaults) => changeGlobalDraft({ messageDefaults })}
-                />
-              </div>
+                {/* 2) 전역 메시지 스타일 */}
+                <div className="style-global-subsection">
+                  <h3 className="style-subsection-title">전역 메시지 스타일</h3>
+                  <MessageStylePropsEditor
+                    scope="global"
+                    props={globalDraft.messageDefaults}
+                    onChange={(messageDefaults) => changeGlobalDraft({ messageDefaults })}
+                  />
+                </div>
 
-              {/* 3) 시스템 메시지 스타일 */}
-              <div className="style-global-subsection">
-                <h3 className="style-subsection-title">시스템 메시지 스타일</h3>
-                <MessageStylePropsEditor
-                  scope="global"
-                  variant="system"
-                  props={globalDraft.systemDefaults}
-                  onChange={(systemDefaults) =>
-                    changeGlobalDraft({
-                      systemDefaults,
-                      systemTextColor: systemDefaults.textColor ?? '#888888',
-                    })
-                  }
-                />
-              </div>
+                {/* 3) 시스템 메시지 스타일 */}
+                <div className="style-global-subsection">
+                  <h3 className="style-subsection-title">시스템 메시지 스타일</h3>
+                  <MessageStylePropsEditor
+                    scope="global"
+                    variant="system"
+                    props={globalDraft.systemDefaults}
+                    onChange={(systemDefaults) =>
+                      changeGlobalDraft({
+                        systemDefaults,
+                        systemTextColor: systemDefaults.textColor ?? '#888888',
+                      })
+                    }
+                  />
+                </div>
               </div>
 
               {/* 하단 Sticky 액션 바 */}
@@ -1718,80 +1724,80 @@ export function StylePanel({
                           sampleBlock={previewSampleBlock}
                         />
 
-                      {/* 2) 적용 필터 (합연산 · OR) */}
-                      <div className="style-props-group">
-                        <div className="style-group-header">
-                          <h4>적용 필터 · 사용처 (합연산 · OR)</h4>
-                          <small className="muted-note">
-                            검색창과 동일한 필터 문법을 사용하며, 여러 필터의 합집합에
-                            적용됩니다.
-                          </small>
+                        {/* 2) 적용 필터 (합연산 · OR) */}
+                        <div className="style-props-group">
+                          <div className="style-group-header">
+                            <h4>적용 필터</h4>
+                            <small className="muted-note">
+                              검색창과 동일한 필터 문법을 사용하며, 여러 필터의 합집합에
+                              적용됩니다.
+                            </small>
+                          </div>
+                          <StyleCardFilterAdder
+                            project={p}
+                            channels={channels}
+                            onAddFilter={(rawFilter) =>
+                              changeCardDraft((prev) =>
+                                addFilterToStyleCard(prev, rawFilter),
+                              )
+                            }
+                          />
+                          <div className="style-usages-box">
+                            {usages.length === 0 ? (
+                              <span className="muted-note">
+                                아직 지정된 필터(사용처)가 없습니다. 아래에서 검색 필터를
+                                추가해주세요.
+                              </span>
+                            ) : (
+                              usages.map((u, uIdx) => (
+                                <span
+                                  key={`${u.kind}-${uIdx}-${u.label}`}
+                                  className="search-chip style-usage-chip"
+                                >
+                                  <span className="search-chip-label">
+                                    {u.label}
+                                    {u.kind === 'filter' && u.label !== u.filter
+                                      ? ` (${u.filter})`
+                                      : ''}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="search-chip-remove"
+                                    aria-label={`${u.label} 사용처 삭제`}
+                                    title="이 사용처 삭제 (적용 해제)"
+                                    onClick={() => {
+                                      if (u.kind === 'filter') {
+                                        changeCardDraft((prev) => ({
+                                          ...prev,
+                                          filters: prev.filters.filter(
+                                            (f) => f !== u.filter,
+                                          ),
+                                        }));
+                                      } else {
+                                        setPendingUnlinkUsages((prev) => [...prev, u]);
+                                        setDirty(true);
+                                      }
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            )}
+                          </div>
                         </div>
-                        <StyleCardFilterAdder
-                          project={p}
-                          channels={channels}
-                          onAddFilter={(rawFilter) =>
-                            changeCardDraft((prev) =>
-                              addFilterToStyleCard(prev, rawFilter),
-                            )
+
+                        {/* 3) 글씨, 메시지, 아바타(사용 안함 포함), 주사위 판정 */}
+                        <MessageStylePropsEditor
+                          scope="card"
+                          props={cardDraft.props}
+                          onChange={(nextProps) =>
+                            changeCardDraft((prev) => ({
+                              ...prev,
+                              props: nextProps,
+                            }))
                           }
                         />
-                        <div className="style-usages-box">
-                          {usages.length === 0 ? (
-                            <span className="muted-note">
-                              아직 지정된 필터(사용처)가 없습니다. 아래에서 검색 필터를
-                              추가해주세요.
-                            </span>
-                          ) : (
-                            usages.map((u, uIdx) => (
-                              <span
-                                key={`${u.kind}-${uIdx}-${u.label}`}
-                                className="search-chip style-usage-chip"
-                              >
-                                <span className="search-chip-label">
-                                  {u.label}
-                                  {u.kind === 'filter' && u.label !== u.filter
-                                    ? ` (${u.filter})`
-                                    : ''}
-                                </span>
-                                <button
-                                  type="button"
-                                  className="search-chip-remove"
-                                  aria-label={`${u.label} 사용처 삭제`}
-                                  title="이 사용처 삭제 (적용 해제)"
-                                  onClick={() => {
-                                    if (u.kind === 'filter') {
-                                      changeCardDraft((prev) => ({
-                                        ...prev,
-                                        filters: prev.filters.filter(
-                                          (f) => f !== u.filter,
-                                        ),
-                                      }));
-                                    } else {
-                                      setPendingUnlinkUsages((prev) => [...prev, u]);
-                                      setDirty(true);
-                                    }
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 3) 글씨, 메시지, 아바타(사용 안함 포함), 주사위 판정 */}
-                      <MessageStylePropsEditor
-                        scope="card"
-                        props={cardDraft.props}
-                        onChange={(nextProps) =>
-                          changeCardDraft((prev) => ({
-                            ...prev,
-                            props: nextProps,
-                          }))
-                        }
-                      />
                       </div>
 
                       {/* 4) 하단 Sticky 액션 바 ([삭제] [취소] [저장]) */}
