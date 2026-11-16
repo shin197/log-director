@@ -3661,13 +3661,13 @@ dialog::backdrop {
   gap: 8px;
 }
 
-.style-props-sections > .style-props-group {
+.style-props-sections>.style-props-group {
   break-inside: avoid;
   page-break-inside: avoid;
   margin-bottom: 12px;
 }
 
-.style-props-sections > .style-props-group:last-child {
+.style-props-sections>.style-props-group:last-child {
   margin-bottom: 0;
 }
 
@@ -3720,7 +3720,7 @@ dialog::backdrop {
 .style-prop-field.is-color {
   flex: 1 1 122px;
   min-width: 118px;
-  max-width: 164px;
+  max-width: 140px;
 }
 
 .style-prop-field.is-color.is-custom-border {

@@ -251,13 +251,7 @@ function SampleMessagePreview({
         style={{
           borderBottom: `1px solid ${globalStyle.dividerColor}`,
           ...(isSampleSystem ? { paddingLeft: `${systemIndent}px` } : {}),
-          ...styled.panelStyle,
-          ...(!styled.panelStyle.padding &&
-            (styled.panelStyle.backgroundColor ||
-              effectiveProps.panelBorderStyle === 'box' ||
-              effectiveProps.panelBorderStyle === 'left-accent')
-            ? { padding: '12px 14px' }
-            : {}),
+          ...styled.panelStyle
         }}
       >
         {!isSampleSystem && !styled.avatarHidden && (
@@ -354,13 +348,7 @@ function GlobalStylePreview({
           className={`style-sample-message ${normalStyled.avatarHidden ? 'no-avatar' : ''}`.trim()}
           style={{
             borderBottom: `1px solid ${globalStyle.dividerColor}`,
-            ...normalStyled.panelStyle,
-            ...(!normalStyled.panelStyle.padding &&
-              (normalStyled.panelStyle.backgroundColor ||
-                globalStyle.messageDefaults.panelBorderStyle === 'box' ||
-                globalStyle.messageDefaults.panelBorderStyle === 'left-accent')
-              ? { padding: '12px 14px' }
-              : {}),
+            ...normalStyled.panelStyle
           }}
         >
           {!normalStyled.avatarHidden && (
@@ -414,13 +402,7 @@ function GlobalStylePreview({
             paddingLeft: `${systemIndent}px`,
             borderBottom: `1px solid ${globalStyle.dividerColor}`,
             color: sysEffective.textColor || globalStyle.systemTextColor,
-            ...sysStyled.panelStyle,
-            ...(!sysStyled.panelStyle.padding &&
-              (sysStyled.panelStyle.backgroundColor ||
-                sysEffective.panelBorderStyle === 'box' ||
-                sysEffective.panelBorderStyle === 'left-accent')
-              ? { padding: '12px 14px' }
-              : {}),
+            ...sysStyled.panelStyle
           }}
         >
           <div className="style-sample-body">
