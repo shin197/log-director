@@ -821,7 +821,7 @@ code {
   background: rgba(77, 184, 154, 0.04);
 }
 
-.log-message.is-cut> :not(.paste-indicator) {
+.log-message.is-cut > :not(.paste-indicator) {
   opacity: 0.42;
 }
 
@@ -1178,7 +1178,7 @@ code {
   color: var(--text-secondary);
 }
 
-.bulk-replace-summary>span {
+.bulk-replace-summary > span {
   margin-right: auto;
 }
 
@@ -1812,7 +1812,7 @@ code {
   background: transparent;
 }
 
-.char-sidebar-item.is-selected:not(.is-editing)>.char-sidebar-card {
+.char-sidebar-item.is-selected:not(.is-editing) > .char-sidebar-card {
   background: var(--accent-dim);
   border-color: var(--accent-border);
 }
@@ -1852,18 +1852,11 @@ code {
   background: var(--bg-hover);
 }
 
-.char-sidebar-item.is-editing>.char-sidebar-card {
+.char-sidebar-item.is-editing > .char-sidebar-card {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   border-bottom: 1px solid var(--border-subtle);
   background: rgba(255, 255, 255, 0.02);
-}
-
-.char-card-edit-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
 }
 
 .char-editable-name {
@@ -1893,10 +1886,26 @@ code {
 }
 
 .char-sidebar-detail {
-  padding: 10px;
+  padding: 10px 10px 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.char-detail-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 4px -10px 0;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
 }
 
 .char-detail-meta-row {
@@ -2029,7 +2038,7 @@ code {
   gap: 8px;
 }
 
-.field-inline>input {
+.field-inline > input {
   flex: 1;
   min-width: 0;
 }
@@ -2326,7 +2335,7 @@ code {
   flex-wrap: wrap;
 }
 
-.settings-row>.stack-field {
+.settings-row > .stack-field {
   flex: 1 1 200px;
 }
 
@@ -2374,7 +2383,7 @@ code {
   flex-wrap: wrap;
 }
 
-.original-box-head>div:first-child {
+.original-box-head > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2722,7 +2731,7 @@ dialog::backdrop {
   animation: toast-fade 6.5s linear forwards;
 }
 
-.error-toast>div {
+.error-toast > div {
   flex: 1;
   min-width: 0;
 }
@@ -2748,7 +2757,6 @@ dialog::backdrop {
 }
 
 @keyframes toast-fade {
-
   0%,
   25% {
     opacity: 1;

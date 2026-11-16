@@ -82,7 +82,7 @@ body,
 }
 
 .scene-sidebar {
-  width: 260px;
+  width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;

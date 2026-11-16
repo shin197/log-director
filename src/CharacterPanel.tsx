@@ -82,6 +82,25 @@ export function CharacterPanel({
     setDirty(true);
   }
 
+  function cancelEdit() {
+    setEditingCharId(null);
+    setEditingName(false);
+    setEditingFaceIndex(null);
+    setDirty(false);
+  }
+
+  useEffect(() => {
+    if (!editingCharId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.isComposing) return;
+      if (document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      cancelEdit();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editingCharId]);
+
   function startEditCharacter(target: Character) {
     if (editingCharId === target.id) {
       if (dirty && !confirm('저장하지 않은 변경을 버리고 편집을 닫을까요?')) return;
@@ -321,7 +340,7 @@ export function CharacterPanel({
                           onBlur={() => setEditingName(false)}
                           onKeyDown={(e) => {
                             if (e.nativeEvent.isComposing) return;
-                            if (e.key === 'Enter' || e.key === 'Escape') {
+                            if (e.key === 'Enter') {
                               e.preventDefault();
                               e.stopPropagation();
                               setEditingName(false);
@@ -353,58 +372,32 @@ export function CharacterPanel({
                     )}
                   </span>
 
-                  {isEditing ? (
-                    <div
-                      className="char-card-edit-actions"
-                      onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        disabled={x.id === SYSTEM_CHARACTER_ID}
-                        className="danger ghost compact-btn"
-                        title="캐릭터 삭제"
-                        onClick={() => {
-                          if (
-                            x.id !== SYSTEM_CHARACTER_ID &&
-                            confirm(
-                              '캐릭터를 삭제할까요? 연결된 메시지의 이름·이미지는 보존됩니다.',
-                            )
-                          ) {
-                            commit({
-                              ...p,
-                              characters: characters.filter((item) => item.id !== x.id),
-                              blocks: p.blocks.map((b) =>
-                                b.characterId === x.id ? { ...b, characterId: null } : b,
-                              ),
-                            });
-                            setEditingCharId(null);
-                          }
-                        }}
-                      >
-                        삭제
-                      </button>
-                      <button
-                        type="button"
-                        className="primary compact-btn"
-                        disabled={!activeDraft || x.id === SYSTEM_CHARACTER_ID}
-                        onClick={save}
-                      >
-                        저장
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="count-pill">{count}건</span>
-                  )}
+                  {!isEditing && <span className="count-pill">{count}건</span>}
                 </div>
 
                 {isEditing && (
                   <div className="char-sidebar-detail">
                     {x.id === SYSTEM_CHARACTER_ID ? (
-                      <p className="muted-note char-system-note">
-                        고정 시스템 캐릭터입니다. 캐릭터 이름과 이미지 없이 시스템 전용
-                        형식으로 출력되며, 이름·색상·표정 편집 및 삭제가 제한됩니다.
-                      </p>
+                      <>
+                        <p className="muted-note char-system-note">
+                          고정 시스템 캐릭터입니다. 캐릭터 이름과 이미지 없이 시스템 전용
+                          형식으로 출력되며, 이름·색상·표정 편집 및 삭제가 제한됩니다.
+                        </p>
+                        <div
+                          className="char-detail-actions"
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="ghost compact-btn"
+                            title="닫기 (Esc)"
+                            onClick={cancelEdit}
+                          >
+                            닫기
+                          </button>
+                        </div>
+                      </>
                     ) : activeDraft ? (
                       <>
                         <div className="char-detail-meta-row">
@@ -598,6 +591,55 @@ export function CharacterPanel({
                             </div>
                           )}
                         </div>
+
+                        <div
+                          className="char-detail-actions"
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="danger ghost compact-btn"
+                            title="캐릭터 삭제"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  '캐릭터를 삭제할까요? 연결된 메시지의 이름·이미지는 보존됩니다.',
+                                )
+                              ) {
+                                commit({
+                                  ...p,
+                                  characters: characters.filter(
+                                    (item) => item.id !== x.id,
+                                  ),
+                                  blocks: p.blocks.map((b) =>
+                                    b.characterId === x.id
+                                      ? { ...b, characterId: null }
+                                      : b,
+                                  ),
+                                });
+                                setEditingCharId(null);
+                              }
+                            }}
+                          >
+                            삭제
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost compact-btn"
+                            title="편집 취소 (Esc)"
+                            onClick={cancelEdit}
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            className="primary compact-btn"
+                            onClick={save}
+                          >
+                            저장
+                          </button>
+                        </div>
                       </>
                     ) : null}
                   </div>
@@ -755,11 +797,11 @@ export function CharacterPanel({
                             faces: draft.faces.map((x, j) =>
                               j === editingFaceIndex
                                 ? {
-                                  ...x,
-                                  name:
-                                    x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
-                                  iconUrl: uploaded,
-                                }
+                                    ...x,
+                                    name:
+                                      x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
+                                    iconUrl: uploaded,
+                                  }
                                 : x,
                             ),
                           });
