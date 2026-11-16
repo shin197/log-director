@@ -1884,6 +1884,7 @@ test('스타일 확장: 전역 시스템 메시지 스타일, 아바타 사용 �
 test('스타일 확장 2: 화자 색 테두리, 점선 테두리, 아바타 배경색, 정렬, 패딩 및 메시지 간격', () => {
   const styled = buildMessageStyleObjects(
     {
+      panelShape: 'rounded',
       panelBorderStyle: 'box',
       panelBorderLineStyle: 'dashed',
       panelBorderColor: 'speaker',
@@ -1905,7 +1906,16 @@ test('스타일 확장 2: 화자 색 테두리, 점선 테두리, 아바타 배�
   );
 
   assert.equal(styled.panelStyle.border, '1px dashed #B8342C');
+  assert.equal(styled.panelStyle.borderRadius, '6px');
   assert.equal(styled.panelStyle.padding, '10px 18px');
+  assert.equal(
+    buildMessageStyleObjects({ panelShape: 'rounded', panelRadius: 12 }).panelStyle.borderRadius,
+    '12px',
+  );
+  assert.equal(
+    buildMessageStyleObjects({ panelShape: 'square' }).panelStyle.borderRadius,
+    '0px',
+  );
   assert.equal(styled.panelStyle.gridTemplateColumns, '56px minmax(0, 1fr)');
   assert.equal(styled.avatarStyle.width, '56px');
   assert.equal(styled.avatarStyle.height, '56px');

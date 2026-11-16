@@ -26,6 +26,7 @@ import {
   type MessageStyleProps,
   moveStyleCard,
   type PanelBorderStyle,
+  type PanelShape,
   removeStyleCardFromProject,
   resolveSystemBaseStyle,
   type StyleCard,
@@ -251,7 +252,14 @@ function SampleMessagePreview({
         style={{
           borderBottom: `1px solid ${globalStyle.dividerColor}`,
           ...(isSampleSystem ? { paddingLeft: `${systemIndent}px` } : {}),
-          ...styled.panelStyle
+          ...styled.panelStyle,
+          ...(isSampleSystem &&
+          !styled.panelStyle.padding &&
+          (styled.panelStyle.backgroundColor ||
+            effectiveProps.panelBorderStyle === 'box' ||
+            effectiveProps.panelBorderStyle === 'left-accent')
+            ? { padding: '12px 14px', margin: '4px 0' }
+            : {}),
         }}
       >
         {!isSampleSystem && !styled.avatarHidden && (
@@ -402,7 +410,13 @@ function GlobalStylePreview({
             paddingLeft: `${systemIndent}px`,
             borderBottom: `1px solid ${globalStyle.dividerColor}`,
             color: sysEffective.textColor || globalStyle.systemTextColor,
-            ...sysStyled.panelStyle
+            ...sysStyled.panelStyle,
+            ...(!sysStyled.panelStyle.padding &&
+            (sysStyled.panelStyle.backgroundColor ||
+              sysEffective.panelBorderStyle === 'box' ||
+              sysEffective.panelBorderStyle === 'left-accent')
+              ? { padding: '12px 14px', margin: '4px 0' }
+              : {}),
           }}
         >
           <div className="style-sample-body">
@@ -569,6 +583,22 @@ function MessageStylePropsEditor({
       <div className="style-props-group">
         <h4>메시지 패널 · 여백 · 테두리</h4>
         <div className="style-props-grid">
+          <label className="style-prop-field">
+            <span className="field-label">패널 모양</span>
+            <select
+              value={props.panelShape ?? ''}
+              onChange={(e) =>
+                update({
+                  panelShape: (e.target.value as PanelShape) || undefined,
+                })
+              }
+            >
+              <option value="">{isGlobal ? '기본값 (사각형)' : inheritLabel}</option>
+              <option value="square">사각형</option>
+              <option value="rounded">뭉툭한 사각형</option>
+            </select>
+          </label>
+
           <OptionalColorField
             label="패널 배경색"
             value={props.panelBgColor}

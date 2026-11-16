@@ -7,6 +7,7 @@ import {
 } from './query.ts';
 
 export type AvatarShape = 'square' | 'rounded' | 'circle' | 'diamond';
+export type PanelShape = 'square' | 'rounded';
 export type PanelBorderStyle = 'bottom' | 'box' | 'left-accent' | 'none';
 export type BorderLineStyle = 'solid' | 'dashed' | 'dotted';
 export type TextAlignOption = 'left' | 'center' | 'right';
@@ -21,6 +22,7 @@ export type MessageStyleProps = {
   fontStyle?: FontStyleOption;
   textAlign?: TextAlignOption;
   speakerColor?: string;
+  panelShape?: PanelShape;
   panelBgColor?: string;
   panelBorderColor?: string;
   panelBorderStyle?: PanelBorderStyle;
@@ -118,6 +120,7 @@ const VALID_AVATAR_SHAPES = new Set<AvatarShape>([
   'circle',
   'diamond',
 ]);
+const VALID_PANEL_SHAPES = new Set<PanelShape>(['square', 'rounded']);
 const VALID_BORDER_STYLES = new Set<PanelBorderStyle>([
   'bottom',
   'box',
@@ -168,6 +171,9 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
     /^#[0-9a-fA-F]{6}$/.test(raw.speakerColor)
   ) {
     out.speakerColor = raw.speakerColor.toUpperCase();
+  }
+  if (VALID_PANEL_SHAPES.has(raw.panelShape)) {
+    out.panelShape = raw.panelShape;
   }
   if (
     typeof raw.panelBgColor === 'string' &&
@@ -625,6 +631,10 @@ export function buildMessageStyleObjects(
   }
   if (props.panelRadius !== undefined) {
     panelStyle.borderRadius = `${props.panelRadius}px`;
+  } else if (props.panelShape === 'square') {
+    panelStyle.borderRadius = '0px';
+  } else if (props.panelShape === 'rounded') {
+    panelStyle.borderRadius = '6px';
   }
   if (props.panelPaddingY !== undefined || props.panelPaddingX !== undefined) {
     panelStyle.padding = `${props.panelPaddingY ?? 16}px ${props.panelPaddingX ?? 0}px`;

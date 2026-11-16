@@ -192,10 +192,25 @@ export function MessageBlock({
         )
       : null;
   const hideAvatar = Boolean(resolvedVisualStyle?.avatarHidden);
-  const articlePanelStyle = resolvedVisualStyle
+  const rawPanelStyle = resolvedVisualStyle
+    ? (() => {
+        const s = { ...resolvedVisualStyle.panelStyle };
+        if (
+          !s.padding &&
+          (s.backgroundColor ||
+            styleProps?.panelBorderStyle === 'box' ||
+            styleProps?.panelBorderStyle === 'left-accent')
+        ) {
+          s.padding = '12px 14px';
+          s.margin = '4px 0';
+        }
+        return s;
+      })()
+    : undefined;
+  const articlePanelStyle = rawPanelStyle
     ? selected || bulkTarget || cut
-      ? { ...resolvedVisualStyle.panelStyle, backgroundColor: undefined }
-      : resolvedVisualStyle.panelStyle
+      ? { ...rawPanelStyle, backgroundColor: undefined }
+      : rawPanelStyle
     : undefined;
 
   return (
