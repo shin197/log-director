@@ -133,8 +133,8 @@ function SampleMessagePreview({
           borderBottom: `1px solid ${globalStyle.dividerColor}`,
           ...styled.panelStyle,
           ...(styled.panelStyle.backgroundColor ||
-          effectiveProps.panelBorderStyle === 'box' ||
-          effectiveProps.panelBorderStyle === 'left-accent'
+            effectiveProps.panelBorderStyle === 'box' ||
+            effectiveProps.panelBorderStyle === 'left-accent'
             ? { padding: '10px 12px' }
             : {}),
         }}
@@ -463,7 +463,7 @@ function StyleCardFilterAdder({
           characters={project.characters ?? []}
           channels={channels}
           scenes={project.scenes ?? []}
-          onActivate={() => {}}
+          onActivate={() => { }}
           onChangeQuery={(nextQuery) => setFilterInput(nextQuery)}
         />
       </div>
@@ -618,7 +618,6 @@ export function StylePanel({
               <SampleMessagePreview
                 globalStyle={styles.global}
                 styleProps={{}}
-                label="전역 스타일 샘플 미리보기"
               />
             </div>
           )}
@@ -916,7 +915,6 @@ export function StylePanel({
                       <SampleMessagePreview
                         globalStyle={styles.global}
                         styleProps={card.props}
-                        label="샘플 미리보기"
                       />
                     </div>
                   )}
