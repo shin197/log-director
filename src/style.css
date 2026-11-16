@@ -1139,6 +1139,9 @@ code {
 
 .editor-meta-row .meta-time {
   width: 168px;
+  max-width: 168px;
+  min-width: 90px;
+  flex: 0 1 168px;
 }
 
 .editor-url-input {
@@ -1158,8 +1161,8 @@ code {
 
 .style-picker-popover {
   position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+  bottom: calc(100% + 6px);
+  left: 0;
   min-width: 220px;
   max-width: 300px;
   max-height: 260px;
@@ -1169,7 +1172,7 @@ code {
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.55);
   padding: 6px;
 }
 
@@ -1357,6 +1360,15 @@ code {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.editor-tools {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .editor-hint {
