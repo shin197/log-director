@@ -1,6 +1,19 @@
 import type { Block } from './core.ts';
+import type { MergeSeparatorMode } from './presentation.ts';
+
 export const PAGE_SIZE = 1000;
-export function mergeConsecutive(blocks: Block[], selectedIds?: Set<string>): Block[] {
+
+export function resolveMergeSeparator(mode?: MergeSeparatorMode): string {
+  if (mode === 'doubleNewline') return '\n\n';
+  if (mode === 'space') return ' ';
+  return '\n';
+}
+
+export function mergeConsecutive(
+  blocks: Block[],
+  selectedIds?: Set<string>,
+  separator = '\n',
+): Block[] {
   const result: Block[] = [];
   for (const block of blocks) {
     const previous = result.at(-1);
@@ -17,7 +30,7 @@ export function mergeConsecutive(blocks: Block[], selectedIds?: Set<string>): Bl
     if (same) {
       result[result.length - 1] = {
         ...previous,
-        text: previous.text + '\n' + block.text,
+        text: previous.text + separator + block.text,
         diceResult: [previous.diceResult, block.diceResult].filter(Boolean).join('\n'),
       };
     } else result.push({ ...block });

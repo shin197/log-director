@@ -17,6 +17,7 @@ export function BulkTextEditor({
   onChangeReplaceFind,
   onChangeReplaceTo,
   onClearReplace,
+  autoWrapQuotes = true,
 }: {
   previewText: string;
   prefix: string;
@@ -33,6 +34,7 @@ export function BulkTextEditor({
   onChangeReplaceFind: (v: string) => void;
   onChangeReplaceTo: (v: string) => void;
   onClearReplace: () => void;
+  autoWrapQuotes?: boolean;
 }) {
   const prefixRef = useRef<HTMLTextAreaElement>(null);
   const suffixRef = useRef<HTMLTextAreaElement>(null);
@@ -167,7 +169,7 @@ export function BulkTextEditor({
           value={prefix}
           onChange={(e) => onChangePrefix(e.target.value)}
           onKeyDown={(e) => {
-            if (handleWrapKeyDown(e, prefix, onChangePrefix)) return;
+            if (handleWrapKeyDown(e, prefix, onChangePrefix, autoWrapQuotes)) return;
             if (handleGlobalShortcuts(e)) return;
             if (
               e.nativeEvent.isComposing ||
@@ -236,7 +238,7 @@ export function BulkTextEditor({
           value={suffix}
           onChange={(e) => onChangeSuffix(e.target.value)}
           onKeyDown={(e) => {
-            if (handleWrapKeyDown(e, suffix, onChangeSuffix)) return;
+            if (handleWrapKeyDown(e, suffix, onChangeSuffix, autoWrapQuotes)) return;
             if (handleGlobalShortcuts(e)) return;
             if (
               e.nativeEvent.isComposing ||

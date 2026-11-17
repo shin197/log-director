@@ -597,6 +597,7 @@ export function MessageBlock({
                     replaceTo: '',
                   }))
                 }
+                autoWrapQuotes={display.autoWrapQuotes ?? true}
               />
             ) : (
               <textarea
@@ -608,8 +609,11 @@ export function MessageBlock({
                 onChange={(e) => setDraft({ ...draft, text: e.target.value })}
                 onKeyDown={(e) => {
                   if (
-                    handleWrapKeyDown(e, draft.text, (text) =>
-                      setDraft({ ...draft, text }),
+                    handleWrapKeyDown(
+                      e,
+                      draft.text,
+                      (text) => setDraft({ ...draft, text }),
+                      display.autoWrapQuotes ?? true,
                     )
                   )
                     return;
@@ -632,7 +636,15 @@ export function MessageBlock({
                 value={diceValue}
                 onChange={(e) => setDiceValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (handleWrapKeyDown(e, diceValue, setDiceValue)) return;
+                  if (
+                    handleWrapKeyDown(
+                      e,
+                      diceValue,
+                      setDiceValue,
+                      display.autoWrapQuotes ?? true,
+                    )
+                  )
+                    return;
                   if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     finish();

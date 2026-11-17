@@ -912,3 +912,51 @@ export function createStyleResolver(
     return resolved;
   };
 }
+
+export type StylePresetFile = {
+  format: 'log-director-styles';
+  version: 1;
+  styles: ProjectStyles;
+};
+
+/**
+ * Serializes project styles (global settings + style cards) into a standalone JSON preset.
+ */
+export function exportStylesConfig(styles: ProjectStyles | undefined): string {
+  const payload: StylePresetFile = {
+    format: 'log-director-styles',
+    version: 1,
+    styles: styles ?? defaultProjectStyles(),
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+/**
+ * Parses and validates an imported style preset JSON or project JSON's styles block.
+ */
+export function parseStylesConfig(rawText: string): ProjectStyles {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(rawText.replace(/^\uFEFF/, ''));
+  } catch {
+    throw new Error('올바른 JSON 형식의 스타일 설정 파일이 아닙니다.');
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('스타일 설정 구조를 확인할 수 없습니다.');
+  }
+  const candidate =
+    parsed.format === 'log-director-styles' && parsed.styles
+      ? parsed.styles
+      : parsed.styles && typeof parsed.styles === 'object'
+        ? parsed.styles
+        : parsed;
+
+  if (!candidate || typeof candidate !== 'object' || (!Array.isArray(candidate.cards) && !candidate.global)) {
+    throw new Error('유효한 스타일 카드(cards) 또는 전역 스타일 정보가 없습니다.');
+  }
+  const normalized = normalizeProjectStyles(candidate);
+  if (!normalized) {
+    throw new Error('스타일 설정을 해석할 수 없습니다.');
+  }
+  return normalized;
+}

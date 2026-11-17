@@ -4,7 +4,7 @@ import {
   type NavigationKey,
 } from './keyboardNavigation';
 import { Composer, type EyedropPayload } from './Composer';
-import { mergeConsecutive, PAGE_SIZE } from './logOperations';
+import { mergeConsecutive, PAGE_SIZE, resolveMergeSeparator } from './logOperations';
 import { useVirtualScroll } from './useVirtualScroll';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
@@ -13,7 +13,8 @@ import { createStyleResolver, defaultGlobalStyle } from './styles';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { createImportedLogItem, type ImportedLogItem } from './importManager';
-import { normalizeProjectImagePool } from './imagePool';
+import { internProjectImages } from './imagePool';
+import { defaultDisplay } from './presentation';
 import { EMPTY_IMAGE_POOL, ImagePoolContext } from './ImagePoolContext';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
@@ -153,8 +154,12 @@ function App() {
     const withScenes: Project = next.scenes
       ? { ...next, scenes: normalizeScenes(next.scenes, next.blocks) }
       : next;
-    const normalized = normalizeProjectImagePool(withScenes);
-    setPast((x) => [...x, p].slice(-100));
+    const normalized = internProjectImages(withScenes);
+    const maxUndoSteps = Math.max(
+      1,
+      normalized.display?.maxUndoSteps ?? defaultDisplay.maxUndoSteps ?? 100,
+    );
+    setPast((x) => [...x, p].slice(-maxUndoSteps));
     setFuture([]);
     setP(normalized);
   };
@@ -470,8 +475,16 @@ function App() {
 
   function redo() {
     if (!future.length) return;
-    setPast([...past, p].slice(-100));
-    setP(future[0]);
+    const nextProject = future[0];
+    const maxUndoSteps = Math.max(
+      1,
+      nextProject.display?.maxUndoSteps ??
+      p.display?.maxUndoSteps ??
+      defaultDisplay.maxUndoSteps ??
+      100,
+    );
+    setPast([...past, p].slice(-maxUndoSteps));
+    setP(nextProject);
     setFuture(future.slice(1));
     resetInteraction();
   }
@@ -1111,7 +1124,11 @@ function App() {
             type="button"
             className="compact-btn"
             title="프로젝트 저장 (.project.json)"
-            onClick={() => save(JSON.stringify(p, null, 2), p.title + '.project.json')}
+            onClick={() => {
+              const preserve = p.display?.preserveOriginals ?? true;
+              const toSave = preserve ? p : { ...p, original: [] };
+              save(JSON.stringify(toSave, null, 2), (p.title || 'log') + '.project.json');
+            }}
           >
             저장
           </button>
@@ -1151,10 +1168,16 @@ function App() {
       {tab === '설정' && (
         <div className="settings-scroll">
           <div className="settings-container">
-            <SettingsPanel project={p} commit={commit} />
-            <section className="settings-card">
-              <h2>작업 공간 및 원본 보관함</h2>
-              <div className="settings-row">
+            <SettingsPanel
+              project={p}
+              commit={commit}
+              onDownload={save}
+              onNotice={setNotice}
+              onError={notifyError}
+            />
+            <section className="settings-card settings-card-wide">
+              <h2>원본 보관함</h2>
+              {/* <div className="settings-row">
                 <label className="stack-field">
                   <span>프로젝트 제목</span>
                   <input
@@ -1163,14 +1186,7 @@ function App() {
                     onChange={(e) => commit({ ...p, title: e.target.value })}
                   />
                 </label>
-                <div className="stats-pills">
-                  <span className="count-pill">
-                    블록 {p.blocks.length.toLocaleString()}
-                  </span>
-                  <span className="count-pill">캐릭터 {(p.characters ?? []).length}</span>
-                  <span className="count-pill">선택 {selected.size}</span>
-                </div>
-              </div>
+              </div> */}
               <div className="original-box">
                 <div className="original-box-head">
                   <div>
@@ -1181,10 +1197,47 @@ function App() {
                         : '원본 파일 없음 (새로 작성)'}
                     </span>
                   </div>
+                  {!(p.display?.preserveOriginals ?? true) && (
+                    <button
+                      type="button"
+                      className="danger compact-btn"
+                      disabled={p.original.length === 0}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `보관된 원본 ${p.original.length}개를 모두 삭제할까요? (실행 취소로 되돌릴 수 있습니다)`,
+                          )
+                        )
+                          return;
+                        commit({ ...p, original: [] });
+                        setNotice('보관된 원본 데이터를 모두 삭제했습니다.');
+                      }}
+                    >
+                      모두 삭제
+                    </button>
+                  )}
                 </div>
+                <label className="check-field">
+                  <input
+                    type="checkbox"
+                    checked={p.display?.preserveOriginals ?? true}
+                    onChange={(e) =>
+                      commit({
+                        ...p,
+                        display: {
+                          ...defaultDisplay,
+                          ...p.display,
+                          preserveOriginals: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  <span>원본 로그 보존 (해제 시 프로젝트 저장 파일에서 원본 제외)</span>
+                </label>
                 <small className="muted-note">
-                  원본 문자열과 모든 원본 필드는 프로젝트 안에 각각 별도 보존되며 편집 시
-                  훼손되지 않습니다.
+                  {(p.display?.preserveOriginals ?? true)
+                    ? '원본 문자열과 모든 원본 필드는 프로젝트 안에 각각 별도 보존되며 편집 시 훼손되지 않습니다.'
+                    : '프로젝트 파일(.project.json) 저장 시 원본 데이터가 제외되어 파일 용량이 줄어듭니다.'}
                 </small>
                 {p.original.length > 0 && (
                   <div className="original-accordion-list">
@@ -1376,7 +1429,11 @@ function App() {
                     className="compact-btn"
                     title="선택한 메시지 중 캐릭터·채널·유형이 같은 연속 메시지 병합"
                     onClick={() => {
-                      const blocks = mergeConsecutive(p.blocks, selected);
+                      const blocks = mergeConsecutive(
+                        p.blocks,
+                        selected,
+                        resolveMergeSeparator(p.display?.mergeSeparator),
+                      );
                       const mergedCount = p.blocks.length - blocks.length;
                       if (!mergedCount) {
                         setNotice('선택한 메시지 중 병합할 연속 메시지가 없습니다.');
@@ -1562,222 +1619,224 @@ function App() {
               <div className="log-scroll-wrapper">
                 <div
                   ref={scrollerRef}
-                className={applyStylesInEditor ? 'log-scroll is-styled' : 'log-scroll'}
-                style={
-                  editorGlobalStyle
-                    ? ({
-                      '--styled-page-bg': editorGlobalStyle.pageBgColor,
-                      '--styled-container-width': `${editorGlobalStyle.containerWidth}px`,
-                      '--styled-message-gap': `${editorGlobalStyle.messageGap ?? 0}px`,
-                      '--styled-meta-color': editorGlobalStyle.metaColor,
-                      '--styled-divider-color': editorGlobalStyle.dividerColor,
-                      '--styled-system-color':
-                        editorGlobalStyle.systemDefaults?.textColor ||
-                        editorGlobalStyle.systemTextColor,
-                      '--styled-system-indent': editorGlobalStyle.messageDefaults
-                        ?.avatarHidden
-                        ? '0px'
-                        : `${(editorGlobalStyle.messageDefaults?.avatarSize ?? 40) + 12}px`,
-                      '--styled-font-family':
-                        editorGlobalStyle.messageDefaults?.fontFamily ||
-                        'system-ui, sans-serif',
-                      '--styled-font-size': `${editorGlobalStyle.messageDefaults?.fontSize ?? 16}px`,
-                      '--styled-text-color':
-                        editorGlobalStyle.messageDefaults?.textColor || '#eeeeee',
-                    } as React.CSSProperties)
-                    : undefined
-                }
-              >
-                <div className="log-list">
-                  {applyStylesInEditor &&
-                    editorGlobalStyle &&
-                    (isVirtual ? startIndex === 0 : current === 0) &&
-                    p.title && (
-                      <h1
-                        className="styled-log-title"
-                        style={{
-                          color: editorGlobalStyle.titleColor,
-                          fontSize: `${editorGlobalStyle.titleSize}px`,
-                          textAlign: editorGlobalStyle.titleAlign,
-                        }}
-                      >
-                        {p.title}
-                      </h1>
+                  className={applyStylesInEditor ? 'log-scroll is-styled' : 'log-scroll'}
+                  style={
+                    editorGlobalStyle
+                      ? ({
+                        '--styled-page-bg': editorGlobalStyle.pageBgColor,
+                        '--styled-container-width': `${editorGlobalStyle.containerWidth}px`,
+                        '--styled-message-gap': `${editorGlobalStyle.messageGap ?? 0}px`,
+                        '--styled-meta-color': editorGlobalStyle.metaColor,
+                        '--styled-divider-color': editorGlobalStyle.dividerColor,
+                        '--styled-system-color':
+                          editorGlobalStyle.systemDefaults?.textColor ||
+                          editorGlobalStyle.systemTextColor,
+                        '--styled-system-indent': editorGlobalStyle.messageDefaults
+                          ?.avatarHidden
+                          ? '0px'
+                          : `${(editorGlobalStyle.messageDefaults?.avatarSize ?? 40) + 12}px`,
+                        '--styled-font-family':
+                          editorGlobalStyle.messageDefaults?.fontFamily ||
+                          'system-ui, sans-serif',
+                        '--styled-font-size': `${editorGlobalStyle.messageDefaults?.fontSize ?? 16}px`,
+                        '--styled-text-color':
+                          editorGlobalStyle.messageDefaults?.textColor || '#eeeeee',
+                      } as React.CSSProperties)
+                      : undefined
+                  }
+                >
+                  <div className="log-list">
+                    {applyStylesInEditor &&
+                      editorGlobalStyle &&
+                      (isVirtual ? startIndex === 0 : current === 0) &&
+                      p.title && (
+                        <h1
+                          className="styled-log-title"
+                          style={{
+                            color: editorGlobalStyle.titleColor,
+                            fontSize: `${editorGlobalStyle.titleSize}px`,
+                            textAlign: editorGlobalStyle.titleAlign,
+                          }}
+                        >
+                          {p.title}
+                        </h1>
+                      )}
+                    {!visible.length && (
+                      <div className="empty">
+                        <h2>
+                          {p.blocks.length
+                            ? '검색 조건과 일치하는 메시지가 없습니다.'
+                            : '로그가 비어있습니다.'}
+                        </h2>
+                        <p>
+                          {p.blocks.length
+                            ? '검색어를 수정하거나 필터를 꺼보세요.'
+                            : '상단에서 JSON 파일을 열거나 아래 입력창에서 메시지를 작성하세요.'}
+                        </p>
+                      </div>
                     )}
-                  {!visible.length && (
-                    <div className="empty">
-                      <h2>
-                        {p.blocks.length
-                          ? '검색 조건과 일치하는 메시지가 없습니다.'
-                          : '로그가 비어있습니다.'}
-                      </h2>
-                      <p>
-                        {p.blocks.length
-                          ? '검색어를 수정하거나 필터를 꺼보세요.'
-                          : '상단에서 JSON 파일을 열거나 아래 입력창에서 메시지를 작성하세요.'}
-                      </p>
-                    </div>
-                  )}
-                  {isVirtual && offsetTop > 0 && (
-                    <div
-                      style={{ height: offsetTop, pointerEvents: 'none' }}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {(isVirtual
-                    ? visible.slice(startIndex, endIndex + 1)
-                    : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
-                  ).map((b) => {
-                    const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
-                    const isBulkRep = bulkEdit?.repId === b.id;
-                    const displayBlock =
-                      isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
-
-                    return (
-                      <MessageBlock
-                        key={b.id}
-                        block={displayBlock}
-                        lineNumber={lineNumberMap.get(b.id)}
-                        itemRef={measureElement}
-                        characters={p.characters}
-                        channels={channels}
-                        display={p.display}
-                        editing={!bulkEdit && !cutIds && editingId === b.id}
-                        setEditing={(value) => {
-                          if (bulkEdit || cutIds) return;
-                          if (value) {
-                            setEditingSceneId(null);
-                          }
-                          setEditingId(value ? b.id : null);
-                        }}
-                        selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
-                        cut={!!cutIds?.has(b.id)}
-                        cutMode={!!cutIds}
-                        pasteIndicator={
-                          cutIds && pasteTarget?.id === b.id
-                            ? pasteTarget.after
-                              ? 'after'
-                              : 'before'
-                            : undefined
-                        }
-                        onPasteHover={
-                          cutIds
-                            ? (after) =>
-                              setPasteTarget((prev) =>
-                                prev?.id === b.id && prev.after === after
-                                  ? prev
-                                  : { id: b.id, after },
-                              )
-                            : undefined
-                        }
-                        onPasteHere={
-                          cutIds ? (after) => executePaste(b.id, after) : undefined
-                        }
-                        bulkTarget={isBulkTarget && !isBulkRep}
-                        bulkDisabled={!!bulkEdit && !isBulkRep}
-                        bulkContext={
-                          isBulkRep && bulkEdit
-                            ? {
-                              count: bulkEdit.selectedIds.size,
-                              targetBlocks: bulkTargetBlocks,
-                              state: bulkEdit,
-                              originalRepText: bulkRepOriginalText,
-                              faceCharacter: bulkFaceCharacter,
-                              mixedSpeakers: bulkMixedSpeakers,
-                              mixedChannels: bulkMixedChannels,
-                              hasAnyDice: bulkHasAnyDice,
-                              replaceOpen: bulkReplaceOpen,
-                              replaceMatchCount: bulkReplaceMatchCount,
-                              onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                              onCloseReplace: () => setBulkReplaceOpen(false),
-                              onChangeState: (updater) =>
-                                setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                              onSave: saveBulkEdit,
-                              onCancel: () => {
-                                setBulkEdit(null);
-                                setBulkReplaceOpen(false);
-                              },
-                              onDelete: deleteSelected,
-                            }
-                            : undefined
-                        }
-                        searchMatch={Boolean(searchMatchPredicate?.(b))}
-                        styleProps={
-                          editorStyleResolver
-                            ? editorStyleResolver(displayBlock)
-                            : undefined
-                        }
-                        styleCards={p.styles?.cards ?? []}
-                        dividerColor={p.styles?.global.dividerColor}
-                        onJump={
-                          !bulkEdit && searchActive && query.trim()
-                            ? () => jumpToMessage(b.id)
-                            : undefined
-                        }
-                        onEyedrop={() => eyedropBlock(b)}
-                        scene={sceneByMessageId.get(b.id)}
-                        onBookmark={
-                          !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
-                        }
-                        toggle={(keys: SelectionKeys) => {
-                          if (bulkEdit) return;
-                          const next = selectMessage(
-                            selected,
-                            selectionAnchor.current,
-                            visible.map((item) => item.id),
-                            b.id,
-                            keys,
-                          );
-                          cursorId.current = b.id;
-                          selectionAnchor.current = next.anchor;
-                          setSelectedRaw(next.selected);
-                          if (cutIds) setPasteTarget({ id: b.id, after: true });
-                        }}
-                        save={(next) => edit(b.id, next)}
-                        remove={() => {
-                          commit({
-                            ...p,
-                            blocks: p.blocks.filter((x) => x.id !== b.id),
-                          });
-                          setSelected(
-                            new Set([...selected].filter((id) => id !== b.id)),
-                          );
-                        }}
-                        drop={(id, after) => {
-                          if (bulkEdit || cutIds) return;
-                          const movingIds =
-                            selected.has(id) && selected.size > 1
-                              ? selected
-                              : new Set([id]);
-                          const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
-                          if (blocks !== p.blocks) commit({ ...p, blocks });
-                        }}
+                    {isVirtual && offsetTop > 0 && (
+                      <div
+                        style={{ height: offsetTop, pointerEvents: 'none' }}
+                        aria-hidden="true"
                       />
-                    );
-                  })}
-                  {isVirtual && offsetBottom > 0 && (
-                    <div
-                      style={{ height: offsetBottom, pointerEvents: 'none' }}
-                      aria-hidden="true"
-                    />
-                  )}
-                </div>
-              </div>
+                    )}
+                    {(isVirtual
+                      ? visible.slice(startIndex, endIndex + 1)
+                      : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
+                    ).map((b) => {
+                      const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
+                      const isBulkRep = bulkEdit?.repId === b.id;
+                      const displayBlock =
+                        isBulkTarget && bulkEdit ? applyBulkPatch(b, bulkEdit) : b;
 
-              <TimelineScrollbarOverlay
-                items={
-                  isVirtual
-                    ? visible
-                    : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
-                }
-                scrollerRef={scrollerRef}
-                scenes={p.scenes}
-                selectedIds={bulkEdit ? bulkEdit.selectedIds : selected}
-                searchMatchPredicate={searchMatchPredicate}
-                searchFilterActive={searchActive}
-                query={query}
-              />
-            </div>
+                      return (
+                        <MessageBlock
+                          key={b.id}
+                          block={displayBlock}
+                          lineNumber={lineNumberMap.get(b.id)}
+                          itemRef={measureElement}
+                          characters={p.characters}
+                          channels={channels}
+                          display={p.display}
+                          editing={!bulkEdit && !cutIds && editingId === b.id}
+                          setEditing={(value) => {
+                            if (bulkEdit || cutIds) return;
+                            if (value) {
+                              setEditingSceneId(null);
+                            }
+                            setEditingId(value ? b.id : null);
+                          }}
+                          selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
+                          cut={!!cutIds?.has(b.id)}
+                          cutMode={!!cutIds}
+                          pasteIndicator={
+                            cutIds && pasteTarget?.id === b.id
+                              ? pasteTarget.after
+                                ? 'after'
+                                : 'before'
+                              : undefined
+                          }
+                          onPasteHover={
+                            cutIds
+                              ? (after) =>
+                                setPasteTarget((prev) =>
+                                  prev?.id === b.id && prev.after === after
+                                    ? prev
+                                    : { id: b.id, after },
+                                )
+                              : undefined
+                          }
+                          onPasteHere={
+                            cutIds ? (after) => executePaste(b.id, after) : undefined
+                          }
+                          bulkTarget={isBulkTarget && !isBulkRep}
+                          bulkDisabled={!!bulkEdit && !isBulkRep}
+                          bulkContext={
+                            isBulkRep && bulkEdit
+                              ? {
+                                count: bulkEdit.selectedIds.size,
+                                targetBlocks: bulkTargetBlocks,
+                                state: bulkEdit,
+                                originalRepText: bulkRepOriginalText,
+                                faceCharacter: bulkFaceCharacter,
+                                mixedSpeakers: bulkMixedSpeakers,
+                                mixedChannels: bulkMixedChannels,
+                                hasAnyDice: bulkHasAnyDice,
+                                replaceOpen: bulkReplaceOpen,
+                                replaceMatchCount: bulkReplaceMatchCount,
+                                onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                                onCloseReplace: () => setBulkReplaceOpen(false),
+                                onChangeState: (updater) =>
+                                  setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                                onSave: saveBulkEdit,
+                                onCancel: () => {
+                                  setBulkEdit(null);
+                                  setBulkReplaceOpen(false);
+                                },
+                                onDelete: deleteSelected,
+                              }
+                              : undefined
+                          }
+                          searchMatch={Boolean(searchMatchPredicate?.(b))}
+                          styleProps={
+                            editorStyleResolver
+                              ? editorStyleResolver(displayBlock)
+                              : undefined
+                          }
+                          styleCards={p.styles?.cards ?? []}
+                          dividerColor={p.styles?.global.dividerColor}
+                          onJump={
+                            !bulkEdit && searchActive && query.trim()
+                              ? () => jumpToMessage(b.id)
+                              : undefined
+                          }
+                          onEyedrop={() => eyedropBlock(b)}
+                          scene={sceneByMessageId.get(b.id)}
+                          onBookmark={
+                            !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
+                          }
+                          toggle={(keys: SelectionKeys) => {
+                            if (bulkEdit) return;
+                            const next = selectMessage(
+                              selected,
+                              selectionAnchor.current,
+                              visible.map((item) => item.id),
+                              b.id,
+                              keys,
+                            );
+                            cursorId.current = b.id;
+                            selectionAnchor.current = next.anchor;
+                            setSelectedRaw(next.selected);
+                            if (cutIds) setPasteTarget({ id: b.id, after: true });
+                          }}
+                          save={(next) => edit(b.id, next)}
+                          remove={() => {
+                            commit({
+                              ...p,
+                              blocks: p.blocks.filter((x) => x.id !== b.id),
+                            });
+                            setSelected(
+                              new Set([...selected].filter((id) => id !== b.id)),
+                            );
+                          }}
+                          drop={(id, after) => {
+                            if (bulkEdit || cutIds) return;
+                            const movingIds =
+                              selected.has(id) && selected.size > 1
+                                ? selected
+                                : new Set([id]);
+                            const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
+                            if (blocks !== p.blocks) commit({ ...p, blocks });
+                          }}
+                        />
+                      );
+                    })}
+                    {isVirtual && offsetBottom > 0 && (
+                      <div
+                        style={{ height: offsetBottom, pointerEvents: 'none' }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {(p.display?.showScrollbarOverlay ?? true) && (
+                  <TimelineScrollbarOverlay
+                    items={
+                      isVirtual
+                        ? visible
+                        : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
+                    }
+                    scrollerRef={scrollerRef}
+                    scenes={p.scenes}
+                    selectedIds={bulkEdit ? bulkEdit.selectedIds : selected}
+                    searchMatchPredicate={searchMatchPredicate}
+                    searchFilterActive={searchActive}
+                    query={query}
+                  />
+                )}
+              </div>
 
               <Composer
                 characters={p.characters ?? []}
@@ -1786,6 +1845,7 @@ function App() {
                 disabled={!!cutIds || !!bulkEdit}
                 eyedrop={eyedrop}
                 focusRequest={composerFocusRequest}
+                autoWrapQuotes={p.display?.autoWrapQuotes ?? true}
               />
             </div>
 

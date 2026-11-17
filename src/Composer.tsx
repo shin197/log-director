@@ -28,6 +28,7 @@ export function Composer({
   disabled = false,
   eyedrop = null,
   focusRequest = 0,
+  autoWrapQuotes = true,
 }: {
   characters: Character[];
   channels?: ChannelSummary[];
@@ -35,6 +36,7 @@ export function Composer({
   disabled?: boolean;
   eyedrop?: EyedropPayload | null;
   focusRequest?: number;
+  autoWrapQuotes?: boolean;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
@@ -260,7 +262,7 @@ export function Composer({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (handleWrapKeyDown(e, text, setText)) return;
+              if (handleWrapKeyDown(e, text, setText, autoWrapQuotes)) return;
               if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
                 e.preventDefault();
                 e.currentTarget.blur();

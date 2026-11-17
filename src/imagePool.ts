@@ -60,10 +60,56 @@ export function internImageUrl(
   return url;
 }
 
-export function normalizeProjectImagePool(p: Project): Project {
+export function collectReferencedImageKeys(p: Project): Set<string> {
+  const used = new Set<string>();
+  const addRef = (url?: string) => {
+    if (url && url.startsWith(IMAGE_REF_PREFIX)) {
+      used.add(url.slice(IMAGE_REF_PREFIX.length));
+    }
+  };
+  for (const c of p.characters ?? []) {
+    addRef(c.iconUrl);
+    for (const f of c.faces) {
+      addRef(f.iconUrl);
+    }
+  }
+  for (const b of p.blocks) {
+    addRef(b.iconUrl);
+  }
+  return used;
+}
+
+export function getUnusedImageStats(p: Project): {
+  totalCount: number;
+  unusedCount: number;
+  unusedBytes: number;
+} {
+  const images = p.images ?? {};
+  const keys = Object.keys(images);
+  if (keys.length === 0) {
+    return { totalCount: 0, unusedCount: 0, unusedBytes: 0 };
+  }
+  const used = collectReferencedImageKeys(p);
+  let unusedCount = 0;
+  let unusedBytes = 0;
+  for (const k of keys) {
+    if (!used.has(k)) {
+      unusedCount += 1;
+      unusedBytes += images[k]?.length ?? 0;
+    }
+  }
+  return { totalCount: keys.length, unusedCount, unusedBytes };
+}
+
+function processProjectImagePool(p: Project, pruneUnused: boolean): Project {
   const existingImages = p.images ?? {};
-  const nextImages: ImagePool = {};
+  const nextImages: ImagePool = pruneUnused ? {} : { ...existingImages };
   const cache = new Map<string, string>();
+  if (!pruneUnused) {
+    for (const [k, v] of Object.entries(existingImages)) {
+      cache.set(v, k);
+    }
+  }
 
   const normalizeRef = (url?: string): string => {
     if (!url) return '';
@@ -133,4 +179,19 @@ export function normalizeProjectImagePool(p: Project): Project {
     delete next.images;
   }
   return next;
+}
+
+/**
+ * Registers newly added data:image URIs into the image pool while preserving
+ * unreferenced pool keys so users can review and manually prune them.
+ */
+export function internProjectImages(p: Project): Project {
+  return processProjectImagePool(p, false);
+}
+
+/**
+ * Normalizes the image pool and prunes any keys no longer referenced by blocks or characters.
+ */
+export function normalizeProjectImagePool(p: Project): Project {
+  return processProjectImagePool(p, true);
 }

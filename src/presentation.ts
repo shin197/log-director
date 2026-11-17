@@ -1,3 +1,5 @@
+export type MergeSeparatorMode = 'newline' | 'doubleNewline' | 'space';
+
 export type DisplaySettings = {
   showChannel: boolean;
   showTimestamp: boolean;
@@ -5,7 +7,13 @@ export type DisplaySettings = {
   applyStylesInEditor?: boolean;
   virtualScroll?: boolean;
   virtualBuffer?: number;
+  mergeSeparator?: MergeSeparatorMode;
+  autoWrapQuotes?: boolean;
+  maxUndoSteps?: number;
+  showScrollbarOverlay?: boolean;
+  preserveOriginals?: boolean;
 };
+
 export const defaultDisplay: DisplaySettings = {
   showChannel: true,
   showTimestamp: true,
@@ -13,7 +21,13 @@ export const defaultDisplay: DisplaySettings = {
   applyStylesInEditor: false,
   virtualScroll: true,
   virtualBuffer: 30,
+  mergeSeparator: 'newline',
+  autoWrapQuotes: true,
+  maxUndoSteps: 100,
+  showScrollbarOverlay: true,
+  preserveOriginals: true,
 };
+
 export function displayTime(raw: string | undefined, settings: DisplaySettings): string {
   if (!settings.showTimestamp || !raw) return '';
   if (settings.timestampFormat === 'original') return raw;

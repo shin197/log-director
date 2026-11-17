@@ -48,8 +48,10 @@ export function handleWrapKeyDown(
   e: KeyboardEvent<HTMLTextAreaElement>,
   value: string,
   onChange: (next: string) => void,
+  enabled = true,
 ): boolean {
-  if (e.ctrlKey || e.metaKey || e.altKey || e.nativeEvent.isComposing) return false;
+  if (!enabled || e.ctrlKey || e.metaKey || e.altKey || e.nativeEvent.isComposing)
+    return false;
   const el = e.currentTarget;
   const result = wrapSelectedText(
     value,

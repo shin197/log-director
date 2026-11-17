@@ -2777,6 +2777,49 @@ code {
   gap: 14px;
 }
 
+.settings-card-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.settings-action-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  flex: 1 1 200px;
+  font-size: 13px;
+}
+
+.settings-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.settings-cleanup-btn.has-unused {
+  box-shadow: 0 0 0 2px var(--accent-dim, rgba(96, 165, 250, 0.3));
+  font-weight: 600;
+}
+
 .settings-card h2 {
   margin: 0;
   font-size: 14px;

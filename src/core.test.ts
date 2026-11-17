@@ -9,8 +9,10 @@ import {
   createStyleResolver,
   defaultProjectStyles,
   duplicateStyleCard,
+  exportStylesConfig,
   moveStyleCard,
   normalizeMessageStyleProps,
+  parseStylesConfig,
   removeStyleCardFromProject,
   unlinkStyleUsageFromProject,
 } from './styles.ts';
@@ -575,7 +577,7 @@ test('이전 null 시스템 화자는 불러올 때 키 제거', () => {
   );
 });
 
-import { mergeConsecutive, PAGE_SIZE } from './logOperations.ts';
+import { mergeConsecutive, PAGE_SIZE, resolveMergeSeparator } from './logOperations.ts';
 test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각을 유지', () => {
   const p = parse(
     JSON.stringify({
@@ -1148,6 +1150,8 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, I
 import fs from 'node:fs';
 import { isSafeImageUrl } from './importFormats.ts';
 import {
+  getUnusedImageStats,
+  internProjectImages,
   isImagePoolRef,
   normalizeProjectImagePool,
   resolveImageUrl,
@@ -2380,4 +2384,102 @@ test('스크롤바 오버레이 연속 인덱스 구간 병합(collapseToRanges)
       { start: 10, end: 10 },
     ],
   );
+});
+
+test('설정 탭 신규 옵션: 병합 구분자, 미사용 이미지 통계·정리, 스타일 프리셋 왕복 및 원본 제외 저장', () => {
+  // 1) 연속 병합 줄바꿈 형식
+  assert.equal(resolveMergeSeparator('newline'), '\n');
+  assert.equal(resolveMergeSeparator('doubleNewline'), '\n\n');
+  assert.equal(resolveMergeSeparator('space'), ' ');
+
+  const sampleProj = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: 'A', text: '첫 번째' },
+        { speaker: 'A', text: '두 번째' },
+      ],
+    }),
+    'merge.json',
+  );
+  const mergedDouble = mergeConsecutive(
+    sampleProj.blocks,
+    undefined,
+    resolveMergeSeparator('doubleNewline'),
+  );
+  assert.equal(mergedDouble.length, 1);
+  assert.equal(mergedDouble[0]?.text, '첫 번째\n\n두 번째');
+
+  const mergedSpace = mergeConsecutive(
+    sampleProj.blocks,
+    undefined,
+    resolveMergeSeparator('space'),
+  );
+  assert.equal(mergedSpace[0]?.text, '첫 번째 두 번째');
+
+  // 2) internProjectImages는 미사용 이미지를 유지해 수동 정리 통계 감지 가능
+  const dataUri1 = 'data:image/png;base64,AAAA1111';
+  const dataUri2 = 'data:image/png;base64,BBBB2222';
+  const withTwoImages = internProjectImages({
+    ...sampleProj,
+    blocks: [
+      { ...sampleProj.blocks[0]!, iconUrl: dataUri1 },
+      { ...sampleProj.blocks[1]!, iconUrl: dataUri2 },
+    ],
+  });
+  assert.equal(getUnusedImageStats(withTwoImages).unusedCount, 0);
+
+  // 두 번째 블록 아이콘 제거 후 internProjectImages를 돌리면 미참조 1개가 남아있음
+  const afterRemoveIcon = internProjectImages({
+    ...withTwoImages,
+    blocks: [withTwoImages.blocks[0]!, { ...withTwoImages.blocks[1]!, iconUrl: '' }],
+  });
+  const stats = getUnusedImageStats(afterRemoveIcon);
+  assert.equal(stats.totalCount, 2);
+  assert.equal(stats.unusedCount, 1);
+  assert.equal(stats.unusedBytes, dataUri2.length);
+
+  // 수동 정리(normalizeProjectImagePool) 실행 시 미참조 이미지 제거됨
+  const cleaned = normalizeProjectImagePool(afterRemoveIcon);
+  assert.equal(getUnusedImageStats(cleaned).totalCount, 1);
+  assert.equal(getUnusedImageStats(cleaned).unusedCount, 0);
+
+  // 3) 스타일 카드 설정 내보내기 / 불러오기 왕복
+  const baseStyles = defaultProjectStyles();
+  baseStyles.global.pageBgColor = '#123456';
+  const card = createStyleCard({ name: '강조 카드', filters: ['speaker:A'] }, 1);
+  card.props.textColor = '#ABCDEF';
+  baseStyles.cards.push(card);
+
+  const presetJson = exportStylesConfig(baseStyles);
+  const imported = parseStylesConfig(presetJson);
+  assert.equal(imported.global.pageBgColor, '#123456');
+  assert.equal(imported.cards.length, 1);
+  assert.equal(imported.cards[0]?.name, '강조 카드');
+  assert.equal(imported.cards[0]?.props.textColor, '#ABCDEF');
+
+  assert.throws(() => parseStylesConfig('{invalid-json'), /JSON/);
+  assert.throws(() => parseStylesConfig('{"foo":"bar"}'), /유효한 스타일/);
+
+  // 4) display 신규 설정 및 원본 제외 저장 호환성
+  const noOriginalProj = {
+    ...sampleProj,
+    original: [],
+    display: {
+      showChannel: true,
+      showTimestamp: true,
+      timestampFormat: 'original',
+      mergeSeparator: 'doubleNewline' as const,
+      autoWrapQuotes: false,
+      maxUndoSteps: 50,
+      showScrollbarOverlay: false,
+      preserveOriginals: false,
+    },
+  };
+  const roundtrip = parse(JSON.stringify(noOriginalProj), 'stripped.project.json');
+  assert.equal(roundtrip.original.length, 0);
+  assert.equal(roundtrip.display?.mergeSeparator, 'doubleNewline');
+  assert.equal(roundtrip.display?.autoWrapQuotes, false);
+  assert.equal(roundtrip.display?.maxUndoSteps, 50);
+  assert.equal(roundtrip.display?.showScrollbarOverlay, false);
+  assert.equal(roundtrip.display?.preserveOriginals, false);
 });
