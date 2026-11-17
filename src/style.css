@@ -2759,41 +2759,79 @@ code {
 
 /* Settings Workspace */
 .settings-container {
-  max-width: 960px;
+  max-width: 1020px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 16px;
-  align-items: start;
+  columns: 2 380px;
+  column-gap: 14px;
 }
 
 .settings-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 18px 20px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  break-inside: avoid;
+  margin-bottom: 14px;
 }
 
-.settings-card-wide {
-  grid-column: 1 / -1;
+.settings-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+}
+
+/* Timestamp Block in Settings */
+.settings-timestamp-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-timestamp-box .timestamp-format-field.is-disabled {
+  opacity: 0.5;
+}
+
+.timestamp-format-label,
+.settings-field-head {
+  display: flex;
+
+  flex-direction: column;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.timestamp-format-label code {
+  font-size: 11px;
+}
+
+.settings-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
 }
 
 .settings-action-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .settings-action-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -2803,9 +2841,9 @@ code {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 180px;
-  flex: 1 1 200px;
-  font-size: 13px;
+  min-width: 150px;
+  flex: 1 1 160px;
+  font-size: 12.5px;
 }
 
 .settings-action-buttons {
@@ -2822,25 +2860,25 @@ code {
 
 /* Quick Character Slots in Settings */
 .quick-slots-empty {
-  padding: 14px;
+  padding: 10px 12px;
   border: 1px dashed var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: center;
 }
 
-.quick-slots-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+.quick-slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .quick-slot-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 6px 8px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -2861,8 +2899,8 @@ code {
 
 .quick-slot-avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--bg-surface);
@@ -2879,7 +2917,7 @@ code {
 }
 
 .quick-slot-avatar-placeholder {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -2888,18 +2926,19 @@ code {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .quick-slot-name {
-  font-size: 13px;
+  font-size: 12.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .quick-slot-badge {
+  flex-shrink: 0;
   font-size: 11px;
   color: var(--text-muted);
 }

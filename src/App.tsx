@@ -4,7 +4,7 @@ import {
   type NavigationKey,
 } from './keyboardNavigation';
 import { Composer, type EyedropPayload } from './Composer';
-import { mergeConsecutive, PAGE_SIZE, resolveMergeSeparator } from './logOperations';
+import { mergeConsecutive, resolveMergeSeparator } from './logOperations';
 import { useVirtualScroll } from './useVirtualScroll';
 import { ToastHost, notifyError, AppErrorBoundary } from './Toast';
 import { CharacterPanel, SettingsPanel } from './ProjectPanels';
@@ -89,8 +89,6 @@ function App() {
   const [notice, setNotice] = useState(
     '로그를 열거나 하단 입력창에서 메시지를 추가하세요.',
   );
-  const [page, setPage] = useState(0);
-  const [openOriginals, setOpenOriginals] = useState<Set<number>>(new Set());
   const [importOpen, setImportOpen] = useState(false);
   const [initialImportItems, setInitialImportItems] = useState<ImportedLogItem[]>([]);
   const multiImportInputRef = useRef<HTMLInputElement>(null);
@@ -148,7 +146,6 @@ function App() {
     resetInteraction();
     setQuery('');
     setSearchActive(false);
-    setPage(0);
     setNotice('이전 작업을 복원했습니다.');
     setPendingRestore(null);
   }
@@ -254,7 +251,6 @@ function App() {
     });
   }, [jumpOpen]);
 
-  const isVirtual = Boolean(p.display?.virtualScroll ?? true);
   const virtualBuffer = p.display?.virtualBuffer ?? 25;
 
   const {
@@ -270,11 +266,9 @@ function App() {
     getItemKey: (b) => b.id,
     estimateHeight: 74,
     overscan: virtualBuffer,
-    enabled: isVirtual,
+    enabled: true,
   });
 
-  const pages = isVirtual ? 1 : Math.max(1, Math.ceil(visible.length / PAGE_SIZE)),
-    current = isVirtual ? 0 : Math.min(page, pages - 1);
   const selectedCount = bulkEdit ? bulkEdit.selectedIds.size : selected.size;
   const pendingFocus = useRef<{
     id: string;
@@ -287,8 +281,7 @@ function App() {
     setQuery('');
     setSearchActive(false);
     selectionAnchor.current = null;
-    if (!isVirtual) setPage(0);
-    else scrollerRef.current?.scrollTo({ top: 0 });
+    scrollerRef.current?.scrollTo({ top: 0 });
     searchInput.current?.blur();
   }
 
@@ -296,7 +289,6 @@ function App() {
     if (searchActive) {
       setSearchActive(false);
       selectionAnchor.current = null;
-      if (!isVirtual) setPage(0);
       searchInput.current?.blur();
     } else {
       setSearchActive(true);
@@ -314,11 +306,7 @@ function App() {
     setSelected(new Set([id]));
     if (cutIds) setPasteTarget({ id, after: true });
     pendingFocus.current = { id, direction: 1, center: true };
-    if (isVirtual) {
-      scrollToIndex(index, 'center');
-    } else {
-      setPage(Math.floor(index / PAGE_SIZE));
-    }
+    scrollToIndex(index, 'center');
   }
 
   function jumpToLine(targetLine: number) {
@@ -339,11 +327,7 @@ function App() {
       if (cutIds) setPasteTarget({ id: targetBlock.id, after: true });
       pendingFocus.current = { id: targetBlock.id, direction: 1, center: true };
       const fullIndex = targetLine - 1;
-      if (isVirtual) {
-        scrollToIndex(fullIndex, 'center');
-      } else {
-        setPage(Math.floor(fullIndex / PAGE_SIZE));
-      }
+      scrollToIndex(fullIndex, 'center');
       setNotice(`검색 필터를 해제하고 #${targetLine} 메시지로 이동했습니다.`);
     } else {
       setEditingId(null);
@@ -351,11 +335,7 @@ function App() {
       setSelected(new Set([targetBlock.id]));
       if (cutIds) setPasteTarget({ id: targetBlock.id, after: true });
       pendingFocus.current = { id: targetBlock.id, direction: 1, center: true };
-      if (isVirtual) {
-        scrollToIndex(visibleIndex, 'center');
-      } else {
-        setPage(Math.floor(visibleIndex / PAGE_SIZE));
-      }
+      scrollToIndex(visibleIndex, 'center');
       setNotice(`#${targetLine} 메시지로 이동했습니다.`);
     }
     setJumpOpen(false);
@@ -374,11 +354,7 @@ function App() {
     setSelected(new Set([scene.messageId]));
     if (cutIds) setPasteTarget({ id: scene.messageId, after: true });
     pendingFocus.current = { id: scene.messageId, direction: 1, top: true };
-    if (isVirtual) {
-      scrollToIndex(targetIndex, 'start');
-    } else {
-      setPage(Math.floor(targetIndex / PAGE_SIZE));
-    }
+    scrollToIndex(targetIndex, 'start');
     setNotice(`‘${scene.name || '장면'}’ 장면으로 이동했습니다.`);
   }
 
@@ -550,8 +526,7 @@ function App() {
     setBulkEdit(createBulkEditState(repId, selected, repBlock));
     const visibleIdx = visible.findIndex((b) => b.id === repId);
     if (visibleIdx >= 0) {
-      if (isVirtual) scrollToIndex(visibleIdx, 'center');
-      else setPage(Math.floor(visibleIdx / PAGE_SIZE));
+      scrollToIndex(visibleIdx, 'center');
     }
     pendingFocus.current = { id: repId, direction: 1 };
   }
@@ -575,8 +550,7 @@ function App() {
     setBulkEdit(null);
     setQuery('');
     setSearchActive(false);
-    if (isVirtual) scrollToIndex(index, 'center');
-    else setPage(Math.floor(index / PAGE_SIZE));
+    scrollToIndex(index, 'center');
   }
 
   useEffect(() => {
@@ -761,8 +735,7 @@ function App() {
         pendingFocus.current = { id, direction };
         const index = blocks.filter(predicate).findIndex((b) => b.id === id);
         if (index >= 0) {
-          if (isVirtual) scrollToIndex(index, direction > 0 ? 'end' : 'start');
-          else setPage(Math.floor(index / PAGE_SIZE));
+          scrollToIndex(index, direction > 0 ? 'end' : 'start');
         }
         return;
       }
@@ -774,49 +747,27 @@ function App() {
         (e.key === 'PageUp' || e.key === 'PageDown')
       ) {
         e.preventDefault();
-        if (isVirtual) {
-          const step = 1000;
-          const currentIdx = cursorId.current
-            ? visible.findIndex((b) => b.id === cursorId.current)
-            : 0;
-          const targetIdx =
-            e.key === 'PageDown'
-              ? Math.min(visible.length - 1, (currentIdx < 0 ? 0 : currentIdx) + step)
-              : Math.max(0, (currentIdx < 0 ? 0 : currentIdx) - step);
-          const targetBlock = visible[targetIdx];
-          if (targetBlock) {
-            cursorId.current = targetBlock.id;
-            selectionAnchor.current = { id: targetBlock.id, selected: true };
-            pendingFocus.current = {
-              id: targetBlock.id,
-              direction: e.key === 'PageDown' ? 1 : -1,
-              top: true,
-            };
-            setSelectedRaw(new Set([targetBlock.id]));
-            scrollToIndex(targetIdx, 'start');
-            setNotice(`${targetIdx + 1} / ${visible.length}번째 메시지로 이동했습니다.`);
-          }
-          return;
-        }
-        if (pages <= 1) return;
-        const targetPage =
+        const step = 1000;
+        const currentIdx = cursorId.current
+          ? visible.findIndex((b) => b.id === cursorId.current)
+          : 0;
+        const targetIdx =
           e.key === 'PageDown'
-            ? Math.min(pages - 1, current + 1)
-            : Math.max(0, current - 1);
-        if (targetPage === current) return;
-        setPage(targetPage);
-        const pageFirstBlock = visible[targetPage * PAGE_SIZE];
-        if (pageFirstBlock) {
-          cursorId.current = pageFirstBlock.id;
-          selectionAnchor.current = { id: pageFirstBlock.id, selected: true };
+            ? Math.min(visible.length - 1, (currentIdx < 0 ? 0 : currentIdx) + step)
+            : Math.max(0, (currentIdx < 0 ? 0 : currentIdx) - step);
+        const targetBlock = visible[targetIdx];
+        if (targetBlock) {
+          cursorId.current = targetBlock.id;
+          selectionAnchor.current = { id: targetBlock.id, selected: true };
           pendingFocus.current = {
-            id: pageFirstBlock.id,
+            id: targetBlock.id,
             direction: e.key === 'PageDown' ? 1 : -1,
             top: true,
           };
-          setSelectedRaw(new Set([pageFirstBlock.id]));
+          setSelectedRaw(new Set([targetBlock.id]));
+          scrollToIndex(targetIdx, 'start');
+          setNotice(`${targetIdx + 1} / ${visible.length}번째 메시지로 이동했습니다.`);
         }
-        setNotice(`${targetPage + 1} / ${pages} 페이지로 이동했습니다.`);
         return;
       }
       if (
@@ -871,7 +822,6 @@ function App() {
         const beforeFirst = e.key === 'Home' || (e.key === 'ArrowUp' && next.index === 0);
         setPasteTarget({ id: next.id, after: !beforeFirst });
       }
-      if (!isVirtual) setPage(Math.floor(next.index / PAGE_SIZE));
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
@@ -883,7 +833,6 @@ function App() {
     bulkEdit,
     cutIds,
     pasteTarget,
-    isVirtual,
     scrollToIndex,
     past,
     future,
@@ -904,39 +853,16 @@ function App() {
 
     const node = scroller.querySelector<HTMLElement>(`[data-message-id="${request.id}"]`);
     if (!node) {
-      if (isVirtual) {
-        const idx = visible.findIndex((b) => b.id === request.id);
-        if (idx >= 0) {
-          scrollToIndex(idx, request.center ? 'center' : request.top ? 'start' : 'auto');
-          return;
-        }
+      const idx = visible.findIndex((b) => b.id === request.id);
+      if (idx >= 0) {
+        scrollToIndex(idx, request.center ? 'center' : request.top ? 'start' : 'auto');
+        return;
       }
       pendingFocus.current = null;
       return;
     }
 
     pendingFocus.current = null;
-    // Allow the first and last messages to reach the center as well.
-    if (!isVirtual) {
-      if (request.center) {
-        const room = Math.max(
-          0,
-          (scroller.clientHeight - node.getBoundingClientRect().height) / 2,
-        );
-        scroller.style.paddingTop = `${room}px`;
-        scroller.style.paddingBottom = `${room}px`;
-      } else if (request.top) {
-        scroller.style.paddingTop = '';
-        const roomBottom = Math.max(
-          0,
-          scroller.clientHeight - node.getBoundingClientRect().height,
-        );
-        scroller.style.paddingBottom = `${roomBottom}px`;
-      } else {
-        scroller.style.paddingTop = '';
-        scroller.style.paddingBottom = '';
-      }
-    }
     node.focus({ preventScroll: true });
     const rect = node.getBoundingClientRect(),
       bounds = scroller.getBoundingClientRect();
@@ -968,12 +894,10 @@ function App() {
       scroller.scrollTop += rect.top - margin - bounds.top;
   }, [
     selected,
-    current,
     p.blocks,
     searchActive,
     query,
     bulkEdit,
-    isVirtual,
     startIndex,
     endIndex,
     scrollToIndex,
@@ -1082,31 +1006,6 @@ function App() {
               <span className="count-pill" title="현재 표시 중인 블록 수">
                 {visible.length.toLocaleString()}건
               </span>
-              {!isVirtual && (
-                <>
-                  <button
-                    type="button"
-                    className="compact-btn icon-btn"
-                    aria-label="이전 페이지"
-                    disabled={!current}
-                    onClick={() => setPage(current - 1)}
-                  >
-                    ◀
-                  </button>
-                  <span className="page-indicator">
-                    {current + 1} / {pages}
-                  </span>
-                  <button
-                    type="button"
-                    className="compact-btn icon-btn"
-                    aria-label="다음 페이지"
-                    disabled={current + 1 >= pages}
-                    onClick={() => setPage(current + 1)}
-                  >
-                    ▶
-                  </button>
-                </>
-              )}
             </div>
           )}
           <label
@@ -1136,7 +1035,6 @@ function App() {
                   resetInteraction();
                   setQuery('');
                   setSearchActive(false);
-                  setPage(0);
                   setNotice(
                     `${next.blocks.length.toLocaleString()}개 블록을 불러왔습니다.`,
                   );
@@ -1246,130 +1144,6 @@ function App() {
               onNotice={setNotice}
               onError={notifyError}
             />
-            <section className="settings-card settings-card-wide">
-              <h2>원본 보관함</h2>
-              {/* <div className="settings-row">
-                <label className="stack-field">
-                  <span>프로젝트 제목</span>
-                  <input
-                    aria-label="설정 프로젝트 제목"
-                    value={p.title}
-                    onChange={(e) => commit({ ...p, title: e.target.value })}
-                  />
-                </label>
-              </div> */}
-              <div className="original-box">
-                <div className="original-box-head">
-                  <div>
-                    <strong>보관된 원본 ({p.original.length}개)</strong>
-                    <span className="muted-note">
-                      {p.original.length > 0
-                        ? p.original.map((o) => o.name).join(', ')
-                        : '원본 파일 없음 (새로 작성)'}
-                    </span>
-                  </div>
-                  {!(p.display?.preserveOriginals ?? true) && (
-                    <button
-                      type="button"
-                      className="danger compact-btn"
-                      disabled={p.original.length === 0}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            `보관된 원본 ${p.original.length}개를 모두 삭제할까요? (실행 취소로 되돌릴 수 있습니다)`,
-                          )
-                        )
-                          return;
-                        commit({ ...p, original: [] });
-                        setNotice('보관된 원본 데이터를 모두 삭제했습니다.');
-                      }}
-                    >
-                      모두 삭제
-                    </button>
-                  )}
-                </div>
-                <label className="check-field">
-                  <input
-                    type="checkbox"
-                    checked={p.display?.preserveOriginals ?? true}
-                    onChange={(e) =>
-                      commit({
-                        ...p,
-                        display: {
-                          ...defaultDisplay,
-                          ...p.display,
-                          preserveOriginals: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  <span>원본 로그 보존 (해제 시 프로젝트 저장 파일에서 원본 제외)</span>
-                </label>
-                <small className="muted-note">
-                  {(p.display?.preserveOriginals ?? true)
-                    ? '원본 문자열과 모든 원본 필드는 프로젝트 안에 각각 별도 보존되며 편집 시 훼손되지 않습니다.'
-                    : '프로젝트 파일(.project.json) 저장 시 원본 데이터가 제외되어 파일 용량이 줄어듭니다.'}
-                </small>
-                {p.original.length > 0 && (
-                  <div className="original-accordion-list">
-                    {p.original.map((orig, idx) => {
-                      const isOpen = openOriginals.has(idx);
-                      const toggleOpen = () => {
-                        setOpenOriginals((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(idx)) next.delete(idx);
-                          else next.add(idx);
-                          return next;
-                        });
-                      };
-                      return (
-                        <div
-                          key={`${orig.name}-${idx}`}
-                          className={`original-accordion-item ${isOpen ? 'open' : ''}`}
-                        >
-                          <div className="original-accordion-head">
-                            <button
-                              type="button"
-                              className="original-accordion-toggle"
-                              onClick={toggleOpen}
-                              aria-expanded={isOpen}
-                            >
-                              <span className="original-accordion-caret">
-                                {isOpen ? '▾' : '▸'}
-                              </span>
-                              <span className="original-accordion-badge">#{idx + 1}</span>
-                              <strong className="original-accordion-name">
-                                {orig.name}
-                              </strong>
-                              <span className="muted-note">
-                                ({orig.raw.length.toLocaleString()}자)
-                              </span>
-                            </button>
-                            <div className="original-box-actions">
-                              <button
-                                type="button"
-                                className="compact-btn"
-                                onClick={toggleOpen}
-                              >
-                                {isOpen ? '원본 닫기' : '원본 보기'}
-                              </button>
-                              <button
-                                type="button"
-                                className="compact-btn"
-                                onClick={() => save(orig.raw, orig.name)}
-                              >
-                                원문 내려받기
-                              </button>
-                            </div>
-                          </div>
-                          {isOpen && <pre className="original">{orig.raw}</pre>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </section>
           </div>
         </div>
       )}
@@ -1404,7 +1178,6 @@ function App() {
                       selectionAnchor.current = null;
                       setSearchActive(true);
                       setQuery(nextQuery);
-                      setPage(0);
                     }}
                   />
                   {!isSearchMinimized && (
@@ -1719,7 +1492,7 @@ function App() {
                   <div className="log-list">
                     {applyStylesInEditor &&
                       editorGlobalStyle &&
-                      (isVirtual ? startIndex === 0 : current === 0) &&
+                      startIndex === 0 &&
                       p.title && (
                         <h1
                           className="styled-log-title"
@@ -1746,16 +1519,13 @@ function App() {
                         </p>
                       </div>
                     )}
-                    {isVirtual && offsetTop > 0 && (
+                    {offsetTop > 0 && (
                       <div
                         style={{ height: offsetTop, pointerEvents: 'none' }}
                         aria-hidden="true"
                       />
                     )}
-                    {(isVirtual
-                      ? visible.slice(startIndex, endIndex + 1)
-                      : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
-                    ).map((b) => {
+                    {visible.slice(startIndex, endIndex + 1).map((b) => {
                       const isBulkTarget = !!bulkEdit?.selectedIds.has(b.id);
                       const isBulkRep = bulkEdit?.repId === b.id;
                       const displayBlock =
@@ -1883,7 +1653,7 @@ function App() {
                         />
                       );
                     })}
-                    {isVirtual && offsetBottom > 0 && (
+                    {offsetBottom > 0 && (
                       <div
                         style={{ height: offsetBottom, pointerEvents: 'none' }}
                         aria-hidden="true"
@@ -1894,11 +1664,7 @@ function App() {
 
                 {(p.display?.showScrollbarOverlay ?? true) && (
                   <TimelineScrollbarOverlay
-                    items={
-                      isVirtual
-                        ? visible
-                        : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
-                    }
+                    items={visible}
                     scrollerRef={scrollerRef}
                     scenes={p.scenes}
                     selectedIds={bulkEdit ? bulkEdit.selectedIds : selected}
