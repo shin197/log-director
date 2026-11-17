@@ -1,4 +1,5 @@
 import { FacePicker } from './FacePicker';
+import { ImageUrlInput } from './ImageUrlInput';
 import { SpeakerPicker } from './SpeakerPicker';
 import { ChannelPicker } from './ChannelPicker';
 import type { ChannelSummary } from './channels';
@@ -189,13 +190,13 @@ export function MessageBlock({
   const faceCharacter = isBulk
     ? bulkContext.faceCharacter
     : characters.find((c) => c.id === activeBlock.characterId);
-  const canEditFace = isBulk ? !!bulkContext.faceCharacter : !isSystem;
   const isCustomSpeaker = isBulk
     ? bulkContext.state.speakerAction
       ? bulkContext.state.speakerAction.type === 'unlink' ||
       bulkContext.state.speakerAction.type === 'custom'
       : !bulkContext.mixedSpeakers && !isSystem && !b.characterId
     : !isSystem && !draft.characterId;
+  const canEditFace = isBulk ? !!bulkContext.faceCharacter || isCustomSpeaker : !isSystem;
   const customColorValue = isBulk
     ? (bulkContext.state.color ??
       (bulkContext.state.speakerAction ? '' : (b.color ?? '')))
@@ -371,13 +372,22 @@ export function MessageBlock({
                   setDraft({ ...draft, iconUrl });
                 }
               }}
-              onRequestCustomUrl={() => {
-                setOptions(true);
-                requestAnimationFrame(() => {
-                  urlInputRef.current?.focus();
-                  urlInputRef.current?.select();
-                });
-              }}
+              onRequestCustomUrl={
+                !faceCharacter
+                  ? () => {
+                      setOptions((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          requestAnimationFrame(() => {
+                            urlInputRef.current?.focus();
+                            urlInputRef.current?.select();
+                          });
+                        }
+                        return next;
+                      });
+                    }
+                  : undefined
+              }
               imageButton
               fallbackText={(activeBlock.speaker || '?').slice(0, 1)}
             />
@@ -531,33 +541,24 @@ export function MessageBlock({
               />
             </div>
 
-            {options && canEditFace && !isSystem && (
-              <input
-                ref={urlInputRef}
+            {options && canEditFace && !isSystem && !faceCharacter && (
+              <ImageUrlInput
+                inputRef={urlInputRef}
                 className="editor-url-input"
-                type="url"
-                aria-label="표정 이미지 URL"
-                placeholder="표정 이미지 URL (https://…)"
                 value={resolveImageUrl(
                   isBulk
                     ? (bulkContext.state.iconUrl ?? activeBlock.iconUrl ?? '')
                     : (draft.iconUrl ?? ''),
                   images,
                 )}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(val) => {
                   if (bulkContext) {
                     bulkContext.onChangeState((prev) => ({ ...prev, iconUrl: val }));
                   } else {
                     setDraft({ ...draft, iconUrl: val });
                   }
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.stopPropagation();
-                    setOptions(false);
-                  }
-                }}
+                onClose={() => setOptions(false)}
               />
             )}
 
@@ -865,19 +866,28 @@ export function MessageBlock({
           <div className="message-read">
             <div className="message-header">
               {!isSystem && (
-                <strong
-                  style={{
-                    color:
-                      resolvedVisualStyle?.speakerColor ||
-                      b.color ||
-                      (resolvedVisualStyle ? '#888888' : 'var(--text-primary)'),
-                    fontSize: resolvedVisualStyle?.speakerFontSize
-                      ? `${resolvedVisualStyle.speakerFontSize}px`
-                      : undefined,
-                  }}
-                >
-                  {b.speaker}
-                </strong>
+                <span className="speaker-name-group">
+                  <strong
+                    style={{
+                      color:
+                        resolvedVisualStyle?.speakerColor ||
+                        b.color ||
+                        (resolvedVisualStyle ? '#888888' : 'var(--text-primary)'),
+                      fontSize: resolvedVisualStyle?.speakerFontSize
+                        ? `${resolvedVisualStyle.speakerFontSize}px`
+                        : undefined,
+                    }}
+                  >
+                    {b.speaker}
+                  </strong>
+                  {!b.characterId && (
+                    <span
+                      className="custom-speaker-dot"
+                      title="사용자 지정 화자 (캐릭터 미연결)"
+                      aria-label="사용자 지정 화자"
+                    />
+                  )}
+                </span>
               )}
               {isSystem && <span className="system-tag">SYSTEM</span>}
               {display.showChannel && b.channel && (

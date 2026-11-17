@@ -1358,6 +1358,65 @@ code {
   width: 100%;
 }
 
+/* Custom Speaker Indicator Dot */
+.speaker-name-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.custom-speaker-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+/* Image URL Input + Base64 Upload Button */
+.image-url-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.image-url-input-row .image-url-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.image-url-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.image-url-upload-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.image-url-upload-btn.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .style-picker-popover-wrap {
   position: relative;
   display: inline-flex;

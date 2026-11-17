@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Block, Character } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
 import { FacePicker } from './FacePicker';
+import { ImageUrlInput } from './ImageUrlInput';
 import { ChannelPicker } from './ChannelPicker';
 import type { ChannelSummary } from './channels';
 import { handleWrapKeyDown } from './textEdit';
@@ -137,13 +138,22 @@ export function Composer({
                   setIcon(nextIcon);
                   setUrlOpen(false);
                 }}
-                onRequestCustomUrl={() => {
-                  setUrlOpen(true);
-                  requestAnimationFrame(() => {
-                    urlInputRef.current?.focus();
-                    urlInputRef.current?.select();
-                  });
-                }}
+                onRequestCustomUrl={
+                  !character
+                    ? () => {
+                        setUrlOpen((prev) => {
+                          const next = !prev;
+                          if (next) {
+                            requestAnimationFrame(() => {
+                              urlInputRef.current?.focus();
+                              urlInputRef.current?.select();
+                            });
+                          }
+                          return next;
+                        });
+                      }
+                    : undefined
+                }
                 disabled={disabled}
                 imageButton
                 fallbackText={(name || '?').slice(0, 1)}
@@ -226,22 +236,14 @@ export function Composer({
             ×
           </button>
         </div>
-        {urlOpen && character?.id !== SYSTEM_CHARACTER_ID && (
-          <input
-            ref={urlInputRef}
+        {urlOpen && !character && (
+          <ImageUrlInput
+            inputRef={urlInputRef}
             className="composer-url-input"
-            type="url"
-            aria-label="표정 이미지 URL"
-            placeholder="표정 이미지 URL (https://…)"
             disabled={disabled}
             value={resolveImageUrl(icon, images)}
-            onChange={(e) => setIcon(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.stopPropagation();
-                setUrlOpen(false);
-              }
-            }}
+            onChange={setIcon}
+            onClose={() => setUrlOpen(false)}
           />
         )}
         <div className="composer-bottom">

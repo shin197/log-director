@@ -59,7 +59,7 @@ export function SpeakerPicker({
       ? '시스템'
       : draft.characterId
         ? '캐릭터'
-        : '직접 입력';
+        : '미연결';
   const statusClass = mixed
     ? 'is-mixed'
     : draft.sourceType === 'system'
@@ -104,7 +104,7 @@ export function SpeakerPicker({
               setOpen(true);
               setIndex(
                 (current + (e.key === 'ArrowDown' ? 1 : matches.length)) %
-                  (matches.length + 1),
+                (matches.length + 1),
               );
             }
             if (e.key === 'Enter' && open) {

@@ -27,6 +27,7 @@ export function FacePicker({
   const images = useImagePool();
   const resolvedValue = resolveImageUrl(value, images);
   const isSystemChar = character?.id === SYSTEM_CHARACTER_ID;
+  const isCustomMode = !character && !!onRequestCustomUrl;
   const disabled = disabledProp || isSystemChar || (!character && !onRequestCustomUrl);
 
   useEffect(() => {
@@ -52,11 +53,24 @@ export function FacePicker({
       <button
         type="button"
         className={imageButton ? 'face-btn-avatar' : 'face-btn-icon'}
-        aria-label="표정 선택"
-        title={disabled ? '연결된 캐릭터의 표정 선택' : '표정 선택'}
-        aria-expanded={open}
+        aria-label={isCustomMode ? '이미지 URL 입력' : '표정 선택'}
+        title={
+          isCustomMode
+            ? '클릭하여 이미지 URL 입력 또는 업로드'
+            : disabled
+              ? '연결된 캐릭터의 표정 선택'
+              : '표정 선택'
+        }
+        aria-expanded={isCustomMode ? undefined : open}
         disabled={disabled}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (isCustomMode && onRequestCustomUrl) {
+            setOpen(false);
+            onRequestCustomUrl();
+            return;
+          }
+          setOpen(!open);
+        }}
       >
         {imageButton && isSafeImageUrl(resolvedValue) ? (
           <img src={resolvedValue} alt="현재 표정" />
@@ -64,9 +78,9 @@ export function FacePicker({
           fallbackText || '☺'
         )}
       </button>
-      {open && !disabled && (
+      {open && !disabled && character && (
         <div className="face-options">
-          {character && character.faces.length ? (
+          {character.faces.length ? (
             character.faces.map((face, i) => (
               <button
                 type="button"
@@ -82,21 +96,7 @@ export function FacePicker({
               </button>
             ))
           ) : (
-            <p className="empty-faces">
-              {character ? '등록된 표정이 없습니다.' : '사용자 지정 화자'}
-            </p>
-          )}
-          {onRequestCustomUrl && (
-            <button
-              type="button"
-              className="face-option-custom"
-              onClick={() => {
-                onRequestCustomUrl();
-                setOpen(false);
-              }}
-            >
-              URL 직접 입력...
-            </button>
+            <p className="empty-faces">등록된 표정이 없습니다.</p>
           )}
         </div>
       )}
