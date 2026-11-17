@@ -10,6 +10,8 @@ export function SceneSidebar({
   blocks,
   activeMessageId,
   canAddFromSelection,
+  editingSceneId: propEditingSceneId,
+  onEditingSceneChange,
   focusSceneId,
   onClearFocusScene,
   onAddFromSelection,
@@ -23,6 +25,8 @@ export function SceneSidebar({
   blocks: Block[];
   activeMessageId: string | null;
   canAddFromSelection: boolean;
+  editingSceneId?: string | null;
+  onEditingSceneChange?: (sceneId: string | null) => void;
   focusSceneId: string | null;
   onClearFocusScene: () => void;
   onAddFromSelection: () => void;
@@ -30,15 +34,29 @@ export function SceneSidebar({
   onRenameScene: (sceneId: string, name: string) => void;
   onRemoveScene: (sceneId: string) => void;
 }) {
-  const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
+  const isControlled = propEditingSceneId !== undefined;
+  const [localEditingSceneId, setLocalEditingSceneId] = useState<string | null>(null);
+  const editingSceneId = isControlled ? propEditingSceneId : localEditingSceneId;
+
   const [draftName, setDraftName] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const draftNameRef = useRef(draftName);
+  draftNameRef.current = draftName;
+  const prevEditingIdRef = useRef<string | null>(null);
 
   const ranges = computeSceneRanges(scenes, blocks);
   const blockMap = new Map(blocks.map((b) => [b.id, b]));
 
+  function setEditingIdState(id: string | null) {
+    if (isControlled) {
+      onEditingSceneChange?.(id);
+    } else {
+      setLocalEditingSceneId(id);
+    }
+  }
+
   function startEdit(scene: Scene) {
-    setEditingSceneId(scene.id);
+    setEditingIdState(scene.id);
     setDraftName(scene.name);
     requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -51,21 +69,42 @@ export function SceneSidebar({
     if (nextName !== scene.name) {
       onRenameScene(scene.id, nextName);
     }
-    setEditingSceneId(null);
+    prevEditingIdRef.current = null;
+    setEditingIdState(null);
   }
+
+  function cancelEdit() {
+    prevEditingIdRef.current = null;
+    setEditingIdState(null);
+  }
+
+  // 외부(예: 메시지 편집 진입)에서 editingSceneId가 해제되었을 때, 수정 중이던 이름이 있다면 자동 저장
+  useEffect(() => {
+    if (prevEditingIdRef.current && !editingSceneId) {
+      const prevId = prevEditingIdRef.current;
+      const scene = scenes.find((s) => s.id === prevId);
+      if (scene) {
+        const nextName = draftNameRef.current.trim() || scene.name || '장면';
+        if (nextName !== scene.name) {
+          onRenameScene(scene.id, nextName);
+        }
+      }
+    }
+    prevEditingIdRef.current = editingSceneId;
+  }, [editingSceneId, scenes, onRenameScene]);
 
   useEffect(() => {
     if (!open || !focusSceneId) return;
     const target = scenes.find((s) => s.id === focusSceneId);
     if (!target) return;
-    setEditingSceneId(target.id);
+    setEditingIdState(target.id);
     setDraftName(target.name);
     onClearFocusScene();
     requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     });
-  }, [open, focusSceneId, scenes, onClearFocusScene]);
+  }, [open, focusSceneId, scenes, onClearFocusScene, isControlled, onEditingSceneChange]);
 
   if (!open) {
     return (
@@ -184,7 +223,7 @@ export function SceneSidebar({
                       } else if (e.key === 'Escape') {
                         e.preventDefault();
                         e.stopPropagation();
-                        setEditingSceneId(null);
+                        cancelEdit();
                       }
                     }}
                   />

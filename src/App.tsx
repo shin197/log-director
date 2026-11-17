@@ -95,6 +95,7 @@ function App() {
   };
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [bulkEdit, setBulkEdit] = useState<BulkEditState | null>(null);
   const [bulkReplaceOpen, setBulkReplaceOpen] = useState(false);
   const [cutIds, setCutIds] = useState<Set<string> | null>(null);
@@ -370,6 +371,7 @@ function App() {
 
   function bookmarkMessage(messageId: string) {
     if (cutIds || bulkEdit) return;
+    setEditingId(null);
     const {
       scenes: nextScenes,
       added,
@@ -378,12 +380,14 @@ function App() {
     setSceneBarOpen(true);
     if (existing) {
       setFocusSceneId(existing.id);
+      setEditingSceneId(existing.id);
       setNotice(`‘${existing.name || '장면'}’ 장면 이름을 편집합니다.`);
       return;
     }
     if (added) {
       commit({ ...p, scenes: nextScenes });
       setFocusSceneId(added.id);
+      setEditingSceneId(added.id);
       setNotice(
         `‘${added.name}’ 장면을 등록했습니다. 우측 장면 바에서 이름을 수정하세요.`,
       );
@@ -393,6 +397,7 @@ function App() {
   function resetInteraction() {
     setSelected(new Set());
     setEditingId(null);
+    setEditingSceneId(null);
     setBulkEdit(null);
     setBulkReplaceOpen(false);
     setCutIds(null);
@@ -486,6 +491,7 @@ function App() {
     const repBlock = p.blocks.find((b) => b.id === repId);
     if (!repBlock) return;
     setEditingId(null);
+    setEditingSceneId(null);
     setBulkReplaceOpen(false);
     setBulkEdit(createBulkEditState(repId, selected, repBlock));
     const visibleIdx = visible.findIndex((b) => b.id === repId);
@@ -1637,6 +1643,9 @@ function App() {
                         editing={!bulkEdit && !cutIds && editingId === b.id}
                         setEditing={(value) => {
                           if (bulkEdit || cutIds) return;
+                          if (value) {
+                            setEditingSceneId(null);
+                          }
                           setEditingId(value ? b.id : null);
                         }}
                         selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
@@ -1772,6 +1781,14 @@ function App() {
               canAddFromSelection={
                 !cutIds && !bulkEdit && Boolean(cursorId.current || selected.size > 0)
               }
+              editingSceneId={editingSceneId}
+              onEditingSceneChange={(sceneId) => {
+                if (sceneId) {
+                  setEditingId(null);
+                  setBulkEdit(null);
+                }
+                setEditingSceneId(sceneId);
+              }}
               focusSceneId={focusSceneId}
               onClearFocusScene={() => setFocusSceneId(null)}
               onAddFromSelection={() => {
@@ -1794,6 +1811,9 @@ function App() {
                   ...p,
                   scenes: removeScene(p.scenes, p.blocks, sceneId),
                 });
+                if (editingSceneId === sceneId) {
+                  setEditingSceneId(null);
+                }
                 setNotice('장면 북마크를 삭제했습니다.');
               }}
             />

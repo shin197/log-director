@@ -1303,9 +1303,9 @@ code {
   color: var(--accent);
 }
 
-.log-message.has-jump {
+/* .log-message.has-jump {
   padding-right: 130px;
-}
+} */
 
 /* Search Match Subtle Vertical Line Indicator (Option 1) */
 .log-message.search-match:not(.selected):not(.bulk-target):not(.system) {
