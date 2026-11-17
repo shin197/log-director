@@ -29,6 +29,13 @@ import {
   getMarkerBoundsPercent,
 } from './scrollbarOverview.ts';
 import {
+  createSlotFromBlock,
+  getQuickSlotNumber,
+  removeQuickCharacterSlot,
+  resolveQuickSlotForComposer,
+  setQuickCharacterSlot,
+} from './quickSlots.ts';
+import {
   applyBulkEditToProject,
   createBulkEditState,
   getBulkFaceCharacter,
@@ -2482,4 +2489,65 @@ test('설정 탭 신규 옵션: 병합 구분자, 미사용 이미지 통계·�
   assert.equal(roundtrip.display?.maxUndoSteps, 50);
   assert.equal(roundtrip.display?.showScrollbarOverlay, false);
   assert.equal(roundtrip.display?.preserveOriginals, false);
+});
+
+test('빠른 캐릭터 전환 슬롯: 저장·불러오기·해제 및 project.json/이미지풀 보존', () => {
+  // 1) 단축키 숫자 인식
+  assert.equal(getQuickSlotNumber({ key: '1', code: 'Digit1' }), 1);
+  assert.equal(getQuickSlotNumber({ key: '9', code: 'Digit9' }), 9);
+  assert.equal(getQuickSlotNumber({ key: '!', code: 'Digit1' }), 1);
+  assert.equal(getQuickSlotNumber({ key: '0', code: 'Digit0' }), null);
+  assert.equal(getQuickSlotNumber({ key: 'a', code: 'KeyA' }), null);
+
+  // 2) 블록에서 슬롯 생성 (채널 미포함) & 슬롯 등록/해제
+  const base = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: '아린', channelName: '잡담', iconUrl: 'https://example.com/a.png', text: '안녕' },
+        { speaker: '사용자지정', channelName: '메인', iconUrl: 'data:image/png;base64,QQ==', color: '#112233', text: '커스텀' },
+      ],
+    }),
+    'quick.json',
+  );
+  const slot1 = createSlotFromBlock(base.blocks[0]!, base.characters ?? []);
+  assert.equal(slot1.speaker, '아린');
+  assert.ok(slot1.characterId);
+  assert.equal('channel' in slot1, false);
+
+  let slots = setQuickCharacterSlot(undefined, 1, slot1);
+  slots = setQuickCharacterSlot(slots, 2, createSlotFromBlock(base.blocks[1]!, base.characters ?? []));
+  assert.equal(Object.keys(slots).length, 2);
+
+  // 캐릭터 이름 변경 시 연동 슬롯은 최신 이름 반영
+  const renamedChars = (base.characters ?? []).map((c) =>
+    c.id === slot1.characterId ? { ...c, name: '아린(개명)' } : c,
+  );
+  const resolved1 = resolveQuickSlotForComposer(slots['1']!, renamedChars);
+  assert.equal(resolved1.speaker, '아린(개명)');
+
+  // 슬롯 해제
+  const afterRemove = removeQuickCharacterSlot(slots, 1);
+  assert.equal(afterRemove?.['1'], undefined);
+  assert.ok(afterRemove?.['2']);
+
+  const empty = removeQuickCharacterSlot(afterRemove, 2);
+  assert.equal(empty, undefined);
+
+  // 3) project.json 왕복 및 quickSlots 내 base64 이미지 참조 보존
+  const withSlots = {
+    ...base,
+    quickSlots: slots,
+  };
+  const roundtrip = parse(JSON.stringify(withSlots), 'slots.project.json');
+  assert.ok(roundtrip.quickSlots?.['1']);
+  assert.ok(roundtrip.quickSlots?.['2']);
+  assert.ok(isImagePoolRef(roundtrip.quickSlots?.['2']?.iconUrl));
+
+  // 블록에서 커스텀 화자 메시지를 지워도 슬롯에 남아있으면 미참조로 정리되지 않음
+  const onlySlotRef = normalizeProjectImagePool({
+    ...roundtrip,
+    blocks: [],
+  });
+  assert.equal(getUnusedImageStats(onlySlotRef).totalCount, 1);
+  assert.equal(getUnusedImageStats(onlySlotRef).unusedCount, 0);
 });

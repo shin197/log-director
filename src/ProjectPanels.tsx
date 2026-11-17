@@ -1,12 +1,14 @@
 import { useMemo, useRef } from 'react';
 import type { Project } from './core';
-import { getUnusedImageStats, normalizeProjectImagePool } from './imagePool';
+import { getUnusedImageStats, normalizeProjectImagePool, resolveImageUrl } from './imagePool';
 import {
   defaultDisplay,
   displayTime,
   type MergeSeparatorMode,
 } from './presentation';
+import { removeQuickCharacterSlot, resolveQuickSlotForComposer } from './quickSlots';
 import { exportStylesConfig, parseStylesConfig } from './styles';
+import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 
 export { CharacterPanel } from './CharacterPanel';
 
@@ -110,7 +112,7 @@ export function SettingsPanel({
               checked={settings.showScrollbarOverlay ?? true}
               onChange={(e) => update({ showScrollbarOverlay: e.target.checked })}
             />
-            <span>스크롤바 오버레이 표시 (장면·검색·선택)</span>
+            <span>스크롤바 오버레이</span>
           </label>
         </div>
 
@@ -152,7 +154,7 @@ export function SettingsPanel({
               checked={settings.virtualScroll ?? true}
               onChange={(e) => update({ virtualScroll: e.target.checked })}
             />
-            <span>가상 스크롤 활성화 (1,000건 페이지 구분 없이 전체 연속 스크롤)</span>
+            <span>가상 스크롤 활성화</span>
           </label>
         </div>
 
@@ -291,6 +293,84 @@ export function SettingsPanel({
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="settings-card settings-card-wide">
+        <h2>빠른 캐릭터 전환 슬롯 (Ctrl+1~9 / Alt+1~9)</h2>
+        <small className="muted-note">
+          채팅창의 화자·메시지 입력칸이나 타임라인 메시지에서 <code>Ctrl + 1~9</code>를
+          눌러 캐릭터를 저장하고, <code>Alt + 1~9</code>로 빠르게 전환합니다. (채널은
+          복사되지 않습니다)
+        </small>
+        {(() => {
+          const slots = p.quickSlots ?? {};
+          const entries = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+            .filter((k) => Boolean(slots[k]))
+            .map((k) => ({
+              key: k,
+              slot: resolveQuickSlotForComposer(slots[k]!, p.characters ?? []),
+            }));
+
+          if (entries.length === 0) {
+            return (
+              <div className="quick-slots-empty">
+                저장된 빠른 전환 캐릭터가 없습니다. 채팅창에서 <code>Ctrl + 1~9</code>를
+                눌러 자주 쓰는 캐릭터를 등록해보세요.
+              </div>
+            );
+          }
+
+          return (
+            <div className="quick-slots-grid">
+              {entries.map(({ key, slot }) => {
+                const isSystem = slot.characterId === SYSTEM_CHARACTER_ID;
+                const isCustom = !slot.characterId;
+                const resolvedIcon = resolveImageUrl(slot.iconUrl, p.images);
+                return (
+                  <div key={key} className="quick-slot-card">
+                    <span className="quick-slot-key">Alt+{key}</span>
+                    <div className="quick-slot-avatar">
+                      {resolvedIcon ? (
+                        <img src={resolvedIcon} alt="" />
+                      ) : (
+                        <span className="quick-slot-avatar-placeholder">
+                          {isSystem ? 'SYS' : (slot.speaker || '?').slice(0, 1)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="quick-slot-meta">
+                      <strong
+                        className="quick-slot-name"
+                        style={slot.color ? { color: slot.color } : undefined}
+                      >
+                        {slot.speaker || '이름 없음'}
+                      </strong>
+                      <span className="quick-slot-badge">
+                        {isSystem ? '시스템' : isCustom ? '사용자 지정' : '캐릭터'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="ghost icon-btn quick-slot-remove-btn"
+                      title={`슬롯 ${key} 지정 해제`}
+                      aria-label={`슬롯 ${key} (${slot.speaker}) 지정 해제`}
+                      onClick={() => {
+                        const nextSlots = removeQuickCharacterSlot(p.quickSlots, key);
+                        const nextProject = { ...p };
+                        if (nextSlots) nextProject.quickSlots = nextSlots;
+                        else delete nextProject.quickSlots;
+                        commit(nextProject);
+                        onNotice?.(`${key}번 빠른 전환 슬롯을 해제했습니다.`);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </section>
     </>
   );

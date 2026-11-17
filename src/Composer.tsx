@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Block, Character } from './core';
+import type { Block, Character, QuickCharacterSlot } from './core';
 import { fuzzyName, inheritCharacter } from './characters';
 import { FacePicker } from './FacePicker';
 import { ImageUrlInput } from './ImageUrlInput';
@@ -11,12 +11,13 @@ import { CharacterCard } from './CharacterCard';
 import { ColorInput } from './ColorInput';
 import { resolveImageUrl } from './imagePool';
 import { useImagePool } from './ImagePoolContext';
+import { getQuickSlotNumber } from './quickSlots';
 
 export type EyedropPayload = {
   speaker: string;
   characterId: string | null;
   iconUrl: string;
-  channel: string;
+  channel?: string;
   color?: string;
   key: number;
 };
@@ -29,6 +30,7 @@ export function Composer({
   eyedrop = null,
   focusRequest = 0,
   autoWrapQuotes = true,
+  onSaveQuickSlot,
 }: {
   characters: Character[];
   channels?: ChannelSummary[];
@@ -37,6 +39,7 @@ export function Composer({
   eyedrop?: EyedropPayload | null;
   focusRequest?: number;
   autoWrapQuotes?: boolean;
+  onSaveQuickSlot?: (slotNumber: number, slot: QuickCharacterSlot) => void;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
@@ -66,7 +69,9 @@ export function Composer({
     setId(eyedrop.characterId);
     setIcon(eyedrop.iconUrl);
     setColor(eyedrop.color ?? '');
-    setChannel(eyedrop.channel);
+    if (eyedrop.channel !== undefined) {
+      setChannel(eyedrop.channel);
+    }
     setOpen(false);
     setUrlOpen(false);
     setCollapsed(false);
@@ -127,8 +132,39 @@ export function Composer({
     );
   }
 
+  function handleComposerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && onSaveQuickSlot) {
+      const slotNum = getQuickSlotNumber(e);
+      if (slotNum !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+        const c =
+          character ??
+          characters.find((ch) => ch.name === name) ??
+          (name.trim() ? matches[0] : undefined);
+        const slot: QuickCharacterSlot = c
+          ? {
+              speaker: c.name,
+              characterId: c.id,
+              iconUrl:
+                c.id === SYSTEM_CHARACTER_ID
+                  ? ''
+                  : icon || c.iconUrl || c.faces[0]?.iconUrl || '',
+              color: c.id === SYSTEM_CHARACTER_ID ? undefined : c.color || undefined,
+            }
+          : {
+              speaker: name.trim(),
+              characterId: null,
+              iconUrl: icon,
+              color: color || undefined,
+            };
+        onSaveQuickSlot(slotNum, slot);
+      }
+    }
+  }
+
   return (
-    <div className="composer">
+    <div className="composer" onKeyDown={handleComposerKeyDown}>
       <div className="composer-inner">
         <div className="composer-top">
           <div className="composer-speaker-group">

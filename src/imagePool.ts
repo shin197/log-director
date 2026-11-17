@@ -76,6 +76,11 @@ export function collectReferencedImageKeys(p: Project): Set<string> {
   for (const b of p.blocks) {
     addRef(b.iconUrl);
   }
+  if (p.quickSlots) {
+    for (const slot of Object.values(p.quickSlots)) {
+      addRef(slot.iconUrl);
+    }
+  }
   return used;
 }
 
@@ -158,13 +163,31 @@ function processProjectImagePool(p: Project, pruneUnused: boolean): Project {
     return b;
   });
 
+  let slotsChanged = false;
+  let nextQuickSlots = p.quickSlots;
+  if (p.quickSlots) {
+    const updatedSlots: NonNullable<Project['quickSlots']> = {};
+    for (const [k, slot] of Object.entries(p.quickSlots)) {
+      const nextIconUrl = normalizeRef(slot.iconUrl);
+      if (nextIconUrl !== slot.iconUrl) {
+        slotsChanged = true;
+        updatedSlots[k] = { ...slot, iconUrl: nextIconUrl };
+      } else {
+        updatedSlots[k] = slot;
+      }
+    }
+    if (slotsChanged) {
+      nextQuickSlots = updatedSlots;
+    }
+  }
+
   const prevKeys = Object.keys(existingImages);
   const nextKeys = Object.keys(nextImages);
   const poolChanged =
     prevKeys.length !== nextKeys.length ||
     nextKeys.some((k) => existingImages[k] !== nextImages[k]);
 
-  if (!charsChanged && !blocksChanged && !poolChanged) {
+  if (!charsChanged && !blocksChanged && !slotsChanged && !poolChanged) {
     return p;
   }
 
@@ -172,6 +195,7 @@ function processProjectImagePool(p: Project, pruneUnused: boolean): Project {
     ...p,
     characters: charsChanged ? nextCharacters : p.characters,
     blocks: blocksChanged ? nextBlocks : p.blocks,
+    ...(slotsChanged ? { quickSlots: nextQuickSlots } : {}),
   };
   if (nextKeys.length > 0) {
     next.images = nextImages;

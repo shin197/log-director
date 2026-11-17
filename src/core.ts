@@ -46,6 +46,12 @@ export type OriginalFile = {
   name: string;
   raw: string;
 };
+export type QuickCharacterSlot = {
+  speaker: string;
+  characterId: string | null;
+  iconUrl: string;
+  color?: string;
+};
 export type Project = {
   format: 'log-studio';
   version: 1;
@@ -57,6 +63,7 @@ export type Project = {
   scenes?: Scene[];
   styles?: ProjectStyles;
   display?: DisplaySettings;
+  quickSlots?: Record<string, QuickCharacterSlot>;
   expressions?: { speaker: string; iconUrl: string; name: string }[];
 };
 export const blank = (): Project => ({
@@ -100,6 +107,25 @@ export function validateLogStudioProject(d: any): Project {
   }
   if (d.styles && typeof d.styles === 'object') {
     migrated.styles = normalizeProjectStyles(d.styles);
+  }
+  if (d.quickSlots && typeof d.quickSlots === 'object' && !Array.isArray(d.quickSlots)) {
+    const cleanSlots: Record<string, QuickCharacterSlot> = {};
+    for (const [k, v] of Object.entries(d.quickSlots)) {
+      if (!/^[1-9]$/.test(k) || !v || typeof v !== 'object') continue;
+      const item = v as any;
+      if (typeof item.speaker !== 'string') continue;
+      cleanSlots[k] = {
+        speaker: item.speaker,
+        characterId: typeof item.characterId === 'string' ? item.characterId : null,
+        iconUrl: typeof item.iconUrl === 'string' ? item.iconUrl : '',
+        ...(typeof item.color === 'string' && item.color ? { color: item.color } : {}),
+      };
+    }
+    if (Object.keys(cleanSlots).length > 0) {
+      migrated.quickSlots = cleanSlots;
+    } else {
+      delete migrated.quickSlots;
+    }
   }
   return normalizeProjectImagePool(migrated);
 }

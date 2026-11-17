@@ -27,6 +27,10 @@ const CONTEXT_CONTENT: Record<
             desc: '스포이트: 캐릭터·표정·채널을 입력창에 복사',
           },
           { key: 'Tab', desc: '하단 채팅창(Composer) 포커스 / 해제' },
+          {
+            key: 'Ctrl+1~9 / Alt+1~9',
+            desc: '현재 화자를 1~9번 슬롯에 저장 / 저장된 캐릭터로 빠르게 전환',
+          },
         ],
       },
       {

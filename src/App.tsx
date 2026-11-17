@@ -30,6 +30,12 @@ import {
 import { SceneSidebar } from './SceneSidebar';
 import { TimelineScrollbarOverlay } from './TimelineScrollbarOverlay';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
+import {
+  createSlotFromBlock,
+  getQuickSlotNumber,
+  resolveQuickSlotForComposer,
+  setQuickCharacterSlot,
+} from './quickSlots';
 import { SearchBar } from './SearchBar';
 import { RestoreDialog } from './RestoreDialog';
 import { HelpSheet, type HelpContext } from './HelpSheet';
@@ -56,6 +62,7 @@ import {
   type Project,
   type Block,
   type Scene,
+  type QuickCharacterSlot,
 } from './core';
 import './style.css';
 import './workspace-layout.css';
@@ -432,6 +439,39 @@ function App() {
     setNotice(`‘${speaker || '캐릭터 없음'}’ 캐릭터 정보를 입력창에 가져왔습니다.`);
   }
 
+  function saveQuickSlot(slotNumber: number, slot: QuickCharacterSlot) {
+    if (!slot.speaker.trim()) {
+      setNotice('저장할 화자 또는 캐릭터를 먼저 선택하세요.');
+      return;
+    }
+    commit({
+      ...p,
+      quickSlots: setQuickCharacterSlot(p.quickSlots, slotNumber, slot),
+    });
+    setNotice(
+      `‘${slot.speaker}’ 캐릭터를 ${slotNumber}번 슬롯에 저장했습니다. (Alt+${slotNumber}로 전환)`,
+    );
+  }
+
+  function applyQuickSlot(slotNumber: number) {
+    const raw = p.quickSlots?.[String(slotNumber)];
+    if (!raw) {
+      setNotice(
+        `${slotNumber}번 슬롯에 저장된 캐릭터가 없습니다. 채팅창에서 Ctrl+${slotNumber}로 저장하세요.`,
+      );
+      return;
+    }
+    const resolved = resolveQuickSlotForComposer(raw, p.characters ?? []);
+    setEyedrop({
+      speaker: resolved.speaker,
+      characterId: resolved.characterId,
+      iconUrl: resolved.iconUrl,
+      color: resolved.color,
+      key: Date.now() + Math.random(),
+    });
+    setNotice(`${slotNumber}번 슬롯: ‘${resolved.speaker}’(으)로 전환했습니다.`);
+  }
+
   function startCutMode() {
     if (!selected.size || editingId || bulkEdit || cutIds) return;
     const ids = new Set(selected);
@@ -561,6 +601,14 @@ function App() {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (tab !== '로그' || document.querySelector('dialog[open]')) return;
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        const slotNum = getQuickSlotNumber(e);
+        if (slotNum !== null) {
+          e.preventDefault();
+          if (!e.repeat) applyQuickSlot(slotNum);
+          return;
+        }
+      }
       if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         if (!e.repeat) toggleSearch();
@@ -634,6 +682,27 @@ function App() {
             setQuery('');
             setSearchActive(false);
             setSelected(new Set(p.blocks.map((b) => b.id)));
+          }
+          return;
+        }
+        const slotNum = !e.shiftKey ? getQuickSlotNumber(e) : null;
+        if (slotNum !== null) {
+          const targetId =
+            (target.closest('[data-message-id]') as HTMLElement | null)?.dataset
+              .messageId ??
+            cursorId.current ??
+            [...selected].at(-1);
+          const targetBlock = targetId
+            ? p.blocks.find((b) => b.id === targetId)
+            : undefined;
+          if (targetBlock) {
+            e.preventDefault();
+            if (!e.repeat) {
+              saveQuickSlot(
+                slotNum,
+                createSlotFromBlock(targetBlock, p.characters ?? []),
+              );
+            }
           }
           return;
         }
@@ -823,6 +892,8 @@ function App() {
     replaceOpen,
     p.scenes,
     p.blocks,
+    p.characters,
+    p.quickSlots,
   ]);
 
   useEffect(() => {
@@ -1846,6 +1917,7 @@ function App() {
                 eyedrop={eyedrop}
                 focusRequest={composerFocusRequest}
                 autoWrapQuotes={p.display?.autoWrapQuotes ?? true}
+                onSaveQuickSlot={saveQuickSlot}
               />
             </div>
 
