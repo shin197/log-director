@@ -949,8 +949,8 @@ function App() {
       : 0;
 
   const helpContext: HelpContext =
-    tab === '캐릭터'
-      ? 'characters'
+    tab === '스타일'
+      ? 'styles'
       : tab === '설정'
         ? 'settings'
         : cutIds

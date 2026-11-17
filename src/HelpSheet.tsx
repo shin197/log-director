@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 export type HelpContext =
-  'log' | 'log-editing' | 'log-bulk' | 'log-cut' | 'characters' | 'settings';
+  | 'log'
+  | 'log-editing'
+  | 'log-bulk'
+  | 'log-cut'
+  | 'styles'
+  | 'settings';
 
 type HelpSection = {
   title: string;
@@ -13,68 +18,87 @@ const CONTEXT_CONTENT: Record<
   { badge: string; title: string; sections: HelpSection[] }
 > = {
   log: {
-    badge: '로그 편집',
-    title: '타임라인 탐색 및 검색',
+    badge: '도움말',
+    title: '로그 편집',
     sections: [
       {
-        title: '선택 · 편집 · 스포이트',
+        title: '선택 · 편집 · 입력창 적용',
         items: [
           { key: '클릭 / Ctrl / Shift', desc: '단일 · 다중 · 구간 메시지 선택' },
-          { key: '더블클릭', desc: '메시지 편집 (선택 후 따옴표·괄호 자동 감싸기)' },
+          {
+            key: '더블클릭',
+            desc: '메시지 편집',
+          },
           { key: '드래그 / Alt+↑↓', desc: '선택 메시지 순서 이동' },
           {
             key: 'Alt+클릭 / Ctrl+C',
-            desc: '스포이트: 캐릭터·표정·채널을 입력창에 복사',
+            desc: '스포이트: 캐릭터·표정·채널을 채팅창에 복사',
           },
-          { key: 'Tab', desc: '하단 채팅창(Composer) 포커스 / 해제' },
           {
             key: 'Ctrl+1~9 / Alt+1~9',
-            desc: '현재 화자를 1~9번 슬롯에 저장 / 저장된 캐릭터로 빠르게 전환',
+            desc: '현재 캐릭터를 1~9번 슬롯에 저장 / 저장된 캐릭터로 전환',
           },
+          { key: 'Tab', desc: '채팅창 포커스 / 해제' },
         ],
       },
       {
-        title: '편집 모드 · 단축키',
+        title: '편집 모드 · 탐색 단축키',
         items: [
-          { key: 'Ctrl+Shift+Enter', desc: '다중 선택 일괄 편집 시작' },
+          {
+            key: 'Ctrl+Shift+Enter',
+            desc: '다중 선택 일괄 편집',
+          },
           {
             key: 'Ctrl+X / Ctrl+V',
-            desc: '선택 메시지 오려두기 / 원하는 위치에 붙여넣기',
+            desc: '메시지 오리기 / 붙여넣기',
           },
           { key: '↑↓ / Shift+↑↓', desc: '커서 이동 / 10개씩 이동 (Ctrl 조합 시 선택 유지)' },
-          { key: 'PgUp / PgDn', desc: '이전 / 다음 장면(북마크)으로 이동' },
-          { key: 'Ctrl+G', desc: '메시지 번호(라인)로 즉시 이동' },
-          { key: 'Shift+PgUp / PgDn', desc: '이전 / 다음 페이지(1000개 단위) 이동' },
-          { key: 'Home / End', desc: '필터 해제 후 처음 / 끝으로 이동' },
-          { key: 'Ctrl+Z / Ctrl+Y', desc: '실행 취소 / 다시 하기 · Del 선택 삭제' },
+          {
+            key: 'PgUp / PgDn',
+            desc: '이전 / 다음 장면(북마크) 이동 (Shift 조합 시 1000개 단위 점프)',
+          },
+          { key: 'Ctrl+G', desc: '메시지 번호로 이동' },
+          { key: 'Home / End', desc: '필터 해제 후 맨 처음 / 맨 끝으로 이동' },
+          { key: 'Ctrl+Z / Ctrl+Y', desc: '실행 취소 / 다시 하기' },
+          { key: 'Del', desc: '삭제' }
         ],
-      },
-      {
-        title: '검색 문법 (Ctrl+F 필터 ON/OFF · Ctrl+H 치환)',
-        items: [
-          { key: '일반 텍스트', desc: '캐릭터·대사·주사위 판정 통합 검색' },
-          { key: 'from:이름 · in:채널', desc: '캐릭터 또는 채널 필터 (in:none 빈 채널)' },
-          { key: 'scene:장면이름', desc: '해당 장면 시작부터 다음 장면 직전까지 필터' },
-          { key: 'dice:키워드', desc: '주사위 판정 결과 텍스트 필터' },
-          { key: 'is:상태', desc: 'dice / system / normal / unlinked' },
-          { key: '-조건 · Tab/Enter', desc: '조건 제외 · 자동완성 칩 확정' },
-        ],
-      },
+      }
+      // ,
+      // {
+      //   title: '검색 문법 (Ctrl+F 필터 ON/OFF · Ctrl+H 치환)',
+      //   items: [
+      //     { key: '일반 텍스트', desc: '캐릭터·대사·주사위 판정 통합 검색' },
+      //     { key: 'from:이름', desc: '캐릭터 필터' },
+      //     { key: 'in:채널', desc: '채널 필터 (in:none 채널 없음)' },
+      //     { key: 'scene:장면이름', desc: '해당 장면 시작부터 다음 장면 까지 필터' },
+      //     {
+      //       key: 'style:카드이름',
+      //       desc: '특정 스타일 카드가 적용된 메시지 필터 (style:none 미적용)',
+      //     },
+      //     { key: 'dice:키워드', desc: '주사위 판정 결과 텍스트 필터' },
+      //     { key: 'is:상태', desc: 'dice / system / normal / unlinked' },
+      //     { key: '-조건 · Tab/Enter', desc: '조건 제외 · 자동완성 칩 확정' },
+      //   ],
+      // },
     ],
   },
   'log-editing': {
-    badge: '개별 편집 중',
-    title: '단일 메시지 편집 도움말',
+    badge: '도움말',
+    title: '개별 편집',
     sections: [
       {
-        title: '메시지 수정',
+        title: '메시지 수정 · 스타일',
         items: [
           {
-            key: '텍스트 선택 + 괄호/따옴표',
-            desc: '선택 영역을 ", \', (, [, 「, 『 등으로 자동 감싸기',
+            key: '따옴표·괄호 입력',
+            desc: '", \', (, [, 「 등 입력 시 자동 닫기 및 커서 이동 · 선택 시 감싸기',
           },
           { key: '아바타 이미지 클릭', desc: '캐릭터의 다른 표정 이미지로 변경' },
           { key: '캐릭터 · 채널 변경', desc: '연결된 캐릭터나 소속 채널 수정' },
+          {
+            key: '개별 스타일 지정',
+            desc: '메시지 하단 스타일 드롭다운/칩으로 개별 스타일 카드 추가 및 해제',
+          },
           { key: 'Enter / 더블클릭 / 저장', desc: '편집 내용 저장 (Shift+Enter 줄바꿈)' },
           { key: 'Esc', desc: '저장하지 않고 편집 종료' },
         ],
@@ -82,21 +106,25 @@ const CONTEXT_CONTENT: Record<
     ],
   },
   'log-bulk': {
-    badge: '일괄 편집 중',
-    title: '다중 선택 일괄 편집 도움말',
+    badge: '도움말',
+    title: '일괄 편집',
     sections: [
       {
-        title: '대사 앞뒤 추가 · 치환',
+        title: '대사 앞뒤 추가 · 치환 · 스타일',
         items: [
           {
             key: '기존 대사 블럭 + 따옴표/괄호',
-            desc: '기존 대사 앞뒤를 한 번에 감싸기',
+            desc: '기존 대사 앞뒤를 한 번에 감싸기 (입력창 내 자동 닫기 지원)',
           },
           { key: '↑↓ / ←→', desc: '앞 추가 입력칸 ↔ 기존 블럭 ↔ 뒤 추가 입력칸 이동' },
+          {
+            key: '일괄 스타일 편집',
+            desc: '선택된 모든 메시지에 스타일 카드를 일괄 추가하거나 일괄 해제',
+          },
           { key: 'Ctrl+H', desc: '선택 메시지 대사 내부 문자열 찾기/치환 바 토글' },
           {
             key: 'Enter / 일괄 저장',
-            desc: '변경 사항 한 번의 commit으로 일괄 적용 (Shift+Enter 줄바꿈)',
+            desc: '적용한 내용을 일괄적으로 저장',
           },
           { key: 'Esc', desc: '치환 바 닫기 또는 일괄 편집 취소' },
         ],
@@ -116,7 +144,7 @@ const CONTEXT_CONTENT: Record<
           },
           { key: 'Ctrl+V', desc: '현재 커서 위치 기준으로 즉시 붙여넣기' },
           {
-            key: '검색 · 페이지 이동',
+            key: '검색 · 장면/라인 이동',
             desc: '오려둔 상태에서 원하는 목적지를 탐색 가능',
           },
           { key: 'Esc / 오리기 취소', desc: '이동을 취소하고 원래 자리 유지' },
@@ -124,59 +152,120 @@ const CONTEXT_CONTENT: Record<
       },
     ],
   },
-  characters: {
-    badge: '캐릭터 탭',
-    title: '캐릭터 및 표정 관리 도움말',
+  styles: {
+    badge: '도움말',
+    title: '스타일 편집',
     sections: [
       {
-        title: '목록 · 정보 관리',
+        title: '전역 스타일 (최상단 고정)',
         items: [
-          { key: '좌측 목록 드래그', desc: '캐릭터 표시 순서를 드래그로 자유롭게 변경' },
-          { key: 'Alt+클릭', desc: '해당 캐릭터(기본 표정)를 하단 입력창에 즉시 적용' },
           {
-            key: '＋ 추가 (Ctrl+V)',
-            desc: '새 캐릭터 생성 또는 코코포리아 캐릭터 JSON 붙여넣기 등록',
+            key: '문서 · 기본 메시지 스타일',
+            desc: '배경색, 최대 폭(px), 메시지 간격, 제목 서식 및 일반·시스템 기본 스타일 설정',
           },
-          { key: '저장 버튼', desc: '이름·색상·표정 변경을 연결된 메시지와 함께 저장' },
+          {
+            key: '기본값 복원 / 저장',
+            desc: '코코포리아 기본 테마로 복원 가능 · 편집 후 하단 저장 클릭 시 반영 (Esc 취소)',
+          },
         ],
       },
       {
-        title: '표정 카드 관리',
+        title: '일반 스타일 카드 · 계층(우선순위)',
         items: [
           {
-            key: '이미지 사각형 클릭',
-            desc: '사진 파일 업로드(base64) 또는 URL/base64 입력',
+            key: '＋ 카드 추가 / 복제',
+            desc: '스타일 카드 생성 및 복제 · 카드 클릭 시 편집 및 미리보기',
           },
           {
-            key: '＋ 파일로 추가',
-            desc: '여러 이미지 파일을 한 번에 표정으로 즉시 등록',
+            key: '드래그 / ↑↓ 이동',
+            desc: '카드 순서로 변경, 아래쪽 카드가 위쪽보다 우선도가 높음',
           },
-          { key: '⋮⋮ 핸들 드래그', desc: '표정 카드 간 순서를 드래그로 재정렬' },
-          { key: '기본 지정', desc: '캐릭터 대표 아이콘으로 사용할 기본 표정 설정' },
+          {
+            key: '속성별 지정 (+ / ×)',
+            desc: '원하는 속성만 부분 지정하고 ×로 해제 시 상위 카드·전역 스타일 값을 계승',
+          },
+          {
+            key: '미리보기',
+            desc: '현재 로그에서 조건과 일치하는 메시지와 실제 샘플 적용 모습 즉시 확인',
+          },
+        ],
+      },
+      {
+        title: '적용 필터 · 서식 · 연동',
+        items: [
+          {
+            key: '적용 필터',
+            desc: '검색 문법으로 자동 적용된 필터들 중 하나만 맞아도 적용',
+          },
+          {
+            key: '사용처 칩 해제 (×)',
+            desc: '캐릭터·개별 메시지에 직접 연결된 사용처를 칩의 × 버튼으로 일괄 해제',
+          },
+          {
+            key: '패널 · 아바타 · 판정 서식',
+            desc: '글씨체, 화자 색/점선 테두리, 아바타 형태(원·사각·마름모·숨김), 주사위 강조 지원',
+          },
+          {
+            key: '로그·설정 연동',
+            desc: '로그 편집/일괄 편집에서 개별 지정 가능 · 설정 탭에서 프리셋(.styles.json) 백업',
+          },
         ],
       },
     ],
   },
   settings: {
-    badge: '설정 탭',
-    title: '표시 설정 · 보관함 · 내보내기 도움말',
+    badge: '도움말',
+    title: '설정',
     sections: [
       {
-        title: '출력 및 프로젝트 관리',
+        title: '표시 및 타임라인 · 캐릭터 전환 슬롯',
         items: [
           {
-            key: '채널 · 타임스탬프 설정',
-            desc: '편집 화면과 4종 내보내기에 일괄 적용 (원본 보존)',
+            key: '채널 · 타임스탬프 · 스타일',
+            desc: '편집 화면·내보내기 표시 여부 및 타임스탬프 표기 형식(원본 표기/날짜 변환) 지정',
+          },
+          {
+            key: '오버레이 · 가상 스크롤 버퍼',
+            desc: '스크롤바 미니맵 표시 토글 및 상하 여유 렌더링 개수(15~100개) 조절',
+          },
+          {
+            key: '캐릭터 전환 슬롯',
+            desc: 'Ctrl+1~9로 저장한 화자 목록 확인 및 × 버튼으로 슬롯 지정 해제',
+          },
+        ],
+      },
+      {
+        title: '편집 동작 및 데이터 관리',
+        items: [
+          {
+            key: '연속 병합 옵션',
+            desc: '병합 구분자(\\n, 빈 줄, 공백) 및 표정이 달라도 합치기 허용 여부 설정',
+          },
+          {
+            key: '따옴표·괄호 자동 감싸기/닫기',
+            desc: '입력 시 자동 닫힘·닫힘 기호 스킵 및 선택 영역 감싸기 기능',
+          },
+          {
+            key: '스타일 카드 내보내기/불러오기',
+            desc: '스타일 카드(.styles.json) 내보내기/불러오기, 기존을 덮어씀',
+          },
+          {
+            key: 'URL 변환 버튼',
+            desc: '외부 웹 이미지 URL로 되어있는 이미지를 Base64로 내재화 저장',
+          },
+        ],
+      },
+      {
+        title: '원본 보관함 · 저장 및 내보내기',
+        items: [
+          {
+            key: '원본 로그 보존',
+            desc: '불러온 원본 원문 열람/내려받기 · 보존 해제 시 프로젝트 파일에서 원본 제외 및 일괄 삭제 가능',
           },
           {
             key: '상단 저장 (.project.json)',
-            desc: '원본·캐릭터·편집 상태를 프로젝트 파일로 보관',
+            desc: '프로젝트 전체 상태 저장 · 상단 내보내기에서 HTML·TXT·JSON·MD 출력 지원',
           },
-          {
-            key: '상단 내보내기',
-            desc: 'HTML·TXT·JSON·MD 출력 (검색 필터·Base64 최적화 지원)',
-          },
-          { key: '원본 보관함', desc: '처음 불러온 원본 로그 문자열 확인' },
         ],
       },
     ],

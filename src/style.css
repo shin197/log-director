@@ -780,7 +780,7 @@ code {
   top: 58px;
   right: 18px;
   z-index: 80;
-  width: min(370px, calc(100vw - 24px));
+  width: min(410px, calc(100vw - 24px));
   max-height: calc(100vh - 84px);
   display: flex;
   flex-direction: column;
