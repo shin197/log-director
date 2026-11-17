@@ -849,6 +849,79 @@ code {
   font-size: 13px;
 }
 
+/* Collapsible Jump to Line Bar (Ctrl+G) */
+.jump-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.jump-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.jump-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+.jump-prefix {
+  position: absolute;
+  left: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.jump-input-wrap input {
+  padding-left: 22px;
+  width: 140px;
+  max-width: 180px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+}
+
+.jump-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jump-preview-speaker {
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.jump-preview-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jump-warning {
+  font-size: 12px;
+  color: var(--danger, #f87171);
+}
+
 /* Log Timeline & Message Blocks */
 .log-list {
   max-width: var(--log-width);
@@ -1154,6 +1227,27 @@ code {
   background: transparent;
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Message Line Number Badge on Hover */
+.message-index-badge {
+  position: absolute;
+  right: 12px;
+  bottom: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  line-height: 1;
+}
+
+.log-message:hover .message-index-badge,
+.log-message:focus-within .message-index-badge,
+.log-message.selected .message-index-badge {
+  opacity: 0.55;
 }
 
 .message-bookmark-trigger.is-bookmarked:hover {
@@ -1760,7 +1854,7 @@ code {
   text-align: left;
   border: 0;
   background: transparent;
-  padding: 5px 8px;
+  padding: 4px 4px;
   border-radius: var(--radius-sm);
 }
 

@@ -73,6 +73,7 @@ export function MessageBlock({
   scene,
   onBookmark,
   itemRef,
+  lineNumber,
 }: {
   block: Block;
   searchMatch?: boolean;
@@ -84,6 +85,7 @@ export function MessageBlock({
   scene?: Scene;
   onBookmark?: () => void;
   itemRef?: (node: HTMLElement | null) => void;
+  lineNumber?: number;
   characters?: Character[];
   channels?: ChannelSummary[];
   display?: DisplaySettings;
@@ -953,6 +955,15 @@ export function MessageBlock({
             </button>
           )}
         </div>
+      )}
+      {lineNumber !== undefined && !isEditing && !bulkDisabled && (
+        <span
+          className="message-index-badge"
+          aria-hidden="true"
+          title={`메시지 #${lineNumber}`}
+        >
+          #{lineNumber}
+        </span>
       )}
     </article>
   );

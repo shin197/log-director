@@ -70,6 +70,9 @@ function App() {
   const [searchActive, setSearchActive] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [jumpValue, setJumpValue] = useState('');
+  const jumpInputRef = useRef<HTMLInputElement>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const [find, setFind] = useState('');
@@ -204,6 +207,39 @@ function App() {
   }, [applyStylesInEditor, p.styles, p.characters, p.scenes, p.blocks]);
 
   const visible = p.blocks.filter(predicate);
+  const lineNumberMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < p.blocks.length; i++) {
+      map.set(p.blocks[i].id, i + 1);
+    }
+    return map;
+  }, [p.blocks]);
+
+  const parsedJumpNum = useMemo(() => {
+    const raw = jumpValue.trim().replace(/^[#:]/, '');
+    if (!raw) return null;
+    const n = parseInt(raw, 10);
+    return !isNaN(n) && n >= 1 && n <= p.blocks.length ? n : null;
+  }, [jumpValue, p.blocks.length]);
+
+  const parsedJumpTarget = parsedJumpNum !== null ? p.blocks[parsedJumpNum - 1] : null;
+
+  useEffect(() => {
+    if (!jumpOpen) return;
+    if (selected.size === 1) {
+      const id = Array.from(selected)[0];
+      const line = lineNumberMap.get(id);
+      if (line) setJumpValue(String(line));
+      else setJumpValue('');
+    } else {
+      setJumpValue('');
+    }
+    requestAnimationFrame(() => {
+      jumpInputRef.current?.focus();
+      jumpInputRef.current?.select();
+    });
+  }, [jumpOpen]);
+
   const isVirtual = Boolean(p.display?.virtualScroll ?? true);
   const virtualBuffer = p.display?.virtualBuffer ?? 25;
 
@@ -269,6 +305,46 @@ function App() {
     } else {
       setPage(Math.floor(index / PAGE_SIZE));
     }
+  }
+
+  function jumpToLine(targetLine: number) {
+    if (isNaN(targetLine) || targetLine < 1 || targetLine > p.blocks.length) {
+      setNotice(`1부터 ${p.blocks.length} 사이의 유효한 메시지 번호를 입력하세요.`);
+      return;
+    }
+    const targetBlock = p.blocks[targetLine - 1];
+    if (!targetBlock) return;
+
+    const visibleIndex = visible.findIndex((b) => b.id === targetBlock.id);
+    if (visibleIndex < 0) {
+      setSearchActive(false);
+      setQuery('');
+      setEditingId(null);
+      setBulkEdit(null);
+      setSelected(new Set([targetBlock.id]));
+      if (cutIds) setPasteTarget({ id: targetBlock.id, after: true });
+      pendingFocus.current = { id: targetBlock.id, direction: 1, center: true };
+      const fullIndex = targetLine - 1;
+      if (isVirtual) {
+        scrollToIndex(fullIndex, 'center');
+      } else {
+        setPage(Math.floor(fullIndex / PAGE_SIZE));
+      }
+      setNotice(`검색 필터를 해제하고 #${targetLine} 메시지로 이동했습니다.`);
+    } else {
+      setEditingId(null);
+      setBulkEdit(null);
+      setSelected(new Set([targetBlock.id]));
+      if (cutIds) setPasteTarget({ id: targetBlock.id, after: true });
+      pendingFocus.current = { id: targetBlock.id, direction: 1, center: true };
+      if (isVirtual) {
+        scrollToIndex(visibleIndex, 'center');
+      } else {
+        setPage(Math.floor(visibleIndex / PAGE_SIZE));
+      }
+      setNotice(`#${targetLine} 메시지로 이동했습니다.`);
+    }
+    setJumpOpen(false);
   }
 
   function jumpToScene(scene: Scene) {
@@ -474,12 +550,27 @@ function App() {
         if (cutIds) return;
         e.preventDefault();
         if (!e.repeat) {
+          setJumpOpen(false);
           if (bulkEdit) setBulkReplaceOpen((v) => !v);
           else setReplaceOpen((v) => !v);
         }
         return;
       }
+      if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'g') {
+        if (cutIds || bulkEdit) return;
+        e.preventDefault();
+        if (!e.repeat) {
+          setReplaceOpen(false);
+          setBulkReplaceOpen(false);
+          setJumpOpen((v) => !v);
+        }
+        return;
+      }
       if (e.key === 'Escape') {
+        if (jumpOpen) {
+          setJumpOpen(false);
+          return;
+        }
         if (cutIds) {
           cancelCutMode();
           return;
@@ -487,6 +578,10 @@ function App() {
         if (bulkEdit) {
           setBulkEdit(null);
           setBulkReplaceOpen(false);
+          return;
+        }
+        if (replaceOpen) {
+          setReplaceOpen(false);
           return;
         }
         setSelected(new Set());
@@ -704,6 +799,8 @@ function App() {
     past,
     future,
     searchActive,
+    jumpOpen,
+    replaceOpen,
     p.scenes,
     p.blocks,
   ]);
@@ -1295,9 +1392,10 @@ function App() {
                   type="button"
                   className="compact-btn"
                   aria-pressed={bulkEdit ? bulkReplaceOpen : replaceOpen}
-                  onClick={() =>
-                    bulkEdit ? setBulkReplaceOpen((v) => !v) : setReplaceOpen((v) => !v)
-                  }
+                  onClick={() => {
+                    setJumpOpen(false);
+                    bulkEdit ? setBulkReplaceOpen((v) => !v) : setReplaceOpen((v) => !v);
+                  }}
                   title="일괄 치환 열기/닫기 (Ctrl+H)"
                 >
                   치환
@@ -1369,6 +1467,76 @@ function App() {
                 className="ghost icon-btn"
                 aria-label="치환 바 닫기"
                 onClick={() => setReplaceOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {jumpOpen && (
+            <div className="jump-bar">
+              {/* <span className="jump-title">라인 이동</span> */}
+              <span className="count-pill">전체 {p.blocks.length}개</span>
+              <div className="jump-input-wrap">
+                <span className="jump-prefix">#</span>
+                <input
+                  ref={jumpInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="이동할 메시지 번호"
+                  placeholder={`1 ~ ${p.blocks.length}`}
+                  value={jumpValue}
+                  onChange={(e) => setJumpValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const num = parseInt(jumpValue.trim().replace(/^[#:]/, ''), 10);
+                      if (!isNaN(num)) jumpToLine(num);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setJumpOpen(false);
+                    }
+                  }}
+                />
+              </div>
+              {parsedJumpTarget ? (
+                <span
+                  className="jump-preview"
+                  title={`${parsedJumpTarget.speaker || '익명'}: ${parsedJumpTarget.text}`}
+                >
+                  <strong className="jump-preview-speaker">
+                    {parsedJumpTarget.speaker || '익명'}
+                  </strong>
+                  <span className="jump-preview-text">
+                    {parsedJumpTarget.text
+                      ? parsedJumpTarget.text.slice(0, 32) +
+                      (parsedJumpTarget.text.length > 32 ? '…' : '')
+                      : (parsedJumpTarget.diceResult || '(빈 메시지)')}
+                  </span>
+                </span>
+              ) : jumpValue.trim() ? (
+                <span className="jump-warning">
+                  1 ~ {p.blocks.length} 사이 번호 입력
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="primary compact-btn"
+                disabled={!parsedJumpTarget}
+                onClick={() => {
+                  const num = parseInt(jumpValue.trim().replace(/^[#:]/, ''), 10);
+                  if (!isNaN(num)) jumpToLine(num);
+                }}
+                title="해당 번호 메시지로 이동 (Enter)"
+              >
+                이동
+              </button>
+              <button
+                type="button"
+                className="ghost icon-btn"
+                aria-label="라인 이동 닫기"
+                onClick={() => setJumpOpen(false)}
+                title="닫기 (Esc)"
               >
                 ×
               </button>
@@ -1461,6 +1629,7 @@ function App() {
                       <MessageBlock
                         key={b.id}
                         block={displayBlock}
+                        lineNumber={lineNumberMap.get(b.id)}
                         itemRef={measureElement}
                         characters={p.characters}
                         channels={channels}

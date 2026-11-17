@@ -47,6 +47,10 @@ body,
   flex-shrink: 0;
 }
 
+.log-editor>.jump-bar {
+  flex-shrink: 0;
+}
+
 .log-editor-body {
   flex: 1;
   min-height: 0;

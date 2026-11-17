@@ -39,6 +39,7 @@ const CONTEXT_CONTENT: Record<
           },
           { key: '↑↓ / Shift+↑↓', desc: '커서 이동 / 10개씩 이동 (Ctrl 조합 시 선택 유지)' },
           { key: 'PgUp / PgDn', desc: '이전 / 다음 장면(북마크)으로 이동' },
+          { key: 'Ctrl+G', desc: '메시지 번호(라인)로 즉시 이동' },
           { key: 'Shift+PgUp / PgDn', desc: '이전 / 다음 페이지(1000개 단위) 이동' },
           { key: 'Home / End', desc: '필터 해제 후 처음 / 끝으로 이동' },
           { key: 'Ctrl+Z / Ctrl+Y', desc: '실행 취소 / 다시 하기 · Del 선택 삭제' },

@@ -2296,3 +2296,22 @@ test('마름모(diamond) 인장: 틀 45도 회전(70.71%) 및 내부 역회전(1
   assert.equal(reparsed.blocks.length, 1);
   assert.equal(resolveImageUrl(reparsed.blocks[0]?.iconUrl, reparsed.images), 'https://example.com/alpha.png');
 });
+
+test('메시지 라인 번호(Ctrl+G) 파싱 및 유효성 검증', () => {
+  const parseLineNumber = (input: string, total: number) => {
+    const raw = input.trim().replace(/^[#:]/, '');
+    if (!raw) return null;
+    const n = parseInt(raw, 10);
+    return !isNaN(n) && n >= 1 && n <= total ? n : null;
+  };
+
+  assert.equal(parseLineNumber('333', 500), 333);
+  assert.equal(parseLineNumber('#333', 500), 333);
+  assert.equal(parseLineNumber(':333', 500), 333);
+  assert.equal(parseLineNumber(' #42 ', 500), 42);
+  assert.equal(parseLineNumber('0', 500), null);
+  assert.equal(parseLineNumber('501', 500), null);
+  assert.equal(parseLineNumber('-5', 500), null);
+  assert.equal(parseLineNumber('abc', 500), null);
+  assert.equal(parseLineNumber('', 500), null);
+});
