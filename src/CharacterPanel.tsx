@@ -24,11 +24,13 @@ export function CharacterPanel({
   onToggleOpen,
   project: p,
   commit,
+  onSelectForComposer,
 }: {
   open?: boolean;
   onToggleOpen?: () => void;
   project: Project;
   commit: (p: Project) => void;
+  onSelectForComposer?: (char: Character) => void;
 }) {
   const characters = p.characters ?? [];
   const [active, setActive] = useState(characters[0]?.id ?? '');
@@ -263,7 +265,11 @@ export function CharacterPanel({
                   className="char-sidebar-card"
                   aria-pressed={isSelected}
                   aria-expanded={isEditing}
-                  title={isEditing ? undefined : '더블클릭하여 캐릭터 편집'}
+                  title={
+                    isEditing
+                      ? undefined
+                      : '더블클릭하여 편집, Alt+클릭하여 입력창에 적용'
+                  }
                   draggable={!isEditing}
                   onDragStart={(e) => {
                     if (isEditing) {
@@ -304,7 +310,13 @@ export function CharacterPanel({
                     setDragCharIndex(null);
                     setDragOverChar(null);
                   }}
-                  onClick={() => {
+                  onClick={(e) => {
+                    if (e.altKey && onSelectForComposer) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onSelectForComposer(x);
+                      return;
+                    }
                     setActive(x.id);
                   }}
                   onDoubleClick={() => {

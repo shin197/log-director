@@ -1458,6 +1458,21 @@ function App() {
               onToggleOpen={() => setCharBarOpen((v) => !v)}
               project={p}
               commit={commit}
+              onSelectForComposer={(char) => {
+                const isSystem = char.id === SYSTEM_CHARACTER_ID;
+                const defaultIcon = isSystem
+                  ? ''
+                  : (char.iconUrl || char.faces?.[0]?.iconUrl || '');
+                setEyedrop({
+                  speaker: isSystem ? '시스템' : char.name,
+                  characterId: char.id,
+                  iconUrl: defaultIcon,
+                  color: isSystem ? '' : (char.color ?? ''),
+                  key: Date.now() + Math.random(),
+                });
+                setComposerFocusRequest((n) => n + 1);
+                setNotice(`‘${char.name}’ 캐릭터를 입력창에 가져왔습니다.`);
+              }}
             />
 
             <div className="log-main-content">

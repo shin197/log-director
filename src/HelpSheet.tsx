@@ -132,6 +132,7 @@ const CONTEXT_CONTENT: Record<
         title: '목록 · 정보 관리',
         items: [
           { key: '좌측 목록 드래그', desc: '캐릭터 표시 순서를 드래그로 자유롭게 변경' },
+          { key: 'Alt+클릭', desc: '해당 캐릭터(기본 표정)를 하단 입력창에 즉시 적용' },
           {
             key: '＋ 추가 (Ctrl+V)',
             desc: '새 캐릭터 생성 또는 코코포리아 캐릭터 JSON 붙여넣기 등록',
