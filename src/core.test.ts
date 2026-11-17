@@ -22,6 +22,11 @@ import {
   toStoredColorValue,
 } from './color.ts';
 import {
+  collapseToRanges,
+  computeThumbHeight,
+  getMarkerBoundsPercent,
+} from './scrollbarOverview.ts';
+import {
   applyBulkEditToProject,
   createBulkEditState,
   getBulkFaceCharacter,
@@ -2314,4 +2319,65 @@ test('메시지 라인 번호(Ctrl+G) 파싱 및 유효성 검증', () => {
   assert.equal(parseLineNumber('-5', 500), null);
   assert.equal(parseLineNumber('abc', 500), null);
   assert.equal(parseLineNumber('', 500), null);
+});
+
+test('스크롤바 오버레이 연속 인덱스 구간 병합(collapseToRanges)', () => {
+  assert.deepEqual(collapseToRanges([]), []);
+  assert.deepEqual(collapseToRanges([0]), [{ start: 0, end: 0 }]);
+  assert.deepEqual(collapseToRanges([0, 1, 2, 5, 8, 9, 10]), [
+    { start: 0, end: 2 },
+    { start: 5, end: 5 },
+    { start: 8, end: 10 },
+  ]);
+  assert.deepEqual(collapseToRanges([3, 4, 5, 6]), [{ start: 3, end: 6 }]);
+
+  // 단일 불연속 인덱스들
+  assert.deepEqual(collapseToRanges([1, 3, 5, 7]), [
+    { start: 1, end: 1 },
+    { start: 3, end: 3 },
+    { start: 5, end: 5 },
+    { start: 7, end: 7 },
+  ]);
+
+  // 시각적 겹침(픽셀 거리 기반) 병합: 5000개 메시지, 트랙 높이 500px (1개당 0.1px), 최소 마커 2px
+  // 인덱스 100(10.0px) ~ 115(11.5px)은 2px 이내이므로 하나로 병합되고, 125(12.5px)는 분리됨
+  assert.deepEqual(
+    collapseToRanges([100, 110, 115, 125], {
+      totalCount: 5000,
+      trackHeightPx: 500,
+      minMarkerPx: 2,
+    }),
+    [
+      { start: 100, end: 115 },
+      { start: 125, end: 125 },
+    ],
+  );
+
+  // 스크롤바 썸 높이 추정 및 가동 범위 보정 테스트
+  assert.equal(computeThumbHeight(500, 500, 500), 0); // 스크롤 불필요
+  assert.equal(computeThumbHeight(500, 2500, 500), 100); // 500/2500 * 500 = 100px
+  assert.equal(computeThumbHeight(500, 50000, 500, 30), 30); // 최소 30px 보장
+
+  // 트랙 500px, 썸 100px일 때: offset = 50px(10%), travel = 400px(80%)
+  const firstBounds = getMarkerBoundsPercent(0, 0, 100, 500, 100);
+  assert.equal(firstBounds.topPercent, 10); // 50 / 500 = 10%
+  const midBounds = getMarkerBoundsPercent(50, 50, 100, 500, 100);
+  assert.equal(midBounds.topPercent, 50); // 50 + 0.5*400 = 250 -> 50%
+  const endBounds = getMarkerBoundsPercent(99, 99, 100, 500, 100);
+  // 50 + 0.99*400 = 446 -> 89.2% (썸 중심 범위 내)
+  assert.ok(Math.abs(endBounds.topPercent - 89.2) < 0.01);
+
+  // 썸 가동 범위(400px) 내 시각적 겹침 병합 테스트
+  assert.deepEqual(
+    collapseToRanges([0, 1, 2, 10], {
+      totalCount: 1000,
+      trackHeightPx: 500,
+      thumbHeightPx: 100, // travel = 400px -> 1개당 0.4px
+      minMarkerPx: 2,
+    }),
+    [
+      { start: 0, end: 2 }, // 0~2는 연속이고 2의 end=1.2px, min=2px. 10의 top=4px > 2px이므로 분리
+      { start: 10, end: 10 },
+    ],
+  );
 });

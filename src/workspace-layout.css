@@ -68,6 +68,15 @@ body,
   overflow: hidden;
 }
 
+.log-scroll-wrapper {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .log-scroll {
   flex: 1;
   min-height: 0;

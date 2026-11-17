@@ -27,6 +27,7 @@ import {
   updateSceneName,
 } from './scenes';
 import { SceneSidebar } from './SceneSidebar';
+import { TimelineScrollbarOverlay } from './TimelineScrollbarOverlay';
 import { SYSTEM_CHARACTER_ID } from './systemCharacter';
 import { SearchBar } from './SearchBar';
 import { RestoreDialog } from './RestoreDialog';
@@ -1558,8 +1559,9 @@ function App() {
             />
 
             <div className="log-main-content">
-              <div
-                ref={scrollerRef}
+              <div className="log-scroll-wrapper">
+                <div
+                  ref={scrollerRef}
                 className={applyStylesInEditor ? 'log-scroll is-styled' : 'log-scroll'}
                 style={
                   editorGlobalStyle
@@ -1761,6 +1763,21 @@ function App() {
                   )}
                 </div>
               </div>
+
+              <TimelineScrollbarOverlay
+                items={
+                  isVirtual
+                    ? visible
+                    : visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
+                }
+                scrollerRef={scrollerRef}
+                scenes={p.scenes}
+                selectedIds={bulkEdit ? bulkEdit.selectedIds : selected}
+                searchMatchPredicate={searchMatchPredicate}
+                searchFilterActive={searchActive}
+                query={query}
+              />
+            </div>
 
               <Composer
                 characters={p.characters ?? []}

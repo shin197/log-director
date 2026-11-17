@@ -15,6 +15,7 @@ export type VirtualScrollResult = {
   offsetTop: number;
   offsetBottom: number;
   totalHeight: number;
+  positions: Float64Array;
   isVirtual: boolean;
   measureElement: (node: HTMLElement | null) => void;
   scrollToIndex: (index: number, align?: 'start' | 'center' | 'end' | 'auto') => void;
@@ -259,6 +260,7 @@ export function useVirtualScroll<T>({
     offsetTop,
     offsetBottom,
     totalHeight,
+    positions,
     isVirtual: enabled,
     measureElement,
     scrollToIndex,
