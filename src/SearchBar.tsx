@@ -106,6 +106,7 @@ export function SearchBar({
   inputRef,
   query,
   searchActive,
+  minimized = false,
   blocks,
   characters,
   channels,
@@ -117,6 +118,7 @@ export function SearchBar({
   inputRef: React.RefObject<HTMLInputElement | null>;
   query: string;
   searchActive: boolean;
+  minimized?: boolean;
   blocks: Block[];
   characters: Character[];
   channels: ChannelSummary[];
@@ -932,7 +934,13 @@ export function SearchBar({
               ? `${listboxId}-${safeIndex}`
               : undefined
           }
-          placeholder={chips.length ? '검색어 또는 필터 추가...' : '검색 필터'}
+          placeholder={
+            minimized
+              ? '🔎 검색'
+              : chips.length
+                ? '검색어 또는 필터 추가...'
+                : '검색 필터'
+          }
           value={text}
           onFocus={() => {
             onActivate();
@@ -1036,6 +1044,9 @@ export function SearchBar({
                 setDropdownOpen(false);
                 return;
               }
+              e.preventDefault();
+              e.stopPropagation();
+              inputRef.current?.blur();
             }
           }}
         />

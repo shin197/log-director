@@ -68,6 +68,7 @@ function App() {
   const [selected, setSelectedRaw] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -1148,46 +1149,54 @@ function App() {
       <div className="workspace" style={{ display: tab === '로그' ? undefined : 'none' }}>
         <main className="log-editor">
           <div className="toolbar">
-            <div
-              className={`toolbar-search${
-                !query.trim() && !searchActive ? ' is-minimized' : ''
-              }`}
-            >
-              <SearchBar
-                inputRef={searchInput}
-                query={query}
-                searchActive={searchActive}
-                blocks={p.blocks}
-                characters={p.characters ?? []}
-                channels={channels}
-                scenes={p.scenes ?? []}
-                styleCards={p.styles?.cards ?? []}
-                onActivate={() => setSearchActive(true)}
-                onChangeQuery={(nextQuery) => {
-                  selectionAnchor.current = null;
-                  setSearchActive(true);
-                  setQuery(nextQuery);
-                  setPage(0);
-                }}
-              />
-              <button
-                type="button"
-                className="compact-btn filter-toggle-btn"
-                aria-pressed={searchActive}
-                onClick={toggleSearch}
-                title={
-                  searchActive
-                    ? '검색 필터 끄기 (Ctrl+F)'
-                    : '검색 필터 켜기 (Ctrl+F)'
-                }
-              >
-                {searchActive
-                  ? '필터 ON'
-                  : !query.trim()
-                    ? '🔎'
-                    : '필터 OFF'}
-              </button>
-            </div>
+            {(() => {
+              const isSearchMinimized = !query.trim() && !searchActive && !searchFocused;
+              return (
+                <div
+                  className={`toolbar-search${isSearchMinimized ? ' is-minimized' : ''}`}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+                    setSearchFocused(false);
+                    if (!query.trim()) setSearchActive(false);
+                  }}
+                >
+                  <SearchBar
+                    inputRef={searchInput}
+                    query={query}
+                    searchActive={searchActive}
+                    minimized={isSearchMinimized}
+                    blocks={p.blocks}
+                    characters={p.characters ?? []}
+                    channels={channels}
+                    scenes={p.scenes ?? []}
+                    styleCards={p.styles?.cards ?? []}
+                    onActivate={() => setSearchActive(true)}
+                    onChangeQuery={(nextQuery) => {
+                      selectionAnchor.current = null;
+                      setSearchActive(true);
+                      setQuery(nextQuery);
+                      setPage(0);
+                    }}
+                  />
+                  {!isSearchMinimized && (
+                    <button
+                      type="button"
+                      className="compact-btn filter-toggle-btn"
+                      aria-pressed={searchActive}
+                      onClick={toggleSearch}
+                      title={
+                        searchActive
+                          ? '검색 필터 끄기 (Ctrl+F)'
+                          : '검색 필터 켜기 (Ctrl+F)'
+                      }
+                    >
+                      {searchActive ? '필터 ON' : '필터 OFF'}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="toolbar-divider" />
 
@@ -1453,119 +1462,119 @@ function App() {
                         key={b.id}
                         block={displayBlock}
                         itemRef={measureElement}
-                          characters={p.characters}
-                          channels={channels}
-                          display={p.display}
-                          editing={!bulkEdit && !cutIds && editingId === b.id}
-                          setEditing={(value) => {
-                            if (bulkEdit || cutIds) return;
-                            setEditingId(value ? b.id : null);
-                          }}
-                          selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
-                          cut={!!cutIds?.has(b.id)}
-                          cutMode={!!cutIds}
-                          pasteIndicator={
-                            cutIds && pasteTarget?.id === b.id
-                              ? pasteTarget.after
-                                ? 'after'
-                                : 'before'
-                              : undefined
-                          }
-                          onPasteHover={
-                            cutIds
-                              ? (after) =>
-                                setPasteTarget((prev) =>
-                                  prev?.id === b.id && prev.after === after
-                                    ? prev
-                                    : { id: b.id, after },
-                                )
-                              : undefined
-                          }
-                          onPasteHere={
-                            cutIds ? (after) => executePaste(b.id, after) : undefined
-                          }
-                          bulkTarget={isBulkTarget && !isBulkRep}
-                          bulkDisabled={!!bulkEdit && !isBulkRep}
-                          bulkContext={
-                            isBulkRep && bulkEdit
-                              ? {
-                                count: bulkEdit.selectedIds.size,
-                                targetBlocks: bulkTargetBlocks,
-                                state: bulkEdit,
-                                originalRepText: bulkRepOriginalText,
-                                faceCharacter: bulkFaceCharacter,
-                                mixedSpeakers: bulkMixedSpeakers,
-                                mixedChannels: bulkMixedChannels,
-                                hasAnyDice: bulkHasAnyDice,
-                                replaceOpen: bulkReplaceOpen,
-                                replaceMatchCount: bulkReplaceMatchCount,
-                                onToggleReplace: () => setBulkReplaceOpen((v) => !v),
-                                onCloseReplace: () => setBulkReplaceOpen(false),
-                                onChangeState: (updater) =>
-                                  setBulkEdit((prev) => (prev ? updater(prev) : null)),
-                                onSave: saveBulkEdit,
-                                onCancel: () => {
-                                  setBulkEdit(null);
-                                  setBulkReplaceOpen(false);
-                                },
-                                onDelete: deleteSelected,
-                              }
-                              : undefined
-                          }
-                          searchMatch={Boolean(searchMatchPredicate?.(b))}
-                          styleProps={
-                            editorStyleResolver
-                              ? editorStyleResolver(displayBlock)
-                              : undefined
-                          }
-                          styleCards={p.styles?.cards ?? []}
-                          dividerColor={p.styles?.global.dividerColor}
-                          onJump={
-                            !bulkEdit && searchActive && query.trim()
-                              ? () => jumpToMessage(b.id)
-                              : undefined
-                          }
-                          onEyedrop={() => eyedropBlock(b)}
-                          scene={sceneByMessageId.get(b.id)}
-                          onBookmark={
-                            !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
-                          }
-                          toggle={(keys: SelectionKeys) => {
-                            if (bulkEdit) return;
-                            const next = selectMessage(
-                              selected,
-                              selectionAnchor.current,
-                              visible.map((item) => item.id),
-                              b.id,
-                              keys,
-                            );
-                            cursorId.current = b.id;
-                            selectionAnchor.current = next.anchor;
-                            setSelectedRaw(next.selected);
-                            if (cutIds) setPasteTarget({ id: b.id, after: true });
-                          }}
-                          save={(next) => edit(b.id, next)}
-                          remove={() => {
-                            commit({
-                              ...p,
-                              blocks: p.blocks.filter((x) => x.id !== b.id),
-                            });
-                            setSelected(
-                              new Set([...selected].filter((id) => id !== b.id)),
-                            );
-                          }}
-                          drop={(id, after) => {
-                            if (bulkEdit || cutIds) return;
-                            const movingIds =
-                              selected.has(id) && selected.size > 1
-                                ? selected
-                                : new Set([id]);
-                            const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
-                            if (blocks !== p.blocks) commit({ ...p, blocks });
-                          }}
-                        />
-                      );
-                    })}
+                        characters={p.characters}
+                        channels={channels}
+                        display={p.display}
+                        editing={!bulkEdit && !cutIds && editingId === b.id}
+                        setEditing={(value) => {
+                          if (bulkEdit || cutIds) return;
+                          setEditingId(value ? b.id : null);
+                        }}
+                        selected={isBulkTarget || (!bulkEdit && selected.has(b.id))}
+                        cut={!!cutIds?.has(b.id)}
+                        cutMode={!!cutIds}
+                        pasteIndicator={
+                          cutIds && pasteTarget?.id === b.id
+                            ? pasteTarget.after
+                              ? 'after'
+                              : 'before'
+                            : undefined
+                        }
+                        onPasteHover={
+                          cutIds
+                            ? (after) =>
+                              setPasteTarget((prev) =>
+                                prev?.id === b.id && prev.after === after
+                                  ? prev
+                                  : { id: b.id, after },
+                              )
+                            : undefined
+                        }
+                        onPasteHere={
+                          cutIds ? (after) => executePaste(b.id, after) : undefined
+                        }
+                        bulkTarget={isBulkTarget && !isBulkRep}
+                        bulkDisabled={!!bulkEdit && !isBulkRep}
+                        bulkContext={
+                          isBulkRep && bulkEdit
+                            ? {
+                              count: bulkEdit.selectedIds.size,
+                              targetBlocks: bulkTargetBlocks,
+                              state: bulkEdit,
+                              originalRepText: bulkRepOriginalText,
+                              faceCharacter: bulkFaceCharacter,
+                              mixedSpeakers: bulkMixedSpeakers,
+                              mixedChannels: bulkMixedChannels,
+                              hasAnyDice: bulkHasAnyDice,
+                              replaceOpen: bulkReplaceOpen,
+                              replaceMatchCount: bulkReplaceMatchCount,
+                              onToggleReplace: () => setBulkReplaceOpen((v) => !v),
+                              onCloseReplace: () => setBulkReplaceOpen(false),
+                              onChangeState: (updater) =>
+                                setBulkEdit((prev) => (prev ? updater(prev) : null)),
+                              onSave: saveBulkEdit,
+                              onCancel: () => {
+                                setBulkEdit(null);
+                                setBulkReplaceOpen(false);
+                              },
+                              onDelete: deleteSelected,
+                            }
+                            : undefined
+                        }
+                        searchMatch={Boolean(searchMatchPredicate?.(b))}
+                        styleProps={
+                          editorStyleResolver
+                            ? editorStyleResolver(displayBlock)
+                            : undefined
+                        }
+                        styleCards={p.styles?.cards ?? []}
+                        dividerColor={p.styles?.global.dividerColor}
+                        onJump={
+                          !bulkEdit && searchActive && query.trim()
+                            ? () => jumpToMessage(b.id)
+                            : undefined
+                        }
+                        onEyedrop={() => eyedropBlock(b)}
+                        scene={sceneByMessageId.get(b.id)}
+                        onBookmark={
+                          !bulkEdit && !cutIds ? () => bookmarkMessage(b.id) : undefined
+                        }
+                        toggle={(keys: SelectionKeys) => {
+                          if (bulkEdit) return;
+                          const next = selectMessage(
+                            selected,
+                            selectionAnchor.current,
+                            visible.map((item) => item.id),
+                            b.id,
+                            keys,
+                          );
+                          cursorId.current = b.id;
+                          selectionAnchor.current = next.anchor;
+                          setSelectedRaw(next.selected);
+                          if (cutIds) setPasteTarget({ id: b.id, after: true });
+                        }}
+                        save={(next) => edit(b.id, next)}
+                        remove={() => {
+                          commit({
+                            ...p,
+                            blocks: p.blocks.filter((x) => x.id !== b.id),
+                          });
+                          setSelected(
+                            new Set([...selected].filter((id) => id !== b.id)),
+                          );
+                        }}
+                        drop={(id, after) => {
+                          if (bulkEdit || cutIds) return;
+                          const movingIds =
+                            selected.has(id) && selected.size > 1
+                              ? selected
+                              : new Set([id]);
+                          const blocks = moveBlocks(p.blocks, movingIds, b.id, after);
+                          if (blocks !== p.blocks) commit({ ...p, blocks });
+                        }}
+                      />
+                    );
+                  })}
                   {isVirtual && offsetBottom > 0 && (
                     <div
                       style={{ height: offsetBottom, pointerEvents: 'none' }}
