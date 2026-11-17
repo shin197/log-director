@@ -332,9 +332,10 @@ export function exportLog(
       const normCh = settings.showChannel && b.channel ? b.channel : '';
       const dataCh = normCh ? ` data-channel="${escape(toChannelCode(normCh))}"` : '';
       const time = displayTime(b.timestamp, settings);
-      const speakerStyle = styled.speakerColor
-        ? `--speaker-color:${color};color:${styled.speakerColor}`
-        : `--speaker-color:${color}`;
+      const speakerStyleParts = [`--speaker-color:${color}`];
+      if (styled.speakerColor) speakerStyleParts.push(`color:${styled.speakerColor}`);
+      if (styled.speakerFontSize) speakerStyleParts.push(`font-size:${styled.speakerFontSize}px`);
+      const speakerStyle = speakerStyleParts.join(';');
       const avatarClass = styled.avatarHidden ? '' : getAvatarClass(resolveIcon(b.iconUrl));
       const spacerSizeAttr =
         !styled.avatarHidden && msgProps.avatarSize !== undefined

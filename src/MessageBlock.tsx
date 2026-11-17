@@ -842,6 +842,9 @@ export function MessageBlock({
                       resolvedVisualStyle?.speakerColor ||
                       b.color ||
                       (resolvedVisualStyle ? '#888888' : 'var(--text-primary)'),
+                    fontSize: resolvedVisualStyle?.speakerFontSize
+                      ? `${resolvedVisualStyle.speakerFontSize}px`
+                      : undefined,
                   }}
                 >
                   {b.speaker}

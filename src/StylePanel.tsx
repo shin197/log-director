@@ -55,36 +55,46 @@ function OptionalColorField({
   const active = Boolean(value);
   return (
     <div className="style-prop-field is-color">
-      <div className="style-prop-label-row">
-        <span className="field-label">{label}</span>
+      <span className="field-label">{label}</span>
+      <div className="color-field-row">
         {active ? (
-          <button
-            type="button"
-            className="ghost compact-btn style-unset-btn"
-            title={scope === 'global' ? '기본값으로 되돌리기' : '속성 지정 해제 (상위 유지)'}
-            onClick={() => onChange(undefined)}
-          >
-            {scope === 'global' ? '기본값' : '해제'}
-          </button>
+          <>
+            <ColorInput
+              title={label}
+              value={value ?? defaultPickColor}
+              onChange={(next) => onChange(next || undefined)}
+            />
+            <button
+              type="button"
+              className="color-action-btn is-clear"
+              aria-label={`${label} 해제`}
+              title={
+                scope === 'global'
+                  ? '기본값으로 되돌리기'
+                  : '속성 지정 해제 (상위 유지)'
+              }
+              onClick={() => onChange(undefined)}
+            >
+              ×
+            </button>
+          </>
         ) : (
-          <button
-            type="button"
-            className="ghost compact-btn style-unset-btn"
-            onClick={() => onChange(defaultPickColor)}
-          >
-            + 지정
-          </button>
+          <>
+            <div className="style-unset-placeholder" title={placeholderText}>
+              {placeholderText}
+            </div>
+            <button
+              type="button"
+              className="color-action-btn is-add"
+              aria-label={`${label} 지정`}
+              title="색상 직접 지정"
+              onClick={() => onChange(defaultPickColor)}
+            >
+              +
+            </button>
+          </>
         )}
       </div>
-      {active ? (
-        <ColorInput
-          title={label}
-          value={value ?? defaultPickColor}
-          onChange={(next) => onChange(next || undefined)}
-        />
-      ) : (
-        <div className="style-unset-placeholder">{placeholderText}</div>
-      )}
     </div>
   );
 }
@@ -113,15 +123,26 @@ function BorderColorField({
           ? 'speaker'
           : 'custom';
   return (
-    <div
-      className={
-        mode === 'custom'
-          ? 'style-prop-field is-color is-custom-border'
-          : 'style-prop-field is-color'
-      }
-    >
+    <div className="style-prop-field is-color">
       <span className="field-label">{label}</span>
-      <div className="style-border-color-control">
+      {mode === 'custom' ? (
+        <div className="color-field-row">
+          <ColorInput
+            title={label}
+            value={value ?? defaultPickColor}
+            onChange={(next) => onChange(next || defaultPickColor)}
+          />
+          <button
+            type="button"
+            className="color-action-btn is-clear"
+            aria-label={`${label} 직접 지정 해제`}
+            title="선택 목록으로 돌아가기"
+            onClick={() => onChange(undefined)}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
         <select
           aria-label={`${label} 방식`}
           value={mode}
@@ -130,7 +151,7 @@ function BorderColorField({
             if (next === '') onChange(undefined);
             else if (next === 'none') onChange('none');
             else if (next === 'speaker') onChange('speaker');
-            else onChange(mode === 'custom' && value ? value : defaultPickColor);
+            else onChange(defaultPickColor);
           }}
         >
           <option value="">{unsetLabel}</option>
@@ -138,14 +159,7 @@ function BorderColorField({
           {allowSpeaker && <option value="speaker">화자 색 따라가기</option>}
           <option value="custom">직접 지정</option>
         </select>
-        {mode === 'custom' && (
-          <ColorInput
-            title={label}
-            value={value ?? defaultPickColor}
-            onChange={(next) => onChange(next || defaultPickColor)}
-          />
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -183,6 +197,143 @@ function SampleAvatar({
       }}
     >
       {(speaker || '?').slice(0, 1)}
+    </div>
+  );
+}
+
+function PxStepper({
+  value,
+  min,
+  max,
+  step = 1,
+  defaultValue,
+  placeholder,
+  required = false,
+  onChange,
+}: {
+  value: number | undefined;
+  min: number;
+  max: number;
+  step?: number;
+  defaultValue: number;
+  placeholder?: string;
+  required?: boolean;
+  onChange: (next: number | undefined) => void;
+}) {
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
+  const adjust = (delta: number) => {
+    const base = value ?? defaultValue;
+    onChange(clamp(base + delta));
+  };
+  return (
+    <div className="px-stepper">
+      <button
+        type="button"
+        className="px-stepper-btn"
+        aria-label="감소"
+        disabled={value !== undefined && value <= min}
+        onClick={() => adjust(-step)}
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        placeholder={placeholder}
+        value={value ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (!raw) {
+            onChange(required ? defaultValue : undefined);
+            return;
+          }
+          const num = Number(raw);
+          if (Number.isFinite(num)) onChange(num);
+        }}
+      />
+      <button
+        type="button"
+        className="px-stepper-btn"
+        aria-label="증가"
+        disabled={value !== undefined && value >= max}
+        onClick={() => adjust(step)}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+const ALIGN_META: Record<TextAlignOption, { label: string; icon: React.ReactNode }> = {
+  left: {
+    label: '왼쪽 정렬',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
+        <rect x="2" y="7.2" width="8" height="1.6" rx="0.8" />
+        <rect x="2" y="11.4" width="10" height="1.6" rx="0.8" />
+      </svg>
+    ),
+  },
+  center: {
+    label: '가운데 정렬',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
+        <rect x="4" y="7.2" width="8" height="1.6" rx="0.8" />
+        <rect x="3" y="11.4" width="10" height="1.6" rx="0.8" />
+      </svg>
+    ),
+  },
+  right: {
+    label: '오른쪽 정렬',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
+        <rect x="6" y="7.2" width="8" height="1.6" rx="0.8" />
+        <rect x="4" y="11.4" width="10" height="1.6" rx="0.8" />
+      </svg>
+    ),
+  },
+};
+
+function AlignButtonGroup({
+  value,
+  options = ['left', 'center', 'right'],
+  allowUnset = true,
+  onChange,
+}: {
+  value: TextAlignOption | undefined;
+  options?: TextAlignOption[];
+  allowUnset?: boolean;
+  onChange: (next: TextAlignOption | undefined) => void;
+}) {
+  return (
+    <div className="align-btn-group" role="group">
+      {options.map((opt) => {
+        const active = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            className={`align-btn${active ? ' is-active' : ''}`}
+            aria-pressed={active}
+            title={
+              active && allowUnset
+                ? `${ALIGN_META[opt].label} 해제 (기본값 유지)`
+                : ALIGN_META[opt].label
+            }
+            onClick={() => {
+              if (active && allowUnset) onChange(undefined);
+              else onChange(opt);
+            }}
+          >
+            {ALIGN_META[opt].icon}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -254,10 +405,10 @@ function SampleMessagePreview({
           ...(isSampleSystem ? { paddingLeft: `${systemIndent}px` } : {}),
           ...styled.panelStyle,
           ...(isSampleSystem &&
-          !styled.panelStyle.padding &&
-          (styled.panelStyle.backgroundColor ||
-            effectiveProps.panelBorderStyle === 'box' ||
-            effectiveProps.panelBorderStyle === 'left-accent')
+            !styled.panelStyle.padding &&
+            (styled.panelStyle.backgroundColor ||
+              effectiveProps.panelBorderStyle === 'box' ||
+              effectiveProps.panelBorderStyle === 'left-accent')
             ? { padding: '12px 14px', margin: '4px 0' }
             : {}),
         }}
@@ -273,7 +424,13 @@ function SampleMessagePreview({
         <div className="style-sample-body">
           <div className="style-sample-header">
             {!isSampleSystem && (
-              <span className="style-sample-speaker" style={{ color: spkColor }}>
+              <span
+                className="style-sample-speaker"
+                style={{
+                  color: spkColor,
+                  fontSize: styled.speakerFontSize ? `${styled.speakerFontSize}px` : undefined,
+                }}
+              >
                 {speakerName}
               </span>
             )}
@@ -370,7 +527,12 @@ function GlobalStylePreview({
             <div className="style-sample-header">
               <span
                 className="style-sample-speaker"
-                style={{ color: normalStyled.speakerColor || '#6CD4BC' }}
+                style={{
+                  color: normalStyled.speakerColor || '#6CD4BC',
+                  fontSize: normalStyled.speakerFontSize
+                    ? `${normalStyled.speakerFontSize}px`
+                    : undefined,
+                }}
               >
                 로그 디렉터
               </span>
@@ -412,9 +574,9 @@ function GlobalStylePreview({
             color: sysEffective.textColor || globalStyle.systemTextColor,
             ...sysStyled.panelStyle,
             ...(!sysStyled.panelStyle.padding &&
-            (sysStyled.panelStyle.backgroundColor ||
-              sysEffective.panelBorderStyle === 'box' ||
-              sysEffective.panelBorderStyle === 'left-accent')
+              (sysStyled.panelStyle.backgroundColor ||
+                sysEffective.panelBorderStyle === 'box' ||
+                sysEffective.panelBorderStyle === 'left-accent')
               ? { padding: '12px 14px', margin: '4px 0' }
               : {}),
           }}
@@ -487,17 +649,13 @@ function MessageStylePropsEditor({
 
           <label className="style-prop-field is-number">
             <span className="field-label">크기 (px)</span>
-            <input
-              type="number"
+            <PxStepper
               min={10}
-              max={36}
-              placeholder={isGlobal ? '기본 16' : '유지'}
-              value={props.fontSize ?? ''}
-              onChange={(e) =>
-                update({
-                  fontSize: e.target.value ? Number(e.target.value) : undefined,
-                })
-              }
+              max={48}
+              defaultValue={16}
+              placeholder={isGlobal ? '16' : '유지'}
+              value={props.fontSize}
+              onChange={(fontSize) => update({ fontSize })}
             />
           </label>
 
@@ -533,22 +691,13 @@ function MessageStylePropsEditor({
             </select>
           </label>
 
-          <label className="style-prop-field">
+          <div className="style-prop-field is-align">
             <span className="field-label">대사 정렬</span>
-            <select
-              value={props.textAlign ?? ''}
-              onChange={(e) =>
-                update({
-                  textAlign: (e.target.value as TextAlignOption) || undefined,
-                })
-              }
-            >
-              <option value="">{isGlobal ? '기본값 (왼쪽)' : inheritLabel}</option>
-              <option value="left">왼쪽</option>
-              <option value="center">가운데</option>
-              <option value="right">오른쪽</option>
-            </select>
-          </label>
+            <AlignButtonGroup
+              value={props.textAlign}
+              onChange={(textAlign) => update({ textAlign })}
+            />
+          </div>
 
           <OptionalColorField
             label={isSystem ? '시스템 글자색' : '본문 글자색'}
@@ -568,14 +717,27 @@ function MessageStylePropsEditor({
           />
 
           {!isSystem && (
-            <OptionalColorField
-              label="화자 이름색 덮어쓰기"
-              value={props.speakerColor}
-              scope={scope}
-              defaultPickColor="#6CD4BC"
-              placeholderText="화자 고유 색 유지 (기본)"
-              onChange={(speakerColor) => update({ speakerColor })}
-            />
+            <>
+              <OptionalColorField
+                label="화자 이름색"
+                value={props.speakerColor}
+                scope={scope}
+                defaultPickColor="#6CD4BC"
+                placeholderText="이름색 유지"
+                onChange={(speakerColor) => update({ speakerColor })}
+              />
+              <label className="style-prop-field is-number">
+                <span className="field-label">화자 크기 (px)</span>
+                <PxStepper
+                  min={10}
+                  max={36}
+                  defaultValue={14}
+                  placeholder={isGlobal ? '14' : '유지'}
+                  value={props.speakerFontSize}
+                  onChange={(speakerFontSize) => update({ speakerFontSize })}
+                />
+              </label>
+            </>
           )}
         </div>
       </div>
@@ -654,49 +816,37 @@ function MessageStylePropsEditor({
 
           <label className="style-prop-field is-number">
             <span className="field-label">모서리 (px)</span>
-            <input
-              type="number"
+            <PxStepper
               min={0}
               max={28}
-              placeholder={isGlobal ? '기본 0' : '유지'}
-              value={props.panelRadius ?? ''}
-              onChange={(e) =>
-                update({
-                  panelRadius: e.target.value !== '' ? Number(e.target.value) : undefined,
-                })
-              }
+              defaultValue={0}
+              placeholder={isGlobal ? '0' : '유지'}
+              value={props.panelRadius}
+              onChange={(panelRadius) => update({ panelRadius })}
             />
           </label>
 
           <label className="style-prop-field is-number">
             <span className="field-label">상하 여백 (px)</span>
-            <input
-              type="number"
+            <PxStepper
               min={0}
               max={48}
-              placeholder={isGlobal ? '기본 16' : '유지'}
-              value={props.panelPaddingY ?? ''}
-              onChange={(e) =>
-                update({
-                  panelPaddingY: e.target.value !== '' ? Number(e.target.value) : undefined,
-                })
-              }
+              defaultValue={16}
+              placeholder={isGlobal ? '16' : '유지'}
+              value={props.panelPaddingY}
+              onChange={(panelPaddingY) => update({ panelPaddingY })}
             />
           </label>
 
           <label className="style-prop-field is-number">
             <span className="field-label">좌우 여백 (px)</span>
-            <input
-              type="number"
+            <PxStepper
               min={0}
               max={64}
-              placeholder={isGlobal ? '기본 0' : '유지'}
-              value={props.panelPaddingX ?? ''}
-              onChange={(e) =>
-                update({
-                  panelPaddingX: e.target.value !== '' ? Number(e.target.value) : undefined,
-                })
-              }
+              defaultValue={0}
+              placeholder={isGlobal ? '0' : '유지'}
+              value={props.panelPaddingX}
+              onChange={(panelPaddingX) => update({ panelPaddingX })}
             />
           </label>
         </div>
@@ -751,19 +901,13 @@ function MessageStylePropsEditor({
           >
             <label className="style-prop-field is-number">
               <span className="field-label">크기 (px)</span>
-              <input
-                type="number"
-                disabled={Boolean(props.avatarHidden)}
+              <PxStepper
                 min={16}
                 max={128}
-                placeholder={isGlobal ? '기본 40' : '유지'}
-                value={props.avatarSize ?? ''}
-                onChange={(e) =>
-                  update({
-                    avatarSize:
-                      e.target.value !== '' ? Number(e.target.value) : undefined,
-                  })
-                }
+                defaultValue={40}
+                placeholder={isGlobal ? '40' : '유지'}
+                value={props.avatarSize}
+                onChange={(avatarSize) => update({ avatarSize })}
               />
             </label>
 
@@ -797,19 +941,13 @@ function MessageStylePropsEditor({
 
             <label className="style-prop-field is-number">
               <span className="field-label">테두리 (px)</span>
-              <input
-                type="number"
-                disabled={Boolean(props.avatarHidden)}
+              <PxStepper
                 min={0}
                 max={8}
-                placeholder={isGlobal ? '기본 0' : '유지'}
-                value={props.avatarBorderWidth ?? ''}
-                onChange={(e) =>
-                  update({
-                    avatarBorderWidth:
-                      e.target.value !== '' ? Number(e.target.value) : undefined,
-                  })
-                }
+                defaultValue={0}
+                placeholder={isGlobal ? '0' : '유지'}
+                value={props.avatarBorderWidth}
+                onChange={(avatarBorderWidth) => update({ avatarBorderWidth })}
               />
             </label>
 
@@ -924,22 +1062,13 @@ function MessageStylePropsEditor({
             </select>
           </label>
 
-          <label className="style-prop-field">
+          <div className="style-prop-field is-align">
             <span className="field-label">판정 정렬</span>
-            <select
-              value={props.diceAlign ?? ''}
-              onChange={(e) =>
-                update({
-                  diceAlign: (e.target.value as TextAlignOption) || undefined,
-                })
-              }
-            >
-              <option value="">{isGlobal ? '기본값 (왼쪽)' : inheritLabel}</option>
-              <option value="left">왼쪽</option>
-              <option value="center">가운데</option>
-              <option value="right">오른쪽</option>
-            </select>
-          </label>
+            <AlignButtonGroup
+              value={props.diceAlign}
+              onChange={(diceAlign) => update({ diceAlign })}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1256,9 +1385,9 @@ export function StylePanel({
               onClick={() => startEditGlobal()}
             >
               <span className="style-card-caret">{isGlobalOpen ? '▾' : '▸'}</span>
-              <span className="style-badge global-badge">전역 · 고정</span>
+              {/* <span className="style-badge global-badge">전역 스타일</span> */}
               <strong className="style-card-title">
-                전역 스타일 (문서 · 메시지 · 시스템)
+                전역 스타일
               </strong>
             </button>
             <div className="style-card-actions">
@@ -1294,34 +1423,29 @@ export function StylePanel({
 
                     <label className="style-prop-field is-number">
                       <span className="field-label">최대 폭 (px)</span>
-                      <input
-                        type="number"
+                      <PxStepper
                         min={480}
                         max={1920}
                         step={20}
+                        defaultValue={960}
+                        required
                         value={globalDraft.containerWidth}
-                        onChange={(e) =>
-                          changeGlobalDraft({
-                            containerWidth: Number(e.target.value) || 960,
-                          })
+                        onChange={(v) =>
+                          changeGlobalDraft({ containerWidth: v ?? 960 })
                         }
                       />
                     </label>
 
                     <label className="style-prop-field is-number">
                       <span className="field-label">메시지 간격 (px)</span>
-                      <input
-                        type="number"
+                      <PxStepper
                         min={0}
                         max={48}
                         step={1}
+                        defaultValue={0}
+                        required
                         value={globalDraft.messageGap ?? 0}
-                        onChange={(e) =>
-                          changeGlobalDraft({
-                            messageGap:
-                              e.target.value !== '' ? Number(e.target.value) : 0,
-                          })
-                        }
+                        onChange={(v) => changeGlobalDraft({ messageGap: v ?? 0 })}
                       />
                     </label>
 
@@ -1338,31 +1462,29 @@ export function StylePanel({
 
                     <label className="style-prop-field is-number">
                       <span className="field-label">제목 크기 (px)</span>
-                      <input
-                        type="number"
+                      <PxStepper
                         min={14}
                         max={48}
+                        defaultValue={24}
+                        required
                         value={globalDraft.titleSize}
-                        onChange={(e) =>
-                          changeGlobalDraft({ titleSize: Number(e.target.value) || 24 })
-                        }
+                        onChange={(v) => changeGlobalDraft({ titleSize: v ?? 24 })}
                       />
                     </label>
 
-                    <label className="style-prop-field">
+                    <div className="style-prop-field is-align">
                       <span className="field-label">제목 정렬</span>
-                      <select
+                      <AlignButtonGroup
                         value={globalDraft.titleAlign}
-                        onChange={(e) =>
+                        options={['left', 'center']}
+                        allowUnset={false}
+                        onChange={(v) =>
                           changeGlobalDraft({
-                            titleAlign: e.target.value === 'center' ? 'center' : 'left',
+                            titleAlign: v === 'center' ? 'center' : 'left',
                           })
                         }
-                      >
-                        <option value="left">왼쪽 정렬</option>
-                        <option value="center">가운데 정렬</option>
-                      </select>
-                    </label>
+                      />
+                    </div>
 
                     <div className="style-prop-field is-color">
                       <span className="field-label">메타 색상</span>
@@ -1561,7 +1683,7 @@ export function StylePanel({
                       onClick={() => startEditCard(card)}
                     >
                       <span className="style-card-caret">{isOpen ? '▾' : '▸'}</span>
-                      <span className="style-badge">우선도 #{idx + 1}</span>
+                      <span className="style-badge">스타일 #{idx + 1}</span>
                     </button>
 
                     {isOpen && cardDraft ? (

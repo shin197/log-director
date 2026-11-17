@@ -10,6 +10,7 @@ import {
   defaultProjectStyles,
   duplicateStyleCard,
   moveStyleCard,
+  normalizeMessageStyleProps,
   removeStyleCardFromProject,
   unlinkStyleUsageFromProject,
 } from './styles.ts';
@@ -2198,4 +2199,33 @@ test('가상 스크롤 이진 탐색 및 가시 범위 계산', () => {
   // 4) 빈 배열 (count=0)
   assert.equal(binarySearchFirst(new Float64Array([0]), 100, 0), 0);
   assert.equal(binarySearchLast(new Float64Array([0]), 100, 0), 0);
+});
+
+test('화자 글씨 크기(speakerFontSize) 정규화 및 HTML 내보내기', () => {
+  const norm = normalizeMessageStyleProps({ speakerFontSize: 18.4 });
+  assert.equal(norm.speakerFontSize, 18);
+  assert.equal(normalizeMessageStyleProps({ speakerFontSize: 5 }).speakerFontSize, undefined);
+
+  const built = buildMessageStyleObjects({ speakerFontSize: 20 });
+  assert.equal(built.speakerFontSize, 20);
+
+  const baseStyles = defaultProjectStyles();
+  const proj = {
+    format: 'log-studio' as const,
+    version: 1 as const,
+    title: '화자 크기 테스트',
+    original: [],
+    characters: [{ id: 'c1', name: '라르코', color: '#6CD4BC' }],
+    blocks: [{ id: 'b1', sourceType: 'chat' as const, characterId: 'c1', speaker: '라르코', text: '안녕' }],
+    display: { ...defaultDisplay },
+    styles: {
+      ...baseStyles,
+      global: {
+        ...baseStyles.global,
+        messageDefaults: { ...baseStyles.global.messageDefaults, speakerFontSize: 22 },
+      },
+    },
+  };
+  const html = exportLog(proj, 'html');
+  assert.ok(html.includes('font-size:22px'));
 });

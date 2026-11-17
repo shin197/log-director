@@ -44,27 +44,28 @@ export function SettingsPanel({
         </label>
       </div>
 
-      <div className="settings-row">
-        <label className="stack-field">
-          <span>타임스탬프 형식</span>
-          <select
-            disabled={!settings.showTimestamp}
-            value={settings.timestampFormat}
-            onChange={(e) => update({ timestampFormat: e.target.value })}
-          >
-            <option value="original">원본 표기</option>
-            <option value="YYYY-MM-DD HH:mm:ss">년-월-일 시:분:초</option>
-            <option value="YYYY-MM-DD">날짜만 (시·분 숨김)</option>
-            <option value="HH:mm">시:분만</option>
-            <option value="HH:mm:ss YYYY-MM-DD">시간 → 날짜</option>
-            <option value="DD/MM/YYYY HH:mm">일/월/년 시:분</option>
-          </select>
-        </label>
-        <div className="time-preview">
-          <span className="field-label">미리보기</span>
-          <code>{displayTime('2026. 11. 13. 오후 09:05:30', settings) || '숨김'}</code>
-        </div>
-      </div>
+      {settings.showTimestamp &&
+        <div className="settings-row">
+          <label className="stack-field">
+            <span>타임스탬프 형식</span>
+            <select
+              disabled={!settings.showTimestamp}
+              value={settings.timestampFormat}
+              onChange={(e) => update({ timestampFormat: e.target.value })}
+            >
+              <option value="original">원본 표기</option>
+              <option value="YYYY-MM-DD HH:mm:ss">년-월-일 시:분:초</option>
+              <option value="YYYY-MM-DD">날짜만 (시·분 숨김)</option>
+              <option value="HH:mm">시:분만</option>
+              <option value="HH:mm:ss YYYY-MM-DD">시간 → 날짜</option>
+              <option value="DD/MM/YYYY HH:mm">일/월/년 시:분</option>
+            </select>
+          </label>
+          <div className="time-preview">
+            <span className="field-label">미리보기</span>
+            <code>{displayTime('2026. 11. 13. 오후 09:05:30', settings) || '숨김'}</code>
+          </div>
+        </div>}
 
       <small className="muted-note">
         편집 화면과 모든 내보내기 형식에 적용되며, 원본 시각 데이터는 보존됩니다.
@@ -98,13 +99,13 @@ export function SettingsPanel({
               <option value="100">100개 (최대 · 고사양 PC)</option>
             </select>
           </label>
-          <div className="time-preview">
+          {/* <div className="time-preview">
             <span className="field-label">예상 렌더링 메시지 수</span>
             <code>
               화면 표시(~15개) + 버퍼({(settings.virtualBuffer ?? 25) * 2}개) ≈ 약{' '}
               {(settings.virtualBuffer ?? 25) * 2 + 15}개
             </code>
-          </div>
+          </div> */}
         </div>
       )}
 

@@ -22,6 +22,7 @@ export type MessageStyleProps = {
   fontStyle?: FontStyleOption;
   textAlign?: TextAlignOption;
   speakerColor?: string;
+  speakerFontSize?: number;
   panelShape?: PanelShape;
   panelBgColor?: string;
   panelBorderColor?: string;
@@ -171,6 +172,14 @@ export function normalizeMessageStyleProps(raw: any): MessageStyleProps {
     /^#[0-9a-fA-F]{6}$/.test(raw.speakerColor)
   ) {
     out.speakerColor = raw.speakerColor.toUpperCase();
+  }
+  if (
+    typeof raw.speakerFontSize === 'number' &&
+    Number.isFinite(raw.speakerFontSize) &&
+    raw.speakerFontSize >= 10 &&
+    raw.speakerFontSize <= 36
+  ) {
+    out.speakerFontSize = Math.round(raw.speakerFontSize);
   }
   if (VALID_PANEL_SHAPES.has(raw.panelShape)) {
     out.panelShape = raw.panelShape;
@@ -601,6 +610,7 @@ export function buildMessageStyleObjects(
   avatarStyle: Record<string, string | number | undefined>;
   avatarHidden: boolean;
   speakerColor?: string;
+  speakerFontSize?: number;
   textStyle: Record<string, string | number | undefined>;
   diceStyle: Record<string, string | number | undefined>;
 } {
@@ -743,6 +753,7 @@ export function buildMessageStyleObjects(
     avatarStyle,
     avatarHidden: Boolean(props.avatarHidden),
     speakerColor: props.speakerColor,
+    speakerFontSize: props.speakerFontSize,
     textStyle,
     diceStyle,
   };
