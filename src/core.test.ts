@@ -1164,6 +1164,9 @@ test('자동저장: 상대 시간 포맷팅, 유의미한 프로젝트 판별, I
 import fs from 'node:fs';
 import { isSafeImageUrl } from './importFormats.ts';
 import {
+  blobToDataUrl,
+  collectExternalImageUrls,
+  embedExternalImagesInProject,
   getUnusedImageStats,
   internProjectImages,
   isImagePoolRef,
@@ -2559,4 +2562,75 @@ test('빠른 캐릭터 전환 슬롯: 저장·불러오기·해제 및 project.j
   });
   assert.equal(getUnusedImageStats(onlySlotRef).totalCount, 1);
   assert.equal(getUnusedImageStats(onlySlotRef).unusedCount, 0);
+});
+
+test('외부 URL 이미지 Base64 변환 및 내부 이미지 풀 저장', async () => {
+  // 1) blobToDataUrl 유틸 검증
+  const dummyBlob = new Blob(['hello image'], { type: 'image/png' });
+  const dataUrl = await blobToDataUrl(dummyBlob);
+  assert.ok(dataUrl.startsWith('data:image/png;base64,'));
+
+  // 2) collectExternalImageUrls: 외부 URL만 정확히 수집
+  const sampleProj = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: 'A', text: '메시지 1', iconUrl: 'https://example.com/icon1.png' },
+        { speaker: 'B', text: '메시지 2', iconUrl: 'https://example.com/icon2.png' },
+        { speaker: 'C', text: '메시지 3', iconUrl: 'https://example.com/icon1.png' }, // 중복 URL
+        { speaker: 'D', text: '메시지 4', iconUrl: 'data:image/png;base64,QUJD' }, // data URI는 제외
+      ],
+    }),
+    'sample.json',
+  );
+
+  // 캐릭터 추가
+  sampleProj.characters = [
+    {
+      id: 'char-1',
+      name: '캐릭터 1',
+      iconUrl: 'https://example.com/char.png',
+      faces: [{ name: '기본', iconUrl: 'https://example.com/face.png' }],
+    },
+  ];
+
+  // 퀵 슬롯 추가
+  sampleProj.quickSlots = {
+    '1': {
+      speaker: '슬롯 화자',
+      iconUrl: 'https://example.com/slot.png',
+    },
+  };
+
+  const collected = collectExternalImageUrls(sampleProj);
+  assert.equal(collected.size, 5);
+  assert.ok(collected.has('https://example.com/icon1.png'));
+  assert.ok(collected.has('https://example.com/icon2.png'));
+  assert.ok(collected.has('https://example.com/char.png'));
+  assert.ok(collected.has('https://example.com/face.png'));
+  assert.ok(collected.has('https://example.com/slot.png'));
+  assert.ok(!collected.has('data:image/png;base64,QUJD'));
+
+  // 3) embedExternalImagesInProject: 매핑된 URL들을 Base64 풀로 변환하고 참조를 img:key로 교체
+  const b64Map: Record<string, string> = {
+    'https://example.com/icon1.png': 'data:image/png;base64,SU1BR0Ux',
+    'https://example.com/char.png': 'data:image/png;base64,SU1BR0VDSEFS',
+  };
+
+  const embedded = embedExternalImagesInProject(sampleProj, b64Map);
+
+  // icon1.png를 참조하던 블록 0과 2는 img:<hash>로 교체됨
+  assert.ok(isImagePoolRef(embedded.blocks[0].iconUrl));
+  assert.ok(isImagePoolRef(embedded.blocks[2].iconUrl));
+  assert.equal(embedded.blocks[0].iconUrl, embedded.blocks[2].iconUrl);
+  assert.equal(resolveImageUrl(embedded.blocks[0].iconUrl, embedded.images), 'data:image/png;base64,SU1BR0Ux');
+
+  // 매핑되지 않은 icon2.png는 원본 그대로 유지
+  assert.equal(embedded.blocks[1].iconUrl, 'https://example.com/icon2.png');
+
+  // 캐릭터의 char.png도 img:<hash>로 교체됨
+  assert.ok(isImagePoolRef(embedded.characters?.[0]?.iconUrl));
+  assert.equal(resolveImageUrl(embedded.characters?.[0]?.iconUrl, embedded.images), 'data:image/png;base64,SU1BR0VDSEFS');
+
+  // 풀에 등록된 이미지 수 확인
+  assert.equal(Object.keys(embedded.images ?? {}).length, 3); // data URI(QUJD) 1개 + 새로 등록된 2개
 });

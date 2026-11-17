@@ -1,6 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Project } from './core';
-import { getUnusedImageStats, normalizeProjectImagePool, resolveImageUrl } from './imagePool';
+import {
+  blobToDataUrl,
+  collectExternalImageUrls,
+  embedExternalImagesInProject,
+  getUnusedImageStats,
+  normalizeProjectImagePool,
+  resolveImageUrl,
+} from './imagePool';
 import {
   defaultDisplay,
   displayTime,
@@ -41,6 +48,71 @@ export function SettingsPanel({
   const unusedStats = useMemo(() => getUnusedImageStats(p), [p]);
   const hasUnusedImages = unusedStats.unusedCount > 0;
   const [openOriginals, setOpenOriginals] = useState<Set<number>>(new Set());
+  const [convertingUrls, setConvertingUrls] = useState(false);
+
+  const externalUrls = useMemo(() => collectExternalImageUrls(p), [p]);
+  const externalUrlCount = externalUrls.size;
+
+  const handleConvertUrlsToBase64 = async () => {
+    if (convertingUrls) return;
+    const urls = [...externalUrls];
+    if (urls.length === 0) {
+      onNotice?.('변환할 외부 이미지 URL이 없습니다.');
+      return;
+    }
+
+    setConvertingUrls(true);
+    try {
+      const results = await Promise.all(
+        urls.map(async (url) => {
+          try {
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            const blob = await res.blob();
+            const dataUri = await blobToDataUrl(blob);
+            return [url, dataUri] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const map: Record<string, string> = {};
+      let successCount = 0;
+      let failCount = 0;
+      for (const item of results) {
+        if (item) {
+          map[item[0]] = item[1];
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      if (successCount === 0) {
+        throw new Error(
+          '외부 이미지를 다운로드하지 못했습니다. (외부 서버의 CORS 보안 정책 또는 잘못된 URL)',
+        );
+      }
+
+      const nextProject = embedExternalImagesInProject(p, map);
+      commit(nextProject);
+
+      if (failCount > 0) {
+        onNotice?.(
+          `외부 이미지 ${urls.length}개 중 ${successCount}개를 Base64로 변환하여 저장했습니다. (${failCount}개는 CORS 또는 네트워크 오류로 실패)`,
+        );
+      } else {
+        onNotice?.(
+          `외부 이미지 ${successCount}개를 모두 Base64로 변환하여 내부 풀에 저장했습니다.`,
+        );
+      }
+    } catch (err) {
+      onError?.(err);
+    } finally {
+      setConvertingUrls(false);
+    }
+  };
 
   const handleDownloadOriginal = (raw: string, filename: string) => {
     if (onDownload) {
@@ -301,7 +373,7 @@ export function SettingsPanel({
           <span>선택한 텍스트 따옴표·괄호 자동 감싸기</span>
         </label>
 
-        <div className="settings-action-group">
+        <div className="settings-compact-grid">
           <div className="settings-action-row">
             <div className="settings-action-info">
               <strong>스타일 카드 설정 ({(p.styles?.cards ?? []).length}개)</strong>
@@ -346,17 +418,33 @@ export function SettingsPanel({
               <span className="muted-note">
                 전체 {unusedStats.totalCount}개 · 미참조 {unusedStats.unusedCount}개
                 {hasUnusedImages ? ` (${formatBytes(unusedStats.unusedBytes)})` : ''}
+                {externalUrlCount > 0 ? ` · 외부 URL ${externalUrlCount}개` : ''}
               </span>
             </div>
-            <button
-              type="button"
-              className={`compact-btn settings-cleanup-btn ${hasUnusedImages ? 'primary has-unused' : ''}`}
-              onClick={handleCleanupImages}
-            >
-              {hasUnusedImages
-                ? `미참조 정리 (${unusedStats.unusedCount})`
-                : '미참조 정리'}
-            </button>
+            <div className="settings-action-buttons">
+              <button
+                type="button"
+                className={`compact-btn ${externalUrlCount > 0 ? 'primary has-unused' : ''}`}
+                disabled={convertingUrls || externalUrlCount === 0}
+                onClick={handleConvertUrlsToBase64}
+                title="외부 웹 URL로 연결된 이미지를 다운로드하여 프로젝트 내부에 Base64로 영구 저장합니다."
+              >
+                {convertingUrls
+                  ? '변환 중...'
+                  : externalUrlCount > 0
+                    ? `URL 변환 (${externalUrlCount})`
+                    : 'URL 변환'}
+              </button>
+              <button
+                type="button"
+                className={`compact-btn settings-cleanup-btn ${hasUnusedImages ? 'primary has-unused' : ''}`}
+                onClick={handleCleanupImages}
+              >
+                {hasUnusedImages
+                  ? `미참조 정리 (${unusedStats.unusedCount})`
+                  : '미참조 정리'}
+              </button>
+            </div>
           </div>
         </div>
       </section>

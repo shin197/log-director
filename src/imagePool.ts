@@ -219,3 +219,137 @@ export function internProjectImages(p: Project): Project {
 export function normalizeProjectImagePool(p: Project): Project {
   return processProjectImagePool(p, true);
 }
+
+/**
+ * Converts a Blob to a data URL (data:image/...;base64,...).
+ */
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  if (typeof FileReader !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('변환 실패'));
+      reader.onerror = () => reject(reader.error ?? new Error('읽기 오류'));
+      reader.readAsDataURL(blob);
+    });
+  }
+  return blob.arrayBuffer().then((buf) => {
+    const maybeBuffer = (
+      globalThis as unknown as {
+        Buffer?: { from(b: ArrayBuffer): { toString(enc: string): string } };
+      }
+    ).Buffer;
+    if (maybeBuffer) {
+      const base64 = maybeBuffer.from(buf).toString('base64');
+      const mime = blob.type || 'image/png';
+      return `data:${mime};base64,${base64}`;
+    }
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    const mime = blob.type || 'image/png';
+    return `data:${mime};base64,${base64}`;
+  });
+}
+
+/**
+ * Collects all unique external web URLs (http:// or https://) referenced in the project.
+ */
+export function collectExternalImageUrls(p: Project): Set<string> {
+  const urls = new Set<string>();
+  const checkUrl = (url?: string) => {
+    if (!url) return;
+    const resolved = resolveImageUrl(url, p.images).trim();
+    if (/^https?:\/\//i.test(resolved)) {
+      urls.add(resolved);
+    }
+  };
+
+  for (const c of p.characters ?? []) {
+    checkUrl(c.iconUrl);
+    for (const f of c.faces) {
+      checkUrl(f.iconUrl);
+    }
+  }
+  for (const b of p.blocks) {
+    checkUrl(b.iconUrl);
+  }
+  if (p.quickSlots) {
+    for (const slot of Object.values(p.quickSlots)) {
+      checkUrl(slot.iconUrl);
+    }
+  }
+  return urls;
+}
+
+/**
+ * Embeds external images into the project image pool by mapping URLs to Base64 data URIs
+ * and replacing their references with img:<hash> keys.
+ */
+export function embedExternalImagesInProject(
+  p: Project,
+  urlToDataUriMap: Record<string, string>,
+): Project {
+  if (Object.keys(urlToDataUriMap).length === 0) return p;
+
+  const nextImages: ImagePool = { ...(p.images ?? {}) };
+  const internCache = new Map<string, string>();
+
+  const urlToRefMap: Record<string, string> = {};
+  for (const [url, dataUri] of Object.entries(urlToDataUriMap)) {
+    if (dataUri.startsWith('data:image/')) {
+      const ref = internImageUrl(dataUri, nextImages, internCache);
+      if (ref) {
+        urlToRefMap[url] = ref;
+      }
+    }
+  }
+
+  const replaceUrl = (url?: string): string => {
+    if (!url) return '';
+    const resolved = resolveImageUrl(url, p.images).trim();
+    if (urlToRefMap[resolved]) {
+      return urlToRefMap[resolved];
+    }
+    return url;
+  };
+
+  const nextCharacters = (p.characters ?? []).map((c) => ({
+    ...c,
+    iconUrl: replaceUrl(c.iconUrl),
+    faces: c.faces.map((f) => ({
+      ...f,
+      iconUrl: replaceUrl(f.iconUrl),
+    })),
+  }));
+
+  const nextBlocks = p.blocks.map((b) => {
+    const nextUrl = replaceUrl(b.iconUrl);
+    if (nextUrl === b.iconUrl) return b;
+    return { ...b, iconUrl: nextUrl };
+  });
+
+  let nextQuickSlots = p.quickSlots;
+  if (p.quickSlots) {
+    nextQuickSlots = {};
+    for (const [k, slot] of Object.entries(p.quickSlots)) {
+      nextQuickSlots[k] = {
+        ...slot,
+        iconUrl: replaceUrl(slot.iconUrl),
+      };
+    }
+  }
+
+  const nextProject: Project = {
+    ...p,
+    characters: nextCharacters,
+    blocks: nextBlocks,
+    quickSlots: nextQuickSlots,
+    images: nextImages,
+  };
+
+  return normalizeProjectImagePool(nextProject);
+}
