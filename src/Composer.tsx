@@ -117,7 +117,7 @@ export function Composer({
             className="composer-expand-btn"
             onClick={() => setCollapsed(false)}
           >
-            ＋ 새 메시지 입력 열기
+            ＋ 메시지 입력 열기
           </button>
         </div>
       </div>
@@ -171,7 +171,7 @@ export function Composer({
                     setOpen(true);
                     setIndex(
                       (selected + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) %
-                        Math.max(1, matches.length),
+                      Math.max(1, matches.length),
                     );
                   }
                   if (e.key === 'Enter' && open && matches.length) {
@@ -251,8 +251,8 @@ export function Composer({
             disabled={disabled}
             placeholder={
               disabled
-                ? '편집 또는 오려붙이기 완료 후 새 메시지를 입력할 수 있습니다.'
-                : '새 메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
+                ? '편집 또는 오려붙이기 완료 후 메시지를 작성할 수 있습니다.'
+                : '메시지 작성 (Enter 전송 · Shift+Enter 줄바꿈)'
             }
             rows={2}
             value={text}

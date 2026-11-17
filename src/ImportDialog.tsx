@@ -206,7 +206,7 @@ export function ImportDialog({
             {items.length === 0 ? (
               <div className="import-queue-empty">
                 <p>불러올 로그 파일을 이곳에 끌어놓거나 [＋ 파일 추가]를 누르세요.</p>
-                <small>JSON · HTML · Markdown · TXT 다중 선택 지원</small>
+                <small>JSON · HTML · Markdown · TXT</small>
               </div>
             ) : (
               <>
@@ -455,6 +455,7 @@ export function ImportDialog({
       </div>
 
       <footer className="export-footer">
+        <span className="muted-note"></span>
         <div className="export-footer-actions">
           <button type="button" className="ghost" onClick={onClose}>
             취소

@@ -2229,3 +2229,70 @@ test('화자 글씨 크기(speakerFontSize) 정규화 및 HTML 내보내기', ()
   const html = exportLog(proj, 'html');
   assert.ok(html.includes('font-size:22px'));
 });
+
+test('마름모(diamond) 인장: 틀 45도 회전(70.71%) 및 내부 역회전(141.42%), HTML 내보내기 및 왕복 파싱', () => {
+  const diamondStyled = buildMessageStyleObjects({
+    avatarShape: 'diamond',
+    avatarSize: 40,
+    avatarBorderWidth: 2,
+    avatarBorderColor: '#FF0000',
+    avatarBgColor: '#112233',
+  });
+  assert.equal(diamondStyled.avatarShape, 'diamond');
+  assert.equal(diamondStyled.avatarFrameStyle.width, '70.7107%');
+  assert.equal(diamondStyled.avatarFrameStyle.height, '70.7107%');
+  assert.equal(diamondStyled.avatarFrameStyle.transform, 'rotate(45deg)');
+  assert.equal(diamondStyled.avatarFrameStyle.border, '2px solid #FF0000');
+  assert.equal(diamondStyled.avatarFrameStyle.backgroundColor, '#112233');
+  assert.equal(diamondStyled.avatarInnerStyle.width, '141.4214%');
+  assert.equal(diamondStyled.avatarInnerStyle.height, '141.4214%');
+  assert.equal(diamondStyled.avatarInnerStyle.transform, 'rotate(-45deg)');
+
+  const circleStyled = buildMessageStyleObjects({
+    avatarShape: 'circle',
+    avatarSize: 40,
+  });
+  assert.equal(circleStyled.avatarShape, 'circle');
+  assert.equal(circleStyled.avatarFrameStyle.width, '100%');
+  assert.equal(circleStyled.avatarFrameStyle.borderRadius, '50%');
+  assert.equal(circleStyled.avatarInnerStyle.width, '100%');
+
+  const baseStyles = defaultProjectStyles();
+  const proj = {
+    format: 'log-studio' as const,
+    version: 1 as const,
+    title: '마름모 인장 테스트',
+    original: [],
+    characters: [{ id: 'c1', name: '알파', color: '#6CD4BC', iconUrl: 'https://example.com/alpha.png' }],
+    blocks: [{
+      id: 'b1',
+      sourceType: 'normal' as const,
+      characterId: 'c1',
+      speaker: '알파',
+      text: '마름모 인장 테스트 대사',
+      iconUrl: 'https://example.com/alpha.png',
+    }],
+    display: { ...defaultDisplay },
+    styles: {
+      ...baseStyles,
+      global: {
+        ...baseStyles.global,
+        messageDefaults: {
+          ...baseStyles.global.messageDefaults,
+          avatarShape: 'diamond' as const,
+          avatarBorderWidth: 2,
+          avatarBorderColor: '#FF0000',
+        },
+      },
+    },
+  };
+  const html = exportLog(proj, 'html');
+  assert.ok(html.includes('class="avatar is-diamond"'));
+  assert.ok(html.includes('class="avatar-frame is-diamond"'));
+  assert.ok(html.includes('class="avatar-inner avatar-image-0"'));
+  assert.ok(html.includes('.avatar.is-diamond'));
+
+  const reparsed = parse(html, 'diamond.html');
+  assert.equal(reparsed.blocks.length, 1);
+  assert.equal(resolveImageUrl(reparsed.blocks[0]?.iconUrl, reparsed.images), 'https://example.com/alpha.png');
+});

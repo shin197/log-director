@@ -608,6 +608,9 @@ export function buildMessageStyleObjects(
 ): {
   panelStyle: Record<string, string | number | undefined>;
   avatarStyle: Record<string, string | number | undefined>;
+  avatarFrameStyle: Record<string, string | number | undefined>;
+  avatarInnerStyle: Record<string, string | number | undefined>;
+  avatarShape?: AvatarShape;
   avatarHidden: boolean;
   speakerColor?: string;
   speakerFontSize?: number;
@@ -675,7 +678,7 @@ export function buildMessageStyleObjects(
     avatarStyle.clipPath = 'none';
   } else if (props.avatarShape === 'diamond') {
     avatarStyle.borderRadius = '0px';
-    avatarStyle.clipPath = 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
+    avatarStyle.clipPath = 'none';
   }
   const avatarLineStyle = props.avatarBorderLineStyle || 'solid';
   const avBorderColor = resolveBorderColor(
@@ -692,6 +695,60 @@ export function buildMessageStyleObjects(
     const width = props.avatarBorderWidth ?? 2;
     avatarStyle.border = `${width}px ${avatarLineStyle} ${avBorderColor ?? '#888888'}`;
     avatarStyle.boxSizing = 'border-box';
+  }
+
+  // 인장 마름모 회전 및 내부 반대 회전(카운터 로테이션) 스타일 구성
+  // 마름모 형태는 45도 회전 시 외곽 bounding box가 원래 크기(S)에 딱 맞도록
+  // 틀(frame)을 1/sqrt(2) ≈ 70.7107% 크기로 줄여 45도 회전하고,
+  // 내부 이미지/문구는 -45도로 역회전 및 sqrt(2) ≈ 141.4214% 크기로 채워 모서리 잘림을 방지합니다.
+  const avatarFrameStyle: Record<string, string | number | undefined> = {};
+  const avatarInnerStyle: Record<string, string | number | undefined> = {};
+
+  if (props.avatarShape === 'diamond') {
+    avatarFrameStyle.width = '70.7107%';
+    avatarFrameStyle.height = '70.7107%';
+    avatarFrameStyle.transform = 'rotate(45deg)';
+    avatarFrameStyle.overflow = 'hidden';
+    avatarFrameStyle.boxSizing = 'border-box';
+    avatarFrameStyle.display = 'flex';
+    avatarFrameStyle.alignItems = 'center';
+    avatarFrameStyle.justifyContent = 'center';
+    avatarFrameStyle.flexShrink = 0;
+    if (props.avatarBgColor) {
+      avatarFrameStyle.backgroundColor = props.avatarBgColor;
+    }
+    if (avatarStyle.border) {
+      avatarFrameStyle.border = avatarStyle.border;
+    }
+
+    avatarInnerStyle.width = '141.4214%';
+    avatarInnerStyle.height = '141.4214%';
+    avatarInnerStyle.maxWidth = 'none';
+    avatarInnerStyle.maxHeight = 'none';
+    avatarInnerStyle.transform = 'rotate(-45deg)';
+    avatarInnerStyle.transformOrigin = 'center center';
+    avatarInnerStyle.objectFit = 'cover';
+    avatarInnerStyle.flexShrink = 0;
+    avatarInnerStyle.display = 'block';
+  } else {
+    avatarFrameStyle.width = '100%';
+    avatarFrameStyle.height = '100%';
+    avatarFrameStyle.overflow = 'hidden';
+    avatarFrameStyle.boxSizing = 'border-box';
+    if (avatarStyle.borderRadius) {
+      avatarFrameStyle.borderRadius = avatarStyle.borderRadius;
+    }
+    if (props.avatarBgColor) {
+      avatarFrameStyle.backgroundColor = props.avatarBgColor;
+    }
+    if (avatarStyle.border) {
+      avatarFrameStyle.border = avatarStyle.border;
+    }
+
+    avatarInnerStyle.width = '100%';
+    avatarInnerStyle.height = '100%';
+    avatarInnerStyle.objectFit = 'cover';
+    avatarInnerStyle.display = 'block';
   }
 
   const textStyle: Record<string, string | number | undefined> = {};
@@ -751,6 +808,9 @@ export function buildMessageStyleObjects(
   return {
     panelStyle,
     avatarStyle,
+    avatarFrameStyle,
+    avatarInnerStyle,
+    avatarShape: props.avatarShape,
     avatarHidden: Boolean(props.avatarHidden),
     speakerColor: props.speakerColor,
     speakerFontSize: props.speakerFontSize,

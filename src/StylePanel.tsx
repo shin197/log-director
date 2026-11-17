@@ -168,16 +168,59 @@ function SampleAvatar({
   iconUrl,
   speaker,
   avatarStyle,
+  avatarFrameStyle,
+  avatarInnerStyle,
+  avatarShape,
   borderColor,
 }: {
   iconUrl?: string;
   speaker: string;
   avatarStyle: Record<string, string | number | undefined>;
+  avatarFrameStyle?: Record<string, string | number | undefined>;
+  avatarInnerStyle?: Record<string, string | number | undefined>;
+  avatarShape?: AvatarShape;
   borderColor: string;
 }) {
   const images = useImagePool();
   const resolvedUrl = iconUrl ? resolveImageUrl(iconUrl, images) : '';
-  if (resolvedUrl && isSafeImageUrl(resolvedUrl)) {
+  const hasImage = Boolean(resolvedUrl && isSafeImageUrl(resolvedUrl));
+
+  if (avatarShape === 'diamond' && avatarFrameStyle) {
+    const size = avatarStyle.width || 40;
+    return (
+      <div
+        className="style-sample-avatar-container is-diamond"
+        style={{
+          width: size,
+          height: size,
+        }}
+      >
+        <div className="avatar-frame is-diamond" style={avatarFrameStyle}>
+          {hasImage ? (
+            <img
+              className="style-sample-avatar-img is-diamond"
+              src={resolvedUrl}
+              alt=""
+              referrerPolicy="no-referrer"
+              style={avatarInnerStyle}
+            />
+          ) : (
+            <span
+              className="avatar-placeholder-text"
+              style={{
+                color: borderColor,
+                ...avatarInnerStyle,
+              }}
+            >
+              {(speaker || '?').slice(0, 1)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (hasImage) {
     return (
       <img
         className="style-sample-avatar-img"
@@ -418,6 +461,9 @@ function SampleMessagePreview({
             iconUrl={sampleBlock?.iconUrl}
             speaker={speakerName}
             avatarStyle={styled.avatarStyle}
+            avatarFrameStyle={styled.avatarFrameStyle}
+            avatarInnerStyle={styled.avatarInnerStyle}
+            avatarShape={styled.avatarShape}
             borderColor={spkColor}
           />
         )}
@@ -520,6 +566,9 @@ function GlobalStylePreview({
             <SampleAvatar
               speaker="로그 디렉터"
               avatarStyle={normalStyled.avatarStyle}
+              avatarFrameStyle={normalStyled.avatarFrameStyle}
+              avatarInnerStyle={normalStyled.avatarInnerStyle}
+              avatarShape={normalStyled.avatarShape}
               borderColor={normalStyled.speakerColor || '#6CD4BC'}
             />
           )}

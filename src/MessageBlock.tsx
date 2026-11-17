@@ -347,7 +347,7 @@ export function MessageBlock({
       )}
       {!isSystem && !hideAvatar && (
         <div
-          className="avatar"
+          className={`avatar ${resolvedVisualStyle?.avatarShape === 'diamond' ? 'is-diamond' : ''}`}
           style={
             resolvedVisualStyle?.avatarStyle.width
               ? {
@@ -379,6 +379,33 @@ export function MessageBlock({
               imageButton
               fallbackText={(activeBlock.speaker || '?').slice(0, 1)}
             />
+          ) : resolvedVisualStyle?.avatarShape === 'diamond' ? (
+            <div
+              className="avatar-frame is-diamond"
+              style={resolvedVisualStyle.avatarFrameStyle}
+            >
+              {activeBlock.iconUrl &&
+              isSafeImageUrl(resolveImageUrl(activeBlock.iconUrl, images)) ? (
+                <img
+                  draggable={false}
+                  src={resolveImageUrl(activeBlock.iconUrl, images)}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  style={resolvedVisualStyle.avatarInnerStyle}
+                />
+              ) : (
+                <span
+                  className="avatar-placeholder-text"
+                  style={{
+                    color: activeBlock.color || undefined,
+                    ...resolvedVisualStyle.avatarInnerStyle,
+                  }}
+                >
+                  {(activeBlock.speaker || '?').slice(0, 1)}
+                </span>
+              )}
+            </div>
           ) : activeBlock.iconUrl &&
             isSafeImageUrl(resolveImageUrl(activeBlock.iconUrl, images)) ? (
             <img
