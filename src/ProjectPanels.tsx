@@ -364,13 +364,16 @@ export function SettingsPanel({
           <span>연속 병합 시 표정이 달라도 합치기</span>
         </label>
 
-        <label className="check-field">
+        <label
+          className="check-field"
+          title="따옴표나 괄호 입력 시 자동으로 닫고 안으로 커서를 이동하며, 텍스트를 선택한 상태에서 입력하면 선택 영역을 감쌉니다."
+        >
           <input
             type="checkbox"
             checked={settings.autoWrapQuotes ?? true}
             onChange={(e) => update({ autoWrapQuotes: e.target.checked })}
           />
-          <span>선택한 텍스트 따옴표·괄호 자동 감싸기</span>
+          <span>따옴표·괄호 자동 감싸기 및 닫기</span>
         </label>
 
         <div className="settings-compact-grid">

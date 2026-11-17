@@ -716,8 +716,14 @@ test('Alt 이동은 인접 메시지만 교환하며 입력과 원본은 보존'
   );
 });
 
-import { wrapSelectedText } from './textEdit.ts';
-test('선택 텍스트 따옴표·괄호 자동 감싸기', () => {
+import {
+  autoClosePair,
+  deletePairOnBackspace,
+  shouldSkipCloseChar,
+  wrapSelectedText,
+} from './textEdit.ts';
+test('선택 텍스트 따옴표·괄호 자동 감싸기 및 자동 닫기', () => {
+  // 1) 선택된 텍스트 감싸기
   assert.deepEqual(wrapSelectedText('안녕 세상', 3, 5, '"'), {
     text: '안녕 "세상"',
     selectionStart: 4,
@@ -750,6 +756,45 @@ test('선택 텍스트 따옴표·괄호 자동 감싸기', () => {
   });
   assert.equal(wrapSelectedText('대사', 1, 1, '"'), null);
   assert.equal(wrapSelectedText('대사', 0, 2, 'a'), null);
+
+  // 2) 커서 위치에서 " 또는 ( 입력 시 자동 닫기 및 커서 이동
+  assert.deepEqual(autoClosePair('', 0, '"'), {
+    text: '""',
+    cursor: 1,
+  });
+  assert.deepEqual(autoClosePair('안녕하세요 ', 6, '('), {
+    text: '안녕하세요 ()',
+    cursor: 7,
+  });
+  assert.deepEqual(autoClosePair('메모 ', 3, '「'), {
+    text: '메모 「」',
+    cursor: 4,
+  });
+  // 영문 단어 중간 apostrophe(don't)는 자동 닫기 제외
+  assert.equal(autoClosePair("don", 3, "'"), null);
+  // 지원하지 않는 일반 키는 null
+  assert.equal(autoClosePair('테스트', 2, 'a'), null);
+
+  // 3) 닫힘 문자 입력 시 이미 앞에 닫힘 문자가 있으면 스킵
+  assert.equal(shouldSkipCloseChar('()', 1, ')'), true);
+  assert.equal(shouldSkipCloseChar('""', 1, '"'), true);
+  assert.equal(shouldSkipCloseChar('(안녕)', 3, ')'), true);
+  assert.equal(shouldSkipCloseChar('(안녕', 3, ')'), false); // 뒤에 닫힘 문자가 없으면 false
+
+  // 4) 백스페이스로 빈 쌍 삭제
+  assert.deepEqual(deletePairOnBackspace('()', 1), {
+    text: '',
+    cursor: 0,
+  });
+  assert.deepEqual(deletePairOnBackspace('""', 1), {
+    text: '',
+    cursor: 0,
+  });
+  assert.deepEqual(deletePairOnBackspace('「」', 1), {
+    text: '',
+    cursor: 0,
+  });
+  assert.equal(deletePairOnBackspace('(안녕)', 1), null); // 내용이 있으면 삭제 안 함
 });
 
 test('일괄 편집 대표 선택, 표정 조건, 일괄 패치 및 단일 적용', () => {
