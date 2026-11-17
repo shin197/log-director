@@ -286,6 +286,15 @@ export function SettingsPanel({
         <label className="check-field">
           <input
             type="checkbox"
+            checked={settings.mergeDifferentFaces ?? false}
+            onChange={(e) => update({ mergeDifferentFaces: e.target.checked })}
+          />
+          <span>연속 병합 시 표정이 달라도 합치기</span>
+        </label>
+
+        <label className="check-field">
+          <input
+            type="checkbox"
             checked={settings.autoWrapQuotes ?? true}
             onChange={(e) => update({ autoWrapQuotes: e.target.checked })}
           />

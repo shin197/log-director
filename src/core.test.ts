@@ -611,7 +611,14 @@ test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각
     'sample.json',
   );
   const before = JSON.stringify(p);
-  const blocks = mergeConsecutive(p.blocks);
+  // 기본 동작: 표정이 다르면 병합하지 않고 분리 유지
+  const defaultBlocks = mergeConsecutive(p.blocks);
+  assert.equal(defaultBlocks.length, 4);
+  assert.equal(defaultBlocks[0].text, '첫 줄');
+  assert.equal(defaultBlocks[1].text, '다음 줄');
+
+  // mergeDifferentFaces = true: 표정이 달라도 첫 표정과 시각을 유지하며 병합
+  const blocks = mergeConsecutive(p.blocks, undefined, '\n', true);
   assert.equal(blocks.length, 3);
   assert.equal(blocks[0].text, '첫 줄\n다음 줄');
   assert.equal(blocks[0].timestamp, 'first');
@@ -619,7 +626,7 @@ test('연속 병합은 화자와 채널 경계를 지키고 첫 표정과 시각
   assert.equal(blocks[2].text, '공지1\n공지2');
   assert.equal(Object.hasOwn(blocks[2], 'speaker'), false);
   // 선택된 메시지만 병합하고 선택되지 않은 연속 메시지는 유지
-  const partial = mergeConsecutive(p.blocks, new Set([p.blocks[0].id, p.blocks[1].id]));
+  const partial = mergeConsecutive(p.blocks, new Set([p.blocks[0].id, p.blocks[1].id]), '\n', true);
   assert.equal(partial.length, 4);
   assert.equal(partial[0].text, '첫 줄\n다음 줄');
   assert.equal(partial[2].text, '공지1');
@@ -2476,6 +2483,7 @@ test('설정 탭 신규 옵션: 병합 구분자, 미사용 이미지 통계·�
       showTimestamp: true,
       timestampFormat: 'original',
       mergeSeparator: 'doubleNewline' as const,
+      mergeDifferentFaces: true,
       autoWrapQuotes: false,
       maxUndoSteps: 50,
       showScrollbarOverlay: false,
@@ -2485,6 +2493,7 @@ test('설정 탭 신규 옵션: 병합 구분자, 미사용 이미지 통계·�
   const roundtrip = parse(JSON.stringify(noOriginalProj), 'stripped.project.json');
   assert.equal(roundtrip.original.length, 0);
   assert.equal(roundtrip.display?.mergeSeparator, 'doubleNewline');
+  assert.equal(roundtrip.display?.mergeDifferentFaces, true);
   assert.equal(roundtrip.display?.autoWrapQuotes, false);
   assert.equal(roundtrip.display?.maxUndoSteps, 50);
   assert.equal(roundtrip.display?.showScrollbarOverlay, false);

@@ -697,7 +697,7 @@ export function CharacterPanel({
             }}
           >
             <div className="paste-hint">
-              코코포리아 캐릭터 JSON을 이 창에 붙여넣으면(Ctrl+V) 즉시 등록됩니다.
+              코코포리아 캐릭터 JSON을 이 창에 붙여넣으면 즉시 등록됩니다.
             </div>
             <label className="stack-field">
               <span>이름</span>
@@ -797,11 +797,11 @@ export function CharacterPanel({
                             faces: draft.faces.map((x, j) =>
                               j === editingFaceIndex
                                 ? {
-                                    ...x,
-                                    name:
-                                      x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
-                                    iconUrl: uploaded,
-                                  }
+                                  ...x,
+                                  name:
+                                    x.name || file.name.replace(/\.[^/.]+$/, '').trim(),
+                                  iconUrl: uploaded,
+                                }
                                 : x,
                             ),
                           });

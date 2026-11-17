@@ -1277,6 +1277,7 @@ function App() {
                         p.blocks,
                         selected,
                         resolveMergeSeparator(p.display?.mergeSeparator),
+                        p.display?.mergeDifferentFaces ?? false,
                       );
                       const mergedCount = p.blocks.length - blocks.length;
                       if (!mergedCount) {

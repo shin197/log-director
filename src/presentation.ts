@@ -8,6 +8,7 @@ export type DisplaySettings = {
   virtualScroll?: boolean;
   virtualBuffer?: number;
   mergeSeparator?: MergeSeparatorMode;
+  mergeDifferentFaces?: boolean;
   autoWrapQuotes?: boolean;
   maxUndoSteps?: number;
   showScrollbarOverlay?: boolean;
@@ -22,6 +23,7 @@ export const defaultDisplay: DisplaySettings = {
   virtualScroll: true,
   virtualBuffer: 30,
   mergeSeparator: 'newline',
+  mergeDifferentFaces: false,
   autoWrapQuotes: true,
   maxUndoSteps: 100,
   showScrollbarOverlay: true,
