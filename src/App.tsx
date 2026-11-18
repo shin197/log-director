@@ -19,7 +19,12 @@ import { EMPTY_IMAGE_POOL, ImagePoolContext } from './ImagePoolContext';
 import { selectMessage, type SelectionAnchor, type SelectionKeys } from './selection';
 import { MessageBlock } from './MessageBlock';
 import { compileQuery, moveBlocks, sanitizeLiveQuery } from './query';
-import { collectChannels } from './channels';
+import {
+  CHANNEL_FILTER_ALL,
+  CHANNEL_FILTER_NONE,
+  collectChannels,
+  filterBlocksByChannel,
+} from './channels';
 import {
   addSceneForMessage,
   findAdjacentScene,
@@ -111,6 +116,11 @@ function App() {
   );
   const [eyedrop, setEyedrop] = useState<EyedropPayload | null>(null);
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
+  const [channelFilter, setChannelFilter] = useState<string>(CHANNEL_FILTER_ALL);
+  const [externalComposerChannel, setExternalComposerChannel] = useState<{
+    channel: string;
+    key: number;
+  } | null>(null);
   const [sceneBarOpen, setSceneBarOpen] = useState(true);
   const [focusSceneId, setFocusSceneId] = useState<string | null>(null);
   const [pendingRestore, setPendingRestore] = useState<AutosavePayload | null>(null);
@@ -217,23 +227,39 @@ function App() {
     return createStyleResolver(effectiveStyles, p.characters ?? [], p.scenes ?? [], p.blocks);
   }, [applyStylesInEditor, p.styles, p.characters, p.scenes, p.blocks]);
 
-  const visible = p.blocks.filter(predicate);
+  const channelScopedBlocks = useMemo(
+    () => filterBlocksByChannel(p.blocks, channelFilter),
+    [p.blocks, channelFilter],
+  );
+  useEffect(() => {
+    if (channelFilter === CHANNEL_FILTER_ALL) return;
+    if (channelScopedBlocks.length === 0) {
+      setChannelFilter(CHANNEL_FILTER_ALL);
+    }
+  }, [channelFilter, channelScopedBlocks.length]);
+
+  const visible = channelScopedBlocks.filter(predicate);
+  const useRelativeLineNumbers =
+    channelFilter !== CHANNEL_FILTER_ALL &&
+    Boolean(p.display?.channelRelativeLineNumbers);
+  const lineNumberBaseBlocks = useRelativeLineNumbers ? channelScopedBlocks : p.blocks;
   const lineNumberMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (let i = 0; i < p.blocks.length; i++) {
-      map.set(p.blocks[i].id, i + 1);
+    for (let i = 0; i < lineNumberBaseBlocks.length; i++) {
+      map.set(lineNumberBaseBlocks[i].id, i + 1);
     }
     return map;
-  }, [p.blocks]);
+  }, [lineNumberBaseBlocks]);
 
   const parsedJumpNum = useMemo(() => {
     const raw = jumpValue.trim().replace(/^[#:]/, '');
     if (!raw) return null;
     const n = parseInt(raw, 10);
-    return !isNaN(n) && n >= 1 && n <= p.blocks.length ? n : null;
-  }, [jumpValue, p.blocks.length]);
+    return !isNaN(n) && n >= 1 && n <= lineNumberBaseBlocks.length ? n : null;
+  }, [jumpValue, lineNumberBaseBlocks.length]);
 
-  const parsedJumpTarget = parsedJumpNum !== null ? p.blocks[parsedJumpNum - 1] : null;
+  const parsedJumpTarget =
+    parsedJumpNum !== null ? lineNumberBaseBlocks[parsedJumpNum - 1] : null;
 
   useEffect(() => {
     if (!jumpOpen) return;
@@ -310,11 +336,13 @@ function App() {
   }
 
   function jumpToLine(targetLine: number) {
-    if (isNaN(targetLine) || targetLine < 1 || targetLine > p.blocks.length) {
-      setNotice(`1부터 ${p.blocks.length} 사이의 유효한 메시지 번호를 입력하세요.`);
+    if (isNaN(targetLine) || targetLine < 1 || targetLine > lineNumberBaseBlocks.length) {
+      setNotice(
+        `1부터 ${lineNumberBaseBlocks.length} 사이의 유효한 메시지 번호를 입력하세요.`,
+      );
       return;
     }
-    const targetBlock = p.blocks[targetLine - 1];
+    const targetBlock = lineNumberBaseBlocks[targetLine - 1];
     if (!targetBlock) return;
 
     const visibleIndex = visible.findIndex((b) => b.id === targetBlock.id);
@@ -326,9 +354,15 @@ function App() {
       setSelected(new Set([targetBlock.id]));
       if (cutIds) setPasteTarget({ id: targetBlock.id, after: true });
       pendingFocus.current = { id: targetBlock.id, direction: 1, center: true };
-      const fullIndex = targetLine - 1;
-      scrollToIndex(fullIndex, 'center');
-      setNotice(`검색 필터를 해제하고 #${targetLine} 메시지로 이동했습니다.`);
+      const scopedIndex = channelScopedBlocks.findIndex((b) => b.id === targetBlock.id);
+      if (scopedIndex < 0 && channelFilter !== CHANNEL_FILTER_ALL) {
+        setChannelFilter(CHANNEL_FILTER_ALL);
+        scrollToIndex(targetLine - 1, 'center');
+        setNotice(`채널 및 검색 필터를 해제하고 #${targetLine} 메시지로 이동했습니다.`);
+      } else {
+        scrollToIndex(scopedIndex >= 0 ? scopedIndex : targetLine - 1, 'center');
+        setNotice(`검색 필터를 해제하고 #${targetLine} 메시지로 이동했습니다.`);
+      }
     } else {
       setEditingId(null);
       setBulkEdit(null);
@@ -1001,13 +1035,6 @@ function App() {
           />
         </div>
         <div className="header-actions">
-          {tab === '로그' && (
-            <div className="header-pagination">
-              <span className="count-pill" title="현재 표시 중인 블록 수">
-                {visible.length.toLocaleString()}건
-              </span>
-            </div>
-          )}
           <label
             className="button compact-btn"
             title="JSON, HTML, Markdown, TXT 로그 또는 프로젝트 JSON 열기"
@@ -1278,6 +1305,7 @@ function App() {
                         selected,
                         resolveMergeSeparator(p.display?.mergeSeparator),
                         p.display?.mergeDifferentFaces ?? false,
+                        p.display?.mergeIgnoreOtherChannels ?? false,
                       );
                       const mergedCount = p.blocks.length - blocks.length;
                       if (!mergedCount) {
@@ -1327,6 +1355,48 @@ function App() {
                 </button>
               )}
             </div>
+            {tab === '로그' && (
+              <div className="header-pagination">
+                <span className="count-pill" title="현재 표시 중인 메시지 수">
+                  {visible.length.toLocaleString()}건
+                </span>
+                <select
+                  className={`header-channel-select ${channelFilter !== CHANNEL_FILTER_ALL ? 'is-filtered' : ''}`}
+                  aria-label="채널별 보기 선택"
+                  title="검색 필터와 별개로 선택한 채널의 메시지만 모아봅니다."
+                  value={channelFilter}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setChannelFilter(next);
+                    setEditingId(null);
+                    setBulkEdit(null);
+                    selectionAnchor.current = null;
+                    if (next !== CHANNEL_FILTER_ALL) {
+                      setExternalComposerChannel({
+                        channel: next === CHANNEL_FILTER_NONE ? '' : next,
+                        key: Date.now() + Math.random(),
+                      });
+                    }
+                  }}
+                >
+                  <option value={CHANNEL_FILTER_ALL}>
+                    전체 채널
+                  </option>
+                  {channels
+                    .filter((c) => c.count > 0)
+                    .map((c) => {
+                      const value = c.name === '' ? CHANNEL_FILTER_NONE : c.name;
+                      const label = c.name === '' ? '빈 채널' : `# ${c.name}`;
+                      return (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                </select>
+
+              </div>
+            )}
           </div>
 
           {replaceOpen && (
@@ -1700,6 +1770,7 @@ function App() {
                 focusRequest={composerFocusRequest}
                 autoWrapQuotes={p.display?.autoWrapQuotes ?? true}
                 onSaveQuickSlot={saveQuickSlot}
+                externalChannel={externalComposerChannel}
               />
             </div>
 

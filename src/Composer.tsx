@@ -31,6 +31,7 @@ export function Composer({
   focusRequest = 0,
   autoWrapQuotes = true,
   onSaveQuickSlot,
+  externalChannel = null,
 }: {
   characters: Character[];
   channels?: ChannelSummary[];
@@ -40,6 +41,7 @@ export function Composer({
   focusRequest?: number;
   autoWrapQuotes?: boolean;
   onSaveQuickSlot?: (slotNumber: number, slot: QuickCharacterSlot) => void;
+  externalChannel?: { channel: string; key: number } | null;
 }) {
   const [name, setName] = useState(''),
     [id, setId] = useState<string | null>(null),
@@ -76,6 +78,11 @@ export function Composer({
     setUrlOpen(false);
     setCollapsed(false);
   }, [eyedrop]);
+
+  useEffect(() => {
+    if (!externalChannel) return;
+    setChannel(externalChannel.channel);
+  }, [externalChannel]);
 
   const character = characters.find((c) => c.id === id);
   const matches = characters.filter((c) => fuzzyName(c.name, name));

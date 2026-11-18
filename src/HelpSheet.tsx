@@ -57,7 +57,9 @@ const CONTEXT_CONTENT: Record<
             key: 'PgUp / PgDn',
             desc: '이전 / 다음 장면(북마크) 이동 (Shift 조합 시 1000개 단위 점프)',
           },
+          { key: 'Ctrl+F', desc: '검색 필터' },
           { key: 'Ctrl+G', desc: '메시지 번호로 이동' },
+          { key: 'Ctrl+H', desc: '선택한 메시지 치환' },
           { key: 'Home / End', desc: '필터 해제 후 맨 처음 / 맨 끝으로 이동' },
           { key: 'Ctrl+Z / Ctrl+Y', desc: '실행 취소 / 다시 하기' },
           { key: 'Del', desc: '삭제' }

@@ -1006,7 +1006,12 @@ test('일괄 이동(moveBlocks, moveSelectedMessages): 떨어진 선택 블록 �
   );
 });
 
-import { collectChannels } from './channels.ts';
+import {
+  CHANNEL_FILTER_ALL,
+  CHANNEL_FILTER_NONE,
+  collectChannels,
+  filterBlocksByChannel,
+} from './channels.ts';
 test('채널 집계: 기본 채널 유지, 메시지 수 카운트, 빈 커스텀 채널 자동 제거', () => {
   const blocks = [
     { id: '1', speaker: 'A', text: '1', diceResult: '', channel: '메인' },
@@ -2678,4 +2683,93 @@ test('외부 URL 이미지 Base64 변환 및 내부 이미지 풀 저장', async
 
   // 풀에 등록된 이미지 수 확인
   assert.equal(Object.keys(embedded.images ?? {}).length, 3); // data URI(QUJD) 1개 + 새로 등록된 2개
+});
+
+test('상단 채널별 보기 필터링(filterBlocksByChannel) 및 번호 재정렬 설정 저장', () => {
+  const sampleProj = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: 'A', text: '1', channelName: '메인' },
+        { speaker: 'B', text: '2', channelName: '잡담' },
+        { speaker: 'C', text: '3', channelName: '' },
+        { speaker: 'A', text: '4', channelName: '메인' },
+        { speaker: 'D', text: '5', channelName: '비밀' },
+      ],
+    }),
+    'channels.json',
+  );
+
+  // 전체 채널
+  assert.equal(filterBlocksByChannel(sampleProj.blocks, CHANNEL_FILTER_ALL).length, 5);
+  // 메인 채널
+  const mainOnly = filterBlocksByChannel(sampleProj.blocks, '메인');
+  assert.equal(mainOnly.length, 2);
+  assert.deepEqual(
+    mainOnly.map((b) => b.text),
+    ['1', '4'],
+  );
+  // 빈 채널
+  const noneOnly = filterBlocksByChannel(sampleProj.blocks, CHANNEL_FILTER_NONE);
+  assert.equal(noneOnly.length, 1);
+  assert.equal(noneOnly[0]?.text, '3');
+
+  // channelRelativeLineNumbers 설정 왕복 저장 보존
+  const withOpt = {
+    ...sampleProj,
+    display: {
+      showChannel: true,
+      showTimestamp: true,
+      timestampFormat: 'original',
+      channelRelativeLineNumbers: true,
+    },
+  };
+  const roundtrip = parse(JSON.stringify(withOpt), 'channel-opt.project.json');
+  assert.equal(roundtrip.display?.channelRelativeLineNumbers, true);
+});
+
+test('연속 병합 시 중간의 다른 채널 메시지 무시 옵션 (첫 번째 메시지 기준)', () => {
+  const sampleProj = parse(
+    JSON.stringify({
+      messages: [
+        { speaker: 'A', text: '대사1', channelName: '메인', timestamp: 't1' },
+        { speaker: 'B', text: '잡담1', channelName: '잡담', timestamp: 't2' },
+        { speaker: 'A', text: '대사2', channelName: '메인', timestamp: 't3' },
+        { speaker: 'C', text: '다른화자', channelName: '메인', timestamp: 't4' },
+        { speaker: 'A', text: '대사3', channelName: '메인', timestamp: 't5' },
+      ],
+    }),
+    'merge-ignore-ch.json',
+  );
+
+  // 1) 옵션 꺼짐 (기본값): 중간에 잡담이 있으므로 대사1과 대사2가 합쳐지지 않음
+  const normalMerged = mergeConsecutive(sampleProj.blocks, undefined, '\n', false, false);
+  assert.equal(normalMerged.length, 5);
+
+  // 2) 옵션 켜짐: 잡담1을 무시하고 대사1 위치에 대사2를 병합 (단, 같은 채널에 C가 끼어있으므로 대사3은 합쳐지지 않음)
+  const crossMerged = mergeConsecutive(sampleProj.blocks, undefined, '\n', false, true);
+  assert.equal(crossMerged.length, 4);
+  assert.equal(crossMerged[0].text, '대사1\n대사2');
+  assert.equal(crossMerged[0].timestamp, 't1'); // 첫 번째 메시지 기준 시각 유지
+  assert.equal(crossMerged[1].text, '잡담1'); // 중간 다른 채널 메시지는 원래 위치 보존
+  assert.equal(crossMerged[2].text, '다른화자');
+  assert.equal(crossMerged[3].text, '대사3');
+
+  // 3) 선택된 메시지만 병합: 대사1과 대사2만 선택 시
+  const selectedIds = new Set([sampleProj.blocks[0].id, sampleProj.blocks[2].id]);
+  const selectedMerged = mergeConsecutive(sampleProj.blocks, selectedIds, '\n', false, true);
+  assert.equal(selectedMerged.length, 4);
+  assert.equal(selectedMerged[0].text, '대사1\n대사2');
+
+  // 4) project.json 왕복 저장 시 mergeIgnoreOtherChannels 보존
+  const withSetting = {
+    ...sampleProj,
+    display: {
+      showChannel: true,
+      showTimestamp: true,
+      timestampFormat: 'original',
+      mergeIgnoreOtherChannels: true,
+    },
+  };
+  const roundtrip = parse(JSON.stringify(withSetting), 'merge-ignore.project.json');
+  assert.equal(roundtrip.display?.mergeIgnoreOtherChannels, true);
 });

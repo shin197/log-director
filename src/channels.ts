@@ -7,9 +7,22 @@ export type ChannelSummary = {
 };
 
 export const DEFAULT_CHANNELS = ['', '메인'] as const;
+export const CHANNEL_FILTER_ALL = '__ALL__';
+export const CHANNEL_FILTER_NONE = '__NONE__';
 
 export function formatChannelLabel(name: string): string {
   return name === '' ? '빈 채널' : name;
+}
+
+export function filterBlocksByChannel(
+  blocks: Block[],
+  channelFilter: string,
+): Block[] {
+  if (!channelFilter || channelFilter === CHANNEL_FILTER_ALL) return blocks;
+  if (channelFilter === CHANNEL_FILTER_NONE) {
+    return blocks.filter((b) => !(b.channel ?? '').trim());
+  }
+  return blocks.filter((b) => (b.channel ?? '').trim() === channelFilter);
 }
 
 export function collectChannels(blocks: Block[]): ChannelSummary[] {

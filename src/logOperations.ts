@@ -14,10 +14,18 @@ export function mergeConsecutive(
   selectedIds?: Set<string>,
   separator = '\n',
   mergeDifferentFaces = false,
+  mergeIgnoreOtherChannels = false,
 ): Block[] {
   const result: Block[] = [];
+  const lastIndexByChannel = new Map<string, number>();
+
   for (const block of blocks) {
-    const previous = result.at(-1);
+    const channelKey = block.channel ?? '';
+    const targetIdx = mergeIgnoreOtherChannels
+      ? (lastIndexByChannel.get(channelKey) ?? -1)
+      : result.length - 1;
+    const previous = targetIdx >= 0 ? result[targetIdx] : undefined;
+
     const inSelection =
       !selectedIds ||
       (!!previous && selectedIds.has(previous.id) && selectedIds.has(block.id));
@@ -29,15 +37,18 @@ export function mergeConsecutive(
       !previous.diceResult.trim() &&
       (previous.sourceType || 'normal') === (block.sourceType || 'normal') &&
       previous.speaker === block.speaker &&
-      (previous.channel ?? '') === (block.channel ?? '') &&
+      (previous.channel ?? '') === channelKey &&
       sameFace;
-    if (same) {
-      result[result.length - 1] = {
+    if (same && targetIdx >= 0) {
+      result[targetIdx] = {
         ...previous,
         text: previous.text + separator + block.text,
         diceResult: [previous.diceResult, block.diceResult].filter(Boolean).join('\n'),
       };
-    } else result.push({ ...block });
+    } else {
+      lastIndexByChannel.set(channelKey, result.length);
+      result.push({ ...block });
+    }
   }
   return result;
 }

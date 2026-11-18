@@ -457,9 +457,31 @@ code {
 
 .header-pagination {
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 6px;
   margin-right: 6px;
+}
+
+.header-channel-select {
+  height: 28px;
+  padding: 0 24px 0 9px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  cursor: pointer;
+  max-width: 170px;
+}
+
+.header-channel-select.is-filtered {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .header-pagination .count-pill {

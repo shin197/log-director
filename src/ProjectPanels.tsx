@@ -200,6 +200,17 @@ export function SettingsPanel({
             />
             <span>스크롤바 오버레이 표시</span>
           </label>
+          <label
+            className="check-field"
+            title="상단 바에서 특정 채널만 골라 볼 때, 메시지 번호를 전체 로그 기준 대신 해당 채널의 1번부터 다시 매깁니다."
+          >
+            <input
+              type="checkbox"
+              checked={settings.channelRelativeLineNumbers ?? false}
+              onChange={(e) => update({ channelRelativeLineNumbers: e.target.checked })}
+            />
+            <span>채널 보기 시 번호 재정렬</span>
+          </label>
         </div>
         <div className="settings-compact-grid">
           <div className="settings-timestamp-box">
@@ -362,6 +373,18 @@ export function SettingsPanel({
             onChange={(e) => update({ mergeDifferentFaces: e.target.checked })}
           />
           <span>연속 병합 시 표정이 달라도 합치기</span>
+        </label>
+
+        <label
+          className="check-field"
+          title="연속 병합 시 두 메시지 사이에 다른 채널의 메시지가 끼어 있어도 같은 채널의 첫 번째 메시지 위치로 병합합니다."
+        >
+          <input
+            type="checkbox"
+            checked={settings.mergeIgnoreOtherChannels ?? false}
+            onChange={(e) => update({ mergeIgnoreOtherChannels: e.target.checked })}
+          />
+          <span>연속 병합시 중간의 다른 채널의 메시지 무시</span>
         </label>
 
         <label

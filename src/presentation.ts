@@ -9,10 +9,12 @@ export type DisplaySettings = {
   virtualBuffer?: number;
   mergeSeparator?: MergeSeparatorMode;
   mergeDifferentFaces?: boolean;
+  mergeIgnoreOtherChannels?: boolean;
   autoWrapQuotes?: boolean;
   maxUndoSteps?: number;
   showScrollbarOverlay?: boolean;
   preserveOriginals?: boolean;
+  channelRelativeLineNumbers?: boolean;
 };
 
 export const defaultDisplay: DisplaySettings = {
@@ -24,10 +26,12 @@ export const defaultDisplay: DisplaySettings = {
   virtualBuffer: 30,
   mergeSeparator: 'newline',
   mergeDifferentFaces: false,
+  mergeIgnoreOtherChannels: false,
   autoWrapQuotes: true,
   maxUndoSteps: 100,
   showScrollbarOverlay: true,
   preserveOriginals: true,
+  channelRelativeLineNumbers: false,
 };
 
 export function displayTime(raw: string | undefined, settings: DisplaySettings): string {
