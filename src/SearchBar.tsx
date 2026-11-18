@@ -144,7 +144,7 @@ export function SearchBar({
     return [chipPart, textPart].filter(Boolean).join(' ');
   }
 
-  // 외부에서 query가 초기화된 경우(예: 필터 해제, Ctrl+A 등) 동기화
+  // 외부에서 query가 초기화된 경우(예: 필터 해제 등) 동기화
   useEffect(() => {
     const currentBuilt = buildFullQuery(chips, text);
     if (query === currentBuilt) return;

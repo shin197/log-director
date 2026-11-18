@@ -687,9 +687,7 @@ function App() {
           }
           if (key === 'a') {
             e.preventDefault();
-            setQuery('');
-            setSearchActive(false);
-            setSelected(new Set(p.blocks.map((b) => b.id)));
+            setSelected(new Set(visible.map((b) => b.id)));
           }
           return;
         }
@@ -743,9 +741,7 @@ function App() {
         }
         if (key === 'a') {
           e.preventDefault();
-          setQuery('');
-          setSearchActive(false);
-          setSelected(new Set(p.blocks.map((b) => b.id)));
+          setSelected(new Set(visible.map((b) => b.id)));
           return;
         }
       }
