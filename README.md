@@ -49,7 +49,9 @@ npm run format:check
 - [개발 인수인계와 검증](docs/DEVELOPMENT.md)
 - [배포 및 빌드 가이드](docs/DEPLOYMENT.md)
 - [향후 개발 목록](docs/ROADMAP.md)
+- [기여 가이드](CONTRIBUTING.md)
 - [에이전트 작업 지침](AGENTS.md)
+- [라이선스 (MIT)](LICENSE)
 
 `sample_log/`에는 같은 로그의 HTML·TXT·JSON·MD 출력 참고 파일이 있습니다. 입력은 현재 JSON만 지원합니다.
 

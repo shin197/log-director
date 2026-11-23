@@ -52,8 +52,12 @@ export type QuickCharacterSlot = {
   iconUrl: string;
   color?: string;
 };
+export const PROJECT_FORMAT = 'log-director' as const;
+export const LEGACY_PROJECT_FORMAT = 'log-studio' as const;
+export type ProjectFormat = typeof PROJECT_FORMAT | typeof LEGACY_PROJECT_FORMAT;
+
 export type Project = {
-  format: 'log-studio';
+  format: ProjectFormat;
   version: 1;
   title: string;
   original: OriginalFile[];
@@ -67,7 +71,7 @@ export type Project = {
   expressions?: { speaker: string; iconUrl: string; name: string }[];
 };
 export const blank = (): Project => ({
-  format: 'log-studio',
+  format: PROJECT_FORMAT,
   version: 1,
   title: '새 로그',
   original: [],
@@ -77,7 +81,7 @@ export const blank = (): Project => ({
 export function validateLogStudioProject(d: any): Project {
   if (
     !d ||
-    d.format !== 'log-studio' ||
+    (d.format !== PROJECT_FORMAT && d.format !== LEGACY_PROJECT_FORMAT) ||
     d.version !== 1 ||
     typeof d.title !== 'string' ||
     !Array.isArray(d.blocks) ||
@@ -101,7 +105,7 @@ export function validateLogStudioProject(d: any): Project {
         !Object.values(d.images).every((v: unknown) => typeof v === 'string')))
   )
     throw Error('프로젝트 구조를 확인해주세요.');
-  const migrated = migrateCharacters(d);
+  const migrated = migrateCharacters({ ...d, format: PROJECT_FORMAT });
   if (Array.isArray(d.scenes)) {
     migrated.scenes = normalizeScenes(d.scenes, migrated.blocks);
   }
@@ -143,7 +147,7 @@ export function parse(raw: string, name: string): Project {
     const { title, blocks } = parseHtmlLog(cleaned, name);
     return normalizeProjectImagePool(
       migrateCharacters({
-        format: 'log-studio',
+        format: PROJECT_FORMAT,
         version: 1,
         title,
         original: [{ name, raw }],
@@ -161,7 +165,7 @@ export function parse(raw: string, name: string): Project {
     const { title, blocks } = parseMarkdownLog(cleaned, name);
     return normalizeProjectImagePool(
       migrateCharacters({
-        format: 'log-studio',
+        format: PROJECT_FORMAT,
         version: 1,
         title,
         original: [{ name, raw }],
@@ -177,7 +181,7 @@ export function parse(raw: string, name: string): Project {
     const { title, blocks } = parseTxtLog(cleaned, name);
     return normalizeProjectImagePool(
       migrateCharacters({
-        format: 'log-studio',
+        format: PROJECT_FORMAT,
         version: 1,
         title,
         original: [{ name, raw }],
@@ -187,7 +191,7 @@ export function parse(raw: string, name: string): Project {
   }
 
   const d = JSON.parse(cleaned);
-  if (d.format === 'log-studio') {
+  if (d.format === PROJECT_FORMAT || d.format === LEGACY_PROJECT_FORMAT) {
     return validateLogStudioProject(d);
   }
   if (!Array.isArray(d.messages)) throw Error('messages 배열을 가진 JSON이 필요합니다.');
@@ -243,7 +247,7 @@ export function parse(raw: string, name: string): Project {
   });
   return normalizeProjectImagePool(
     migrateCharacters({
-      format: 'log-studio',
+      format: PROJECT_FORMAT,
       version: 1,
       title: typeof d.title === 'string' ? d.title : name,
       original: [{ name, raw }],

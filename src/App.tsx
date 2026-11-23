@@ -61,6 +61,7 @@ import {
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  PROJECT_FORMAT,
   blank,
   parse,
   replaceBlocks,
@@ -1118,7 +1119,10 @@ function App() {
             title="프로젝트 저장 (.project.json)"
             onClick={() => {
               const preserve = p.display?.preserveOriginals ?? true;
-              const toSave = preserve ? p : { ...p, original: [] };
+              const toSave = {
+                ...(preserve ? p : { ...p, original: [] }),
+                format: PROJECT_FORMAT,
+              };
               save(JSON.stringify(toSave, null, 2), (p.title || 'log') + '.project.json');
             }}
           >

@@ -17,7 +17,8 @@ import {
   splitSearchTokens,
 } from './query';
 
-const HISTORY_STORAGE_KEY = 'log-studio:search-history';
+const HISTORY_STORAGE_KEY = 'log-director:search-history';
+const LEGACY_HISTORY_STORAGE_KEY = 'log-studio:search-history';
 const MAX_HISTORY = 6;
 
 type SuggestionItem =
@@ -61,7 +62,9 @@ type SuggestionItem =
 
 function loadSearchHistory(): string[] {
   try {
-    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+    const raw =
+      localStorage.getItem(HISTORY_STORAGE_KEY) ??
+      localStorage.getItem(LEGACY_HISTORY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {

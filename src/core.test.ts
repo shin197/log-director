@@ -2773,3 +2773,73 @@ test('연속 병합 시 중간의 다른 채널 메시지 무시 옵션 (첫 번
   const roundtrip = parse(JSON.stringify(withSetting), 'merge-ignore.project.json');
   assert.equal(roundtrip.display?.mergeIgnoreOtherChannels, true);
 });
+
+test('저장 식별자 log-director 전환 및 구버전 log-studio 하위 호환', async () => {
+  // 1) blank() 및 신규 파싱 결과는 모두 log-director 식별자를 사용
+  const emptyProj = blank();
+  assert.equal(emptyProj.format, 'log-director');
+
+  const fromJson = parse(
+    JSON.stringify({ messages: [{ speaker: 'PC1', text: '안녕' }] }),
+    'raw.json',
+  );
+  assert.equal(fromJson.format, 'log-director');
+
+  const fromTxt = parse('Title\n=====\n\nPC1 :\n안녕', 'raw.txt');
+  assert.equal(fromTxt.format, 'log-director');
+
+  // 2) 구버전(log-studio) project.json 불러오기 허용 및 log-director로 정규화
+  const legacyProjectJson = JSON.stringify({
+    format: 'log-studio',
+    version: 1,
+    title: '구버전 프로젝트',
+    original: [{ name: 'old.json', raw: '{}' }],
+    blocks: [{ id: 'b1', speaker: 'PC1', text: '이전 데이터', diceResult: '' }],
+  });
+  const loadedLegacy = parse(legacyProjectJson, 'legacy.project.json');
+  assert.equal(loadedLegacy.format, 'log-director');
+  assert.equal(loadedLegacy.title, '구버전 프로젝트');
+  assert.equal(loadedLegacy.blocks[0].text, '이전 데이터');
+
+  // 3) 알 수 없는 식별자는 거부
+  assert.throws(() =>
+    parse(
+      JSON.stringify({
+        format: 'unknown-app',
+        version: 1,
+        title: '잘못된 프로젝트',
+        original: [],
+        blocks: [],
+      }),
+      'bad.project.json',
+    ),
+  );
+
+  // 4) 자동저장: 신규 저장은 log-director 키로, 구버전 log-studio 자동저장도 복원 호환
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => store.set(k, v),
+    removeItem: (k: string) => store.delete(k),
+  };
+  (globalThis as any).indexedDB = createMockIndexedDB();
+
+  store.set(
+    'log-studio:autosave',
+    JSON.stringify({
+      version: 1,
+      savedAt: 1700000000000,
+      project: JSON.parse(legacyProjectJson),
+    }),
+  );
+  const restoredLegacy = await loadAutosave();
+  assert.ok(restoredLegacy);
+  assert.equal(restoredLegacy.project.format, 'log-director');
+  assert.equal(restoredLegacy.project.title, '구버전 프로젝트');
+
+  assert.equal(await saveAutosave(fromJson, 1700000001000), true);
+  const restoredNew = await loadAutosave();
+  assert.ok(restoredNew);
+  assert.equal(restoredNew.project.format, 'log-director');
+  await clearAutosave();
+});

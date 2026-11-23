@@ -1,9 +1,11 @@
-import { validateLogStudioProject, type Project } from './core.ts';
+import { PROJECT_FORMAT, validateLogStudioProject, type Project } from './core.ts';
 
-export const AUTOSAVE_DB_NAME = 'log-studio';
+export const AUTOSAVE_DB_NAME = 'log-director';
 export const AUTOSAVE_DB_VERSION = 1;
 export const AUTOSAVE_STORE_NAME = 'autosave';
-export const AUTOSAVE_KEY = 'log-studio:autosave';
+export const AUTOSAVE_KEY = 'log-director:autosave';
+export const LEGACY_AUTOSAVE_DB_NAME = 'log-studio';
+export const LEGACY_AUTOSAVE_KEY = 'log-studio:autosave';
 
 export type AutosavePayload = {
   version: 1;
@@ -36,12 +38,12 @@ export function formatRelativeTime(savedAt: number, now = Date.now()): string {
   return `${month}월 ${date}일`;
 }
 
-function openAutosaveDb(): Promise<IDBDatabase | null> {
+function openAutosaveDb(dbName = AUTOSAVE_DB_NAME): Promise<IDBDatabase | null> {
   const idb = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
   if (!idb) return Promise.resolve(null);
 
   return new Promise((resolve, reject) => {
-    const req = idb.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
+    const req = idb.open(dbName, AUTOSAVE_DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
@@ -53,8 +55,8 @@ function openAutosaveDb(): Promise<IDBDatabase | null> {
   });
 }
 
-async function idbGet(key: string): Promise<unknown> {
-  const db = await openAutosaveDb();
+async function idbGet(key: string, dbName = AUTOSAVE_DB_NAME): Promise<unknown> {
+  const db = await openAutosaveDb(dbName);
   if (!db) return undefined;
   try {
     return await new Promise((resolve, reject) => {
@@ -70,7 +72,7 @@ async function idbGet(key: string): Promise<unknown> {
 }
 
 async function idbPut(key: string, value: unknown): Promise<boolean> {
-  const db = await openAutosaveDb();
+  const db = await openAutosaveDb(AUTOSAVE_DB_NAME);
   if (!db) return false;
   try {
     await new Promise<void>((resolve, reject) => {
@@ -87,8 +89,8 @@ async function idbPut(key: string, value: unknown): Promise<boolean> {
   }
 }
 
-async function idbDelete(key: string): Promise<void> {
-  const db = await openAutosaveDb();
+async function idbDelete(key: string, dbName = AUTOSAVE_DB_NAME): Promise<void> {
+  const db = await openAutosaveDb(dbName);
   if (!db) return;
   try {
     await new Promise<void>((resolve, reject) => {
@@ -109,7 +111,7 @@ export async function saveAutosave(p: Project, now = Date.now()): Promise<boolea
     const payload: AutosavePayload = {
       version: 1,
       savedAt: now,
-      project: p,
+      project: { ...p, format: PROJECT_FORMAT },
     };
     return await idbPut(AUTOSAVE_KEY, payload);
   } catch (err) {
@@ -135,13 +137,21 @@ function parseAutosaveRecord(parsed: unknown): AutosavePayload | null {
 
 export async function loadAutosave(): Promise<AutosavePayload | null> {
   try {
-    const record = await idbGet(AUTOSAVE_KEY);
+    const record = await idbGet(AUTOSAVE_KEY, AUTOSAVE_DB_NAME);
     if (record !== undefined) {
       return parseAutosaveRecord(record);
     }
 
+    // 구 식별자(log-studio) IndexedDB 호환 읽기
+    const legacyIdbRecord = await idbGet(LEGACY_AUTOSAVE_KEY, LEGACY_AUTOSAVE_DB_NAME);
+    if (legacyIdbRecord !== undefined) {
+      return parseAutosaveRecord(legacyIdbRecord);
+    }
+
     // 기존 localStorage 자동저장 데이터가 남아 있는 경우 1회 호환 읽기
-    const legacyRaw = globalThis.localStorage?.getItem(AUTOSAVE_KEY);
+    const legacyRaw =
+      globalThis.localStorage?.getItem(AUTOSAVE_KEY) ??
+      globalThis.localStorage?.getItem(LEGACY_AUTOSAVE_KEY);
     if (!legacyRaw) return null;
     return parseAutosaveRecord(JSON.parse(legacyRaw));
   } catch (err) {
@@ -152,12 +162,18 @@ export async function loadAutosave(): Promise<AutosavePayload | null> {
 
 export async function clearAutosave(): Promise<void> {
   try {
-    await idbDelete(AUTOSAVE_KEY);
+    await idbDelete(AUTOSAVE_KEY, AUTOSAVE_DB_NAME);
+  } catch {
+    // ignore
+  }
+  try {
+    await idbDelete(LEGACY_AUTOSAVE_KEY, LEGACY_AUTOSAVE_DB_NAME);
   } catch {
     // ignore
   }
   try {
     globalThis.localStorage?.removeItem(AUTOSAVE_KEY);
+    globalThis.localStorage?.removeItem(LEGACY_AUTOSAVE_KEY);
   } catch {
     // ignore
   }

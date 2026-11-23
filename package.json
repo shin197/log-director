@@ -2,14 +2,15 @@
   "name": "ttrpg-log-editor",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode singlefile",
     "test": "node --experimental-strip-types --test src/core.test.ts",
-    "format": "prettier --write src index.html package.json tsconfig.json README.md .prettierrc.json",
-    "format:check": "prettier --check src index.html package.json tsconfig.json README.md .prettierrc.json",
+    "format": "prettier --write src index.html package.json tsconfig.json README.md CONTRIBUTING.md .prettierrc.json",
+    "format:check": "prettier --check src index.html package.json tsconfig.json README.md CONTRIBUTING.md .prettierrc.json",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist -b release"
   },

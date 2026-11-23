@@ -2,7 +2,7 @@
 
 작업 전에 README.md와 docs/DEVELOPMENT.md를 읽으세요. 데이터 변경 시 docs/DATA_MODEL.md, 조작 변경 시 docs/FEATURES.md도 확인하세요.
 
-- 현재 저장 식별자는 `log-studio`, version은 1입니다. 앱 이름 변경을 이유로 호환 식별자를 바꾸지 마세요.
+- 현재 저장 식별자는 `log-director`, version은 1입니다 (구버전 `log-studio` 파일 불러오기 호환 유지).
 - 사용자의 원본 raw와 입력 파일을 수정하지 마세요. 메시지 ID와 캐릭터 ID는 다른 개념입니다.
 - 시스템 ID는 `builtin:system`입니다. 시스템 메시지에는 speaker 키가 없어야 합니다.
 - 캐릭터 연결은 이름이 아닌 ID 기준입니다. 사용자 지정 메시지에는 연결을 자동 재추론하지 마세요.

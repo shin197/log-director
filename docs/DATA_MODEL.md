@@ -6,7 +6,7 @@
 
 ```ts
 Project = {
-  format: 'log-studio'; // 앱 이름은 Log Director지만 저장 형식 식별자는 유지
+  format: 'log-director'; // 저장 형식 식별자 (구버전 'log-studio' 불러오기 호환 허용)
   version: 1;
   title: string;
   original: { name: string; raw: string } | null;
